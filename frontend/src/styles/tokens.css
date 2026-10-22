@@ -1,0 +1,15 @@
+/* Semantic variables are the theme boundary; additional palettes can override them. */
+:root {
+  color-scheme: light;
+  --background: #f8f7f3;
+  --surface: #fffefa;
+  --surface-soft: #eeeee7;
+  --paper: #e3e4d7;
+  --text: #252820;
+  --muted: #74776b;
+  --accent: #68774a;
+  --border: #e1e2d8;
+  --border-strong: #c7cbba;
+  --danger: #a13b32;
+  --selection: #dce4c9;
+}

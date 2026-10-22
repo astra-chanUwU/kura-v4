@@ -1,0 +1,17 @@
+root = "."
+tmp_dir = ".local/air"
+[build]
+cmd = "go build -tags dev -o .local/air/kura ./cmd/kura"
+entrypoint = [".local/air/kura"]
+args_bin = ["serve"]
+include_ext = ["go", "sql"]
+exclude_dir = ["frontend", ".git", ".local", "bin", "data", "node_modules", "internal/webui/dist"]
+exclude_regex = ["_test.go"]
+delay = 300
+stop_on_error = true
+send_interrupt = true
+kill_delay = "15s"
+[log]
+time = false
+[misc]
+clean_on_exit = true

@@ -1,0 +1,12 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema: internal/db/migrations
+    queries: internal/dao/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/dao/sqlcgen
+        sql_package: database/sql
+        sql_driver: github.com/jackc/pgx/v5
+        emit_empty_slices: true

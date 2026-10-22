@@ -1,0 +1,11 @@
+{
+  "name": "kura-v4",
+  "private": true,
+  "packageManager": "pnpm@12.15.0",
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "dev": "node --env-file=.env scripts/dev.mjs",
+    "check": "make check",
+    "build": "make build"
+  }
+}

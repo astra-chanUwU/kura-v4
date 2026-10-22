@@ -1,0 +1,156 @@
+# Kura V4
+
+A Go/Fiber monolith with an embedded React + TypeScript frontend. The project
+follows the layered conventions explored in
+[VictoriqueMoe/umineko_city_of_books](https://github.com/VictoriqueMoe/umineko_city_of_books),
+with TanStack Router/Query, CSS Modules, PostgreSQL, sqlc and goose.
+
+## Start developing
+
+Install Go **1.27.1**, Node **24.22.1**, pnpm **12.15.0**, and Docker.
+
+```sh
+make setup
+make dev
+```
+
+Open http://localhost:5174. `make dev` starts a dedicated PostgreSQL container,
+applies migrations, and starts Go (Air reload) plus Vite. Ctrl-C stops both app
+processes; PostgreSQL remains available. `make db-down` stops it without deleting
+data. Development uses database port **56432**, API port **8094**, and frontend
+port **5174**. These are separate from Kura V3.
+
+`make setup` copies `.env.example` only if `.env` does not exist. The checked-in
+password is for a loopback-only disposable development database; replace it for
+a VPS. Keep `POSTGRES_*` and `DATABASE_URL` consistent. PostgreSQL bootstrap
+credentials only take effect on first initialization of its volume.
+
+## Commands
+
+| Command | Purpose |
+| --- | --- |
+| `make dev` | Database, migrations, Go reload and Vite |
+| `make check` | Formatting, lint, layers, types, generation drift, all tests, Compose validation and production build |
+| `make test-go` | Go unit/HTTP/storage tests, with race detection |
+| `make test-integration` | A temporary PostgreSQL container: migrations and job lease/retry behavior |
+| `make test-web` | Vitest + React Testing Library |
+| `make generate` | Regenerate sqlc bindings and mockery mocks |
+| `make migration name=description` | Create a goose migration |
+| `make migrate` | Apply migrations to the configured database |
+| `make format` | Format Go and frontend source |
+| `make build` | Build Vite and embed its assets into `bin/kura` |
+
+Go tools are pinned in `go.mod`; pnpm dependencies are pinned in the lockfile.
+Use `pnpm`, not npm/yarn. Generation checks compare file contents and never
+stage changes. No Playwright is installed or used.
+
+The `dev` build tag lets Go tests run without a frontend build. A production
+build intentionally requires the real frontend output; `make build` supplies it.
+
+## What is implemented
+
+- React app shell, Home/About routes, CSS Modules and semantic theme variables.
+- A real `GET /api/v1/site` route reading site settings through every backend
+  layer; frontend loading, connection-error and retry states.
+- Separate `/health/live` and `/health/ready` endpoints and consistent API errors
+  with request identifiers. Unknown API/media paths cannot fall through to the SPA.
+- PostgreSQL migrations, generated query bindings, interface mocks and layer checks.
+- Durable job persistence: atomic claims, expiring leases, bounded retries,
+  ownership tokens and rejection of stale completion attempts. The worker runner
+  is wired into app lifecycle but remains idle until feature handlers are registered.
+- Local byte-preserving storage with opaque keys, atomic publication and failed-write
+  cleanup. Storage is not exposed as a public static directory.
+- VPS Compose configuration, embedded-frontend production build, CI and graceful shutdown.
+
+This is the foundation, not the complete media library. Accounts/sessions,
+viewer/editor/admin permissions, private mode, uploads, thumbnail handlers,
+collections, search, moderation and admin settings UI are subsequent work. The
+accepted authentication design is PostgreSQL sessions with HttpOnly cookies;
+there is no login UI or anonymous write API in this scaffold.
+
+## Code map
+
+```text
+cmd/kura/                 serve and migrate commands
+internal/app/             dependency construction and lifecycle
+internal/controllers/     HTTP parsing and responses
+internal/site/            site business behavior (future domains sit alongside it)
+internal/jobs/            worker behavior
+internal/repository/      persistence composition and transactions
+internal/dao/             SQL access and generated sqlc bindings
+internal/db/              database connection and embedded migrations
+internal/model/           domain/read models
+internal/dto/             handwritten API contracts
+internal/storage/         local storage adapter and storage contract
+internal/webui/           production frontend embedding
+frontend/src/components/  reusable rendering
+frontend/src/pages/       page rendering
+frontend/src/routes/      TanStack route composition
+frontend/src/hooks/       queries, mutations and orchestration
+frontend/src/api/         HTTP adapter and query-key definitions
+frontend/src/types/       handwritten TypeScript API contracts
+frontend/src/styles/      global reset and semantic theme variables
+```
+
+Controllers call services; services receive persistence interfaces; repositories
+compose DAO operations. Fiber stays at the HTTP/application boundary. Domain
+services must not contain SQL. Repositories own multi-statement transactions.
+`internal/app` explicitly constructs the dependencies; no DI container is used.
+Frontend pages/components use hooks, and transport stays in `api`. Pure domain
+logic belongs in `frontend/src/domain` when needed. CSS Modules sit beside their
+components. Additional themes will override the semantic CSS variables.
+
+Go API DTOs and `frontend/src/types/api.ts` are maintained together by hand.
+Changing one requires reviewing the other and the HTTP/client tests. sqlc output
+is a database contract, not a public response schema. Never edit generated files.
+
+## Jobs and storage
+
+Each job handler must be idempotent: delivery is at least once. The initial runner
+uses a 45-second handler deadline and 60-second lease; handlers must honor context
+cancellation. Add lease renewal before introducing longer-running transcodes.
+Only registered job kinds are claimed. Exhausted expired leases become failed;
+failed jobs are not silently retried forever. No job-management UI exists yet.
+
+The local adapter writes bytes unchanged under opaque UUID keys. It never guesses
+media visibility from a file path. Future media routes must check access before
+opening a stored object. `.partial` files can remain after process/power loss;
+a future age-bounded staging cleanup must distinguish abandoned and active writes.
+
+## VPS deployment
+
+Copy the repository to the VPS and create an untracked `.env`. Set a strong
+`POSTGRES_PASSWORD`, matching `DATABASE_URL` with **host `postgres`, port `5432`**,
+`KURA_DOMAIN` to your domain, and `KURA_PUBLIC_URL=https://your-domain`.
+URL-encode any reserved characters in the database password used inside the URL.
+Point DNS to the VPS and allow inbound TCP 80/443 (UDP 443 is optional for HTTP/3).
+
+```sh
+docker compose -f compose.prod.yml build
+docker compose -f compose.prod.yml up -d --wait postgres
+docker compose -f compose.prod.yml run --rm migrate
+docker compose -f compose.prod.yml up -d app caddy
+```
+
+Caddy terminates HTTPS; the Go app and database have no published host ports.
+The application runs as an unprivileged user with a read-only root filesystem;
+its writable media volume and temporary directory are separate. The image contains
+FFmpeg for future media jobs. PostgreSQL, media and Caddy state use named volumes.
+Updates replace the application image without replacing those volumes. Do not run
+`docker compose down -v` against data you want to retain.
+
+Migrations are an explicit deployment step. A failed migration must stop the
+upgrade. Back up before schema changes; a down migration can discard data.
+
+## Backup and restore
+
+Before real media is imported, establish scheduled, encrypted off-host backups and
+perform a restore drill. PostgreSQL and original media are both required; saving
+one alone is insufficient. For a consistent simple backup, stop the app, dump
+PostgreSQL, snapshot/copy the media volume, and restart the app. Keep the deployment
+configuration and required secrets in a separate protected backup.
+
+Restore into a separate Compose project/volumes: restore PostgreSQL and media from
+the same backup set, use the matching application version, and check database
+readiness plus original-byte integrity before opening access. Automated backup
+scripts and an operator restore drill are not part of this initial scaffold.

@@ -1,0 +1,10 @@
+template: testify
+packages:
+  github.com/astra-chanUwU/kura-v4/internal/site:
+    config:
+      dir: "{{.InterfaceDir}}"
+      filename: "{{.InterfaceName | snakecase}}_mock_test.go"
+      pkgname: "{{.SrcPackageName}}"
+      structname: "Mock{{.InterfaceName}}"
+    interfaces:
+      Repository:

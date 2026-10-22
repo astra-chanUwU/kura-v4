@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+.local/
+node_modules/
+frontend/node_modules/
+frontend/coverage/
+internal/webui/dist/
+bin/
+data/
+.DS_Store
+*.log

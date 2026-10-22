@@ -1,0 +1,29 @@
+version: 3
+workdir: .
+allow:
+  depOnAnyVendor: true
+exclude:
+  - frontend
+  - scripts
+  - internal/dao/sqlcgen
+excludeFiles:
+  - "^.*_test\\.go$"
+components:
+  main: { in: cmd/kura }
+  app: { in: internal/app }
+  controllers: { in: internal/controllers }
+  services: { in: [internal/site, internal/jobs] }
+  repository: { in: internal/repository }
+  dao: { in: [internal/dao, internal/dao/sqlcgen] }
+  db: { in: internal/db }
+  storage: { in: internal/storage }
+  kernel: { in: [internal/model, internal/dto, internal/config, internal/webui] }
+commonComponents:
+  - kernel
+deps:
+  main: { mayDependOn: [app, db] }
+  app: { anyProjectDeps: true }
+  controllers: { mayDependOn: [services] }
+  services: { mayDependOn: [repository, storage] }
+  repository: { mayDependOn: [dao, db] }
+  dao: { mayDependOn: [dao, db] }

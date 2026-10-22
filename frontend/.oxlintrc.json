@@ -1,0 +1,73 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "react",
+    "react-hooks",
+    "jsx-a11y"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "react-hooks/rules-of-hooks": "error",
+    "jsx-a11y/prefer-tag-over-role": "off"
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/components/**/*.tsx",
+        "src/pages/**/*.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              "**/api/**",
+              "@tanstack/react-query"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/domain/**/*.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              "react",
+              "react-dom",
+              "@tanstack/*",
+              "**/api/**",
+              "**/hooks/**"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/api/**/*.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              "**/components/**",
+              "**/pages/**",
+              "**/hooks/**",
+              "**/routes/**"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
