@@ -1,0 +1,143 @@
+.page {
+  display: grid;
+  gap: 1rem;
+  max-width: 56rem;
+}
+.page h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  overflow-wrap: anywhere;
+}
+.full {
+  width: 100%;
+  max-height: 75vh;
+  object-fit: contain;
+  border-radius: 0.75rem;
+  background: var(--surface-soft);
+}
+.actionBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: start;
+}
+.meta {
+  display: flex;
+  gap: 1rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.meta a {
+  color: var(--accent);
+}
+.details {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+.detailRow {
+  display: flex;
+  gap: 0.75rem;
+  align-items: start;
+  margin: 0;
+  flex-wrap: wrap;
+}
+.detailLabel {
+  min-width: 3.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding-top: 0.2rem;
+}
+.details a {
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+.artistInput {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.35rem;
+  background: var(--surface-soft);
+  color: var(--text);
+}
+.tagList {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.tag {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  font-size: 0.8rem;
+}
+.tag button {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.9rem;
+}
+.tagForm {
+  display: flex;
+  gap: 0.5rem;
+}
+.tagForm input {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.35rem;
+  background: var(--surface-soft);
+  color: var(--text);
+}
+.tagForm button {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.35rem;
+  background: var(--surface-soft);
+  color: var(--text);
+  cursor: pointer;
+}
+@media (max-width: 640px) {
+  .page h1 {
+    font-size: 1.15rem;
+  }
+  .full {
+    max-height: 62vh;
+  }
+  .details {
+    padding: 0.8rem;
+  }
+  .detailLabel {
+    min-width: 3rem;
+  }
+  .artistInput {
+    flex: 1 1 10rem;
+    min-width: 0;
+  }
+  .tagForm {
+    width: 100%;
+  }
+  .tagForm input {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .tagForm button {
+    flex: none;
+  }
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.error {
+  color: var(--danger);
+  margin: 0;
+}

@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
+	"github.com/astra-chanUwU/kura-v4/internal/accounts"
+	"github.com/astra-chanUwU/kura-v4/internal/board"
+	"github.com/astra-chanUwU/kura-v4/internal/collections"
 	"github.com/astra-chanUwU/kura-v4/internal/config"
 	"github.com/astra-chanUwU/kura-v4/internal/dao"
 	"github.com/astra-chanUwU/kura-v4/internal/db"
@@ -30,6 +34,12 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	}
 	defer media.Close()
 	svc := site.NewService(repository.NewSite(dao.NewSite(conn)))
+	accountsSvc, err := accounts.NewService(repository.NewAccounts(dao.NewAccounts(conn)), cfg.PublicURL, media)
+	if err != nil {
+		return err
+	}
+	boardSvc := board.NewService(repository.NewPosts(dao.NewPosts(conn)), media)
+	collectionsSvc := collections.NewService(repository.NewCollections(dao.NewCollections(conn)))
 	// Fail clearly if migrations have not been applied.
 	readyCtx, readyCancel := context.WithTimeout(ctx, 5*time.Second)
 	_, err = svc.Get(readyCtx)
@@ -37,7 +47,7 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	if err != nil {
 		return errors.New("site schema unavailable; run the migrate command before serve")
 	}
-	api := NewHTTP(svc, conn.PingContext, webui.Files(), log)
+	api := NewHTTP(HTTPDeps{Site: svc, Accounts: accountsSvc, Board: boardSvc, Collections: collectionsSvc, Ping: conn.PingContext, Assets: webui.Files(), Log: log, SecureCookie: strings.HasPrefix(cfg.PublicURL, "https://")})
 	workerCtx, stopWorkers := context.WithCancel(ctx)
 	workerDone := make(chan struct{})
 	go func() {

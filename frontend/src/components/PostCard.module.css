@@ -1,0 +1,141 @@
+.card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface-soft);
+}
+/* The list menu must float over neighbouring tiles, never be clipped. */
+.card:has(.menu) {
+  z-index: 6;
+}
+.media {
+  display: block;
+}
+.media img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 0.72rem;
+  background: var(--surface-soft);
+}
+.actions {
+  display: flex;
+  gap: 0.4rem;
+}
+/* On board tiles the controls float over the thumbnail. */
+.card .actions {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+}
+.actions button,
+.menu button {
+  padding: 0.35rem 0.6rem;
+  text-align: left;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.35rem;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.8rem;
+  opacity: 0.95;
+}
+.menu {
+  display: grid;
+  gap: 0.35rem;
+  max-width: 16rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.card .menu {
+  position: absolute;
+  top: 2.6rem;
+  right: 0.5rem;
+  max-width: calc(100% - 1rem);
+}
+.menu p {
+  margin: 0;
+}
+.notice {
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.35rem;
+  background: var(--surface);
+  color: var(--accent-soft);
+  font-size: 0.8rem;
+}
+.card .notice {
+  position: absolute;
+  left: 0.5rem;
+  bottom: 0.5rem;
+}
+
+.actionsRoot {
+  display: contents;
+}
+.menuLists {
+  display: grid;
+  gap: 0.35rem;
+  max-height: 11rem;
+  overflow-y: auto;
+}
+.moreHint {
+  margin: 0;
+  padding: 0 0.2rem;
+  font-size: 0.75rem;
+}
+.newToggle {
+  justify-self: start;
+}
+.menu input {
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.35rem;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+.newList {
+  display: grid;
+  gap: 0.35rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 640px) {
+  .card .actions {
+    top: 0.35rem;
+    right: 0.35rem;
+    gap: 0.3rem;
+  }
+  .actions button,
+  .menu button {
+    padding: 0.3rem 0.45rem;
+    font-size: 0.75rem;
+  }
+  .card .menu {
+    top: 2.4rem;
+    right: 0.35rem;
+    left: 0.35rem;
+    width: auto;
+    max-width: none;
+  }
+}
+
+.nsfwBadge {
+  position: absolute;
+  left: 0.5rem;
+  bottom: 0.5rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.3rem;
+  background: var(--danger);
+  color: #1c0d0d;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}

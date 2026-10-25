@@ -1,0 +1,83 @@
+.page {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 64rem;
+}
+.header {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.avatar,
+.avatarFallback {
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: var(--surface-soft);
+}
+.avatarFallback {
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  font-weight: 650;
+  color: var(--accent);
+}
+.headerText {
+  flex: 1 1 14rem;
+}
+.headerText h1 {
+  margin: 0;
+}
+.muted {
+  color: var(--muted);
+}
+.stats {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.stats strong {
+  color: var(--text);
+}
+.bio {
+  max-width: 42rem;
+  margin: 0;
+}
+.page a {
+  color: var(--accent);
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 1rem;
+}
+.card {
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+.card h3 {
+  margin: 0 0 0.4rem;
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+  .avatar,
+  .avatarFallback {
+    width: 3.75rem;
+    height: 3.75rem;
+  }
+  .avatarFallback {
+    font-size: 1.4rem;
+  }
+  .headerText h1 {
+    font-size: 1.3rem;
+    overflow-wrap: anywhere;
+  }
+}

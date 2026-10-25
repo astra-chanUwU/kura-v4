@@ -1,131 +1,346 @@
-.eyebrow,
-.label {
-  font-size: 0.65rem;
-  font-weight: 650;
-  letter-spacing: 0.18em;
-  color: var(--muted);
+.page {
+  min-height: 70vh;
 }
-.eyebrow {
-  margin: 0 0 1.6rem;
+
+/* Break out of the centered shell column and use the whole screen. */
+.pageWide {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  padding-inline: clamp(1rem, 4vw, 3.5rem);
+  box-sizing: border-box;
 }
-.title {
-  font-family: Georgia, "Times New Roman", serif;
-  font-weight: 400;
-  font-size: clamp(3rem, 6.5vw, 5.4rem);
-  line-height: 1.04;
-  letter-spacing: -0.055em;
-  margin: 0;
-}
-.title span {
-  color: var(--accent);
-}
-.intro {
-  margin: 1.6rem 0 3rem;
-  color: var(--muted);
-  font-size: 1rem;
-  line-height: 1.8;
-}
-.panel {
-  display: grid;
-  grid-template-columns: 1fr 1.3fr;
-  border: 1px solid var(--border);
-  border-radius: 0.8rem;
-  overflow: hidden;
-  background: var(--surface);
-}
-.illustration {
-  display: grid;
-  place-items: center;
-  position: relative;
-  min-height: 19rem;
-  background: var(--surface-soft);
-}
-.frameBack,
-.frameFront {
-  position: absolute;
-  width: 8.5rem;
-  height: 11rem;
-  border: 1px solid var(--border-strong);
-  border-radius: 0.3rem;
-}
-.frameBack {
-  background: var(--paper);
-  transform: rotate(-12deg) translate(-0.9rem, -0.3rem);
-}
-.frameFront {
-  display: grid;
-  place-items: center;
-  background: var(--surface);
-  transform: rotate(7deg) translate(0.9rem, 0.5rem);
-  box-shadow: 0 0.5rem 2rem #00000009;
-}
-.frameFront span {
-  font-size: 4rem;
-  color: var(--accent);
-  font-family: serif;
-}
-.panelText {
-  padding: clamp(2rem, 4vw, 3.5rem);
-  align-self: center;
-}
-.panelText h2 {
-  font-size: 1.5rem;
-  font-weight: 500;
-  letter-spacing: -0.035em;
-  margin: 0.8rem 0;
-}
-.panelText > p:not(.label):not(.status) {
-  max-width: 26rem;
-  color: var(--muted);
-  line-height: 1.7;
-  font-size: 0.9rem;
-}
-.status {
+
+.heading {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: 1.5rem 0 0;
+  justify-content: space-between;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.heading h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.heading p {
+  margin: 0.3rem 0 0;
   color: var(--muted);
-  font-size: 0.8rem;
-}
-.dot {
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 50%;
-  background: var(--accent);
-}
-.error {
-  color: var(--danger);
   font-size: 0.85rem;
 }
-.error button {
+
+.sparkle {
+  color: var(--accent-soft);
+  font-size: 1.15rem;
+}
+
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 6rem 1rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.empty p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.emptyMark {
+  color: var(--accent);
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.message {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.message button {
+  padding: 0.4rem 0.7rem;
   border: 1px solid var(--border-strong);
+  border-radius: 0.35rem;
   background: var(--surface);
-  padding: 0.5rem 1rem;
-  border-radius: 0.3rem;
+  color: var(--text);
   cursor: pointer;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 1rem;
+  padding-top: 1rem;
+}
+.upload {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.upload input[type="text"],
+.upload input:not([type]) {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.35rem;
+  background: var(--surface);
   color: var(--text);
 }
-@media (max-width: 640px) {
-  .panel {
-    grid-template-columns: 1fr;
+.upload button {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.35rem;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.searchBar {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 30;
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+}
+.searchBar input {
+  flex: 1 1 16rem;
+  max-width: 28rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--text);
+}
+.searchBar button {
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.35rem;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.searchMeta {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.chipRow {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.chip {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 0.8rem;
+}
+.chip button {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.9rem;
+}
+.searchBox {
+  position: relative;
+  flex: 1 1 16rem;
+  max-width: 28rem;
+}
+.searchBox input {
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--text);
+}
+.suggestions {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+}
+.suggestions button {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: 0.35rem;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-align: left;
+}
+.suggestions .suggestionActive {
+  background: var(--surface-soft);
+}
+.suggestionCount {
+  color: var(--muted);
+}
+
+.toTop {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 40;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease-in-out;
+}
+.toTopVisible {
+  opacity: 0.95;
+  pointer-events: auto;
+}
+
+.grid[data-cols="1"] {
+  grid-template-columns: 1fr;
+  max-width: 54rem;
+  margin-inline: auto;
+  width: 100%;
+}
+.grid[data-cols="2"] {
+  grid-template-columns: repeat(2, 1fr);
+}
+.grid[data-cols="3"] {
+  grid-template-columns: repeat(3, 1fr);
+}
+.grid[data-cols="4"] {
+  grid-template-columns: repeat(4, 1fr);
+}
+.grid[data-cols="6"] {
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.viewControls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.viewGroup {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
+  overflow: hidden;
+}
+.viewGroup button {
+  padding: 0.35rem 0.55rem;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.viewGroup button:last-child {
+  border-right: none;
+}
+.viewGroup button.viewActive {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+.uploadButton {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.uploadButton:hover {
+  background: var(--surface-soft);
+}
+
+/* Tablet: search takes its own row, layout controls wrap under it. */
+@media (max-width: 900px) {
+  .searchBox {
+    flex: 1 1 100%;
+    max-width: none;
   }
-  .illustration {
-    min-height: 15rem;
+  .searchBar .searchBox input {
+    max-width: none;
+  }
+  .searchBar {
+    gap: 0.5rem;
+  }
+  .viewControls {
+    margin-left: 0;
+    width: 100%;
+  }
+  .grid {
+    gap: 0.75rem;
   }
 }
-@media (prefers-reduced-motion: no-preference) {
-  .frameFront {
-    animation: appear 0.7s ease-out both;
+
+/* Phone: two thumbnails per row; desktop-only layout pickers hide so
+   search + Upload stay on one usable row. */
+@media (max-width: 700px) {
+  .grid,
+  .grid[data-cols] {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
   }
-  @keyframes appear {
-    from {
-      opacity: 0;
-      translate: 0 0.5rem;
-    }
-    to {
-      opacity: 1;
-      translate: 0 0;
-    }
+  .grid[data-cols="1"] {
+    grid-template-columns: 1fr;
+  }
+  .viewGroup {
+    display: none;
+  }
+  .viewControls {
+    width: auto;
+    margin-left: auto;
+  }
+  .uploadButton {
+    min-height: 2.5rem;
+    padding: 0.5rem 0.85rem;
+  }
+  .toTop {
+    right: 0.9rem;
+    bottom: 0.9rem;
   }
 }

@@ -2,7 +2,7 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 ENV_RUN := node --env-file=.env scripts/run.mjs
 
-.PHONY: help setup db-up db-down dev migrate migration generate generate-check format format-check lint typecheck test test-go test-integration test-web check build compose-check
+.PHONY: help setup db-up db-down dev migrate audit migration generate generate-check format format-check lint typecheck test test-go test-integration test-web check build compose-check
 help:
 	@echo "setup | dev | check | build | migrate | migration name=description | generate"
 setup:
@@ -15,6 +15,8 @@ db-down:
 	docker compose stop postgres
 migrate:
 	$(ENV_RUN) go run -tags dev ./cmd/kura migrate
+audit:
+	$(ENV_RUN) go run -tags dev ./cmd/kura audit
 migration:
 	@test -n "$(name)" || (echo "Usage: make migration name=description"; exit 1)
 	go tool goose -dir internal/db/migrations create "$(name)" sql

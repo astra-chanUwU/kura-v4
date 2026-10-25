@@ -10,6 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astra-chanUwU/kura-v4/internal/accounts"
+	"github.com/astra-chanUwU/kura-v4/internal/board"
+	"github.com/astra-chanUwU/kura-v4/internal/collections"
 	"github.com/astra-chanUwU/kura-v4/internal/controllers"
 	"github.com/astra-chanUwU/kura-v4/internal/dto"
 	"github.com/astra-chanUwU/kura-v4/internal/site"
@@ -18,9 +21,21 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 )
 
-func NewHTTP(service *site.Service, ping func(context.Context) error, assets fs.FS, log *slog.Logger) *fiber.App {
+type HTTPDeps struct {
+	Site         *site.Service
+	Accounts     *accounts.Service
+	Board        *board.Service
+	Collections  *collections.Service
+	Ping         func(context.Context) error
+	Assets       fs.FS
+	Log          *slog.Logger
+	SecureCookie bool
+}
+
+func NewHTTP(deps HTTPDeps) *fiber.App {
+	service, ping, assets, log := deps.Site, deps.Ping, deps.Assets, deps.Log
 	app := fiber.New(fiber.Config{
-		AppName: "Kura", BodyLimit: 1 << 20,
+		AppName: "Kura", BodyLimit: 64 << 20,
 		ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second,
 		ErrorHandler: func(c fiber.Ctx, err error) error {
 			status, code, message := 500, "internal_error", "Something went wrong. Please try again."
@@ -59,12 +74,23 @@ func NewHTTP(service *site.Service, ping func(context.Context) error, assets fs.
 	api := app.Group("/api/v1")
 	api.Use(func(c fiber.Ctx) error { c.Set("Cache-Control", "no-store"); return c.Next() })
 	controllers.NewSite(service).RegisterRoutes(api)
+	if deps.Accounts != nil && deps.Board != nil && deps.Collections != nil {
+		auth := controllers.NewAuth(deps.Accounts, deps.Collections, deps.Board, deps.SecureCookie)
+		api.Use(auth.OptionalAuth)
+		auth.RegisterRoutes(api)
+		media := app.Group("/media", auth.OptionalAuth)
+		auth.RegisterMedia(media)
+		posts := controllers.NewPosts(deps.Board, deps.Collections)
+		posts.RegisterRoutes(api)
+		posts.RegisterMedia(media)
+		controllers.NewCollections(deps.Collections).RegisterRoutes(api)
+	}
 	app.Use("/api", func(c fiber.Ctx) error { return fiber.ErrNotFound })
 	app.Use("/health", func(c fiber.Ctx) error { return fiber.ErrNotFound })
 	app.Use("/media", func(c fiber.Ctx) error { return fiber.ErrNotFound })
 	app.Get("/*", func(c fiber.Ctx) error {
 		if assets == nil {
-			return c.Type("html").SendString("<!doctype html><title>Kura</title><p>Open the Vite development server at <a href=\"http://localhost:5174\">localhost:5174</a>.</p>")
+			return c.Type("html").SendString("<!doctype html><title>Kura</title><p>Open the Vite development server (KURA_PUBLIC_URL in .env).</p>")
 		}
 		name := strings.TrimPrefix(c.Path(), "/")
 		if name == "" {

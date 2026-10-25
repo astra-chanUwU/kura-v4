@@ -3,9 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#191916" />
-    <meta name="description" content="Kura — a home for your collection." />
+    <meta name="theme-color" content="#100f15" />
+    <meta name="description" content="Kura image board" />
     <title>Kura</title>
+    <script>
+      // Passkeys only work on a domain name, never an IP literal: visiting
+      // the dev server as 127.0.0.1 makes every passkey ceremony fail with
+      // "This is an invalid domain". Canonicalize loopback IPs to localhost
+      // (same server, same port) before the app boots.
+      try {
+        var h = window.location.hostname;
+        if (h === "127.0.0.1" || h === "::1" || h === "[::1]" || h === "0.0.0.0") {
+          window.location.replace(
+            window.location.protocol +
+              "//localhost" +
+              (window.location.port ? ":" + window.location.port : "") +
+              window.location.pathname +
+              window.location.search +
+              window.location.hash,
+          );
+        }
+      } catch (e) {}
+      // Apply the saved theme before first paint (no flash of default).
+      try {
+        var t = localStorage.getItem("kura-theme");
+        if (t && t !== "kura") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

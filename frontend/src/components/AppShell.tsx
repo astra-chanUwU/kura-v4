@@ -1,7 +1,25 @@
 import { Link, Outlet } from "@tanstack/react-router";
+import { useState } from "react";
+import { ThemedSelect } from "./ThemedSelect";
+import { useMe } from "../hooks/useKura";
 import styles from "./AppShell.module.css";
 
+const THEMES = [
+  { id: "kura", label: "Kura Dark" },
+  { id: "safebooru", label: "Safebooru" },
+  { id: "rule34", label: "Rule34" },
+  { id: "umineko", label: "Umineko" },
+] as const;
+
 export function AppShell() {
+  const { user, loading } = useMe();
+  const [theme, setTheme] = useState(() => localStorage.getItem("kura-theme") ?? "kura");
+  const applyTheme = (id: string) => {
+    setTheme(id);
+    localStorage.setItem("kura-theme", id);
+    if (id === "kura") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = id;
+  };
   return (
     <div className={styles.shell}>
       <a className={styles.skip} href="#main">
@@ -9,30 +27,52 @@ export function AppShell() {
       </a>
       <header className={styles.header}>
         <Link className={styles.brand} to="/" aria-label="Kura home">
-          <span className={styles.mark} aria-hidden="true">
-            蔵
-          </span>
-          <span>
-            Kura<span className={styles.version}>IV</span>
-          </span>
+          Kura
         </Link>
-        <nav aria-label="Main navigation">
+        <nav aria-label="Main navigation" className={styles.nav}>
           <Link to="/" activeProps={{ className: styles.active }} activeOptions={{ exact: true }}>
-            Home
+            Images
           </Link>
-          <Link to="/about" activeProps={{ className: styles.active }}>
-            About
-          </Link>
+          {!loading &&
+            (user ? (
+              <Link to="/me" activeProps={{ className: styles.active }} className={styles.userLink}>
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} alt="" className={styles.avatar} />
+                ) : (
+                  <span aria-hidden="true" className={styles.avatarFallback}>
+                    {(user.display_name || user.username).charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <span className={styles.userName}>{user.display_name || `@${user.username}`}</span>
+              </Link>
+            ) : (
+              <>
+                <Link to="/login" activeProps={{ className: styles.active }}>
+                  Sign in
+                </Link>
+                <Link
+                  to="/register"
+                  activeProps={{ className: styles.active }}
+                  className={styles.joinLink}
+                >
+                  Create account
+                </Link>
+              </>
+            ))}
         </nav>
-        <span className={styles.note}>A place to keep what matters.</span>
+        <div className={styles.themeWrap}>
+          <ThemedSelect label="Theme" value={theme} onChange={applyTheme}>
+            {THEMES.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </ThemedSelect>
+        </div>
       </header>
       <main id="main" className={styles.main} tabIndex={-1}>
         <Outlet />
       </main>
-      <footer className={styles.footer}>
-        <span>Your collection. Your space.</span>
-        <span>Kura / V4</span>
-      </footer>
     </div>
   );
 }

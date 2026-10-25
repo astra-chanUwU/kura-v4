@@ -10,10 +10,12 @@ async function assertFree(port) {
   });
   await new Promise((resolve) => server.close(resolve));
 }
-await assertFree(8094);
-await assertFree(5174);
-// The local proxy is intentionally fixed; deployment uses KURA_ADDR separately.
-if (process.env.KURA_ADDR !== "127.0.0.1:8094") throw new Error("Local make dev requires KURA_ADDR=127.0.0.1:8094 to match Vite's proxy.");
+// Ports come from .env (loaded by the caller), matching Vite's proxy.
+const apiAddr = process.env.KURA_ADDR || "127.0.0.1:8094";
+const apiPort = Number(apiAddr.split(":").pop());
+const webPort = Number(new URL(process.env.KURA_PUBLIC_URL || "http://localhost:5174").port) || 5174;
+await assertFree(apiPort);
+await assertFree(webPort);
 const children = [
   spawn("go", ["tool", "air"], { stdio: "inherit", detached: true, env: process.env }),
   spawn("pnpm", ["--filter", "@kura/frontend", "dev"], { stdio: "inherit", detached: true, env: process.env }),

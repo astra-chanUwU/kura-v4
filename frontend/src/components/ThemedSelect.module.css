@@ -1,0 +1,35 @@
+.wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.wrap select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0.45rem 2rem 0.45rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.35rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color-scheme: dark;
+}
+.wrap select:hover {
+  background: var(--surface-soft);
+}
+.wrap select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.wrap select option {
+  background: var(--surface);
+  color: var(--text);
+}
+.chevron {
+  position: absolute;
+  right: 0.55rem;
+  pointer-events: none;
+  color: var(--muted);
+}

@@ -8,3 +8,27 @@ packages:
       structname: "Mock{{.InterfaceName}}"
     interfaces:
       Repository:
+  github.com/astra-chanUwU/kura-v4/internal/accounts:
+    config:
+      dir: "{{.InterfaceDir}}"
+      filename: "{{.InterfaceName | snakecase}}_mock_test.go"
+      pkgname: "{{.SrcPackageName}}"
+      structname: "Mock{{.InterfaceName}}"
+    interfaces:
+      Repository:
+  github.com/astra-chanUwU/kura-v4/internal/board:
+    config:
+      dir: "{{.InterfaceDir}}"
+      filename: "{{.InterfaceName | snakecase}}_mock_test.go"
+      pkgname: "{{.SrcPackageName}}"
+      structname: "Mock{{.InterfaceName}}"
+    interfaces:
+      Repository:
+  github.com/astra-chanUwU/kura-v4/internal/collections:
+    config:
+      dir: "{{.InterfaceDir}}"
+      filename: "{{.InterfaceName | snakecase}}_mock_test.go"
+      pkgname: "{{.SrcPackageName}}"
+      structname: "Mock{{.InterfaceName}}"
+    interfaces:
+      Repository:

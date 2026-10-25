@@ -8,7 +8,15 @@ import (
 	"database/sql"
 	"encoding/json"
 	"time"
+
+	"github.com/google/uuid"
 )
+
+type Favorite struct {
+	UserID    uuid.UUID
+	PostID    uuid.UUID
+	CreatedAt time.Time
+}
 
 type Job struct {
 	ID          int64
@@ -25,7 +33,110 @@ type Job struct {
 	UpdatedAt   time.Time
 }
 
+type List struct {
+	ID          uuid.UUID
+	OwnerID     uuid.UUID
+	Title       string
+	Description string
+	Visibility  string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+type ListItem struct {
+	ListID    uuid.UUID
+	PostID    uuid.UUID
+	Position  int32
+	CreatedAt time.Time
+}
+
+type PasswordCredential struct {
+	UserID       uuid.UUID
+	PasswordHash string
+	UpdatedAt    time.Time
+}
+
+type Post struct {
+	ID           uuid.UUID
+	OwnerID      uuid.NullUUID
+	OriginalName string
+	StorageKey   string
+	ContentType  string
+	SizeBytes    int64
+	Sha256       string
+	CreatedAt    time.Time
+	Artist       string
+	Source       string
+	SourceID     string
+	ThumbnailKey string
+	Width        int32
+	Height       int32
+	Rating       string
+}
+
+type PostTag struct {
+	PostID    uuid.UUID
+	Tag       string
+	CreatedAt time.Time
+}
+
+type RecoveryKey struct {
+	UserID    uuid.UUID
+	KeyHash   []byte
+	CreatedAt time.Time
+}
+
+type Session struct {
+	TokenHash []byte
+	UserID    uuid.UUID
+	ExpiresAt time.Time
+	CreatedAt time.Time
+}
+
 type SiteSetting struct {
 	Key   string
 	Value string
+}
+
+type User struct {
+	ID          uuid.UUID
+	Username    string
+	DisplayName string
+	Bio         string
+	Location    string
+	Website     string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	AvatarKey   string
+	AvatarType  string
+	ShowNsfw    bool
+	NsfwAckAt   sql.NullTime
+}
+
+type WebauthnChallenge struct {
+	ID          uuid.UUID
+	Purpose     string
+	Username    string
+	UserID      uuid.NullUUID
+	SessionData json.RawMessage
+	ExpiresAt   time.Time
+	CreatedAt   time.Time
+}
+
+type WebauthnCredential struct {
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	CredentialID    []byte
+	PublicKey       []byte
+	AttestationType string
+	Transports      []string
+	UserPresent     bool
+	UserVerified    bool
+	BackupEligible  bool
+	BackupState     bool
+	Aaguid          []byte
+	SignCount       int64
+	DisplayName     string
+	CreatedAt       time.Time
+	LastUsedAt      sql.NullTime
 }

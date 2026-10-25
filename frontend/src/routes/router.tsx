@@ -1,7 +1,12 @@
 import { createRootRoute, createRoute, createRouter, Link } from "@tanstack/react-router";
 import { AppShell } from "../components/AppShell";
+import { AuthPage } from "../pages/AuthPage";
 import { HomePage } from "../pages/HomePage";
-import { AboutPage } from "../pages/AboutPage";
+import { ListPage } from "../pages/ListPage";
+import { MePage } from "../pages/MePage";
+import { PostPage } from "../pages/PostPage";
+import { ProfilePage } from "../pages/ProfilePage";
+import { RecoverPage } from "../pages/RecoverPage";
 
 const rootRoute = createRootRoute({
   component: AppShell,
@@ -19,13 +24,57 @@ const rootRoute = createRootRoute({
   ),
 });
 const homeRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: HomePage });
-const aboutRoute = createRoute({
+const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/about",
-  component: AboutPage,
+  path: "/login",
+  component: () => <AuthPage mode="login" />,
+});
+const registerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/register",
+  component: () => <AuthPage mode="register" />,
+});
+const meRoute = createRoute({ getParentRoute: () => rootRoute, path: "/me", component: MePage });
+const recoverRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/recover",
+  component: RecoverPage,
+});
+const postRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/posts/$id",
+  component: () => {
+    const { id } = postRoute.useParams();
+    return <PostPage id={id} />;
+  },
+});
+const profileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/u/$username",
+  component: () => {
+    const { username } = profileRoute.useParams();
+    return <ProfilePage username={username} />;
+  },
+});
+const listRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/lists/$id",
+  component: () => {
+    const { id } = listRoute.useParams();
+    return <ListPage id={id} />;
+  },
 });
 export const router = createRouter({
-  routeTree: rootRoute.addChildren([homeRoute, aboutRoute]),
+  routeTree: rootRoute.addChildren([
+    homeRoute,
+    loginRoute,
+    registerRoute,
+    recoverRoute,
+    meRoute,
+    postRoute,
+    profileRoute,
+    listRoute,
+  ]),
   scrollRestoration: true,
 });
 declare module "@tanstack/react-router" {

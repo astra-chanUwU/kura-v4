@@ -2,12 +2,34 @@
 * {
   box-sizing: border-box;
 }
+html,
+body {
+  overflow-x: clip;
+}
 body {
   margin: 0;
   background: var(--background);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+img,
+video {
+  max-width: 100%;
+}
+/* Phones: 16px form text stops iOS Safari auto-zooming on focus, and
+   controls get a comfortable touch height. */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 1rem;
+  }
+  select,
+  input[type="search"],
+  input[type="text"] {
+    min-height: 2.75rem;
+  }
 }
 button,
 input,

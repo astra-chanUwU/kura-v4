@@ -22,7 +22,7 @@ func (r siteStub) Get(context.Context) (model.Site, error) {
 }
 func TestHTTPContractAndSPAFallback(t *testing.T) {
 	assets := fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>Kura</title>")}}
-	app := NewHTTP(site.NewService(siteStub{}), func(context.Context) error { return nil }, assets, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	app := NewHTTP(HTTPDeps{Site: site.NewService(siteStub{}), Ping: func(context.Context) error { return nil }, Assets: assets, Log: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	response, err := app.Test(httptest.NewRequest("GET", "/api/v1/site", nil))
 	require.NoError(t, err)
 	defer response.Body.Close()
@@ -43,7 +43,7 @@ func TestHTTPContractAndSPAFallback(t *testing.T) {
 	}
 }
 func TestInternalErrorsDoNotExposeDatabaseDetails(t *testing.T) {
-	app := NewHTTP(site.NewService(siteStub{err: errors.New("private connection details")}), func(context.Context) error { return nil }, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	app := NewHTTP(HTTPDeps{Site: site.NewService(siteStub{err: errors.New("private connection details")}), Ping: func(context.Context) error { return nil }, Log: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	response, err := app.Test(httptest.NewRequest("GET", "/api/v1/site", nil))
 	require.NoError(t, err)
 	defer response.Body.Close()
@@ -57,7 +57,7 @@ func TestInternalErrorsDoNotExposeDatabaseDetails(t *testing.T) {
 	require.Equal(t, "internal_error", body["code"])
 }
 func TestReadinessFailsWhileLivenessRemainsAvailable(t *testing.T) {
-	app := NewHTTP(site.NewService(siteStub{}), func(context.Context) error { return errors.New("offline") }, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	app := NewHTTP(HTTPDeps{Site: site.NewService(siteStub{}), Ping: func(context.Context) error { return errors.New("offline") }, Log: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	for _, test := range []struct {
 		path   string
 		status int

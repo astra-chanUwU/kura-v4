@@ -1,15 +1,75 @@
-/* Semantic variables are the theme boundary; additional palettes can override them. */
+/* Semantic variables are the theme boundary. Themes only redefine
+   these variables (plus an optional font accent); components never
+   hardcode colors. Default theme: Kura Dark. */
 :root {
+  color-scheme: dark;
+  --header-h: 4.25rem;
+  --background: #100f15;
+  --surface: #191720;
+  --surface-soft: #211e2b;
+  --text: #f2eff7;
+  --muted: #a19bab;
+  --accent: #b49afa;
+  --accent-soft: #f0a7d2;
+  --border: #2d2937;
+  --border-strong: #484153;
+  --danger: #ff9a9a;
+  --selection: #493d62;
+}
+
+/* Safebooru: the classic light blue-and-white booru look. */
+:root[data-theme="safebooru"] {
   color-scheme: light;
-  --background: #f8f7f3;
-  --surface: #fffefa;
-  --surface-soft: #eeeee7;
-  --paper: #e3e4d7;
-  --text: #252820;
-  --muted: #74776b;
-  --accent: #68774a;
-  --border: #e1e2d8;
-  --border-strong: #c7cbba;
-  --danger: #a13b32;
-  --selection: #dce4c9;
+  --background: #eef4fc;
+  --surface: #ffffff;
+  --surface-soft: #dcebfb;
+  --text: #17283c;
+  --muted: #56708c;
+  --accent: #0b6bcb;
+  --accent-soft: #c2437e;
+  --border: #bcd2ee;
+  --border-strong: #8fb0da;
+  --danger: #c1272d;
+  --selection: #a9ccf5;
+}
+
+/* Rule34: near-black with the signature green. */
+:root[data-theme="rule34"] {
+  color-scheme: dark;
+  --background: #0b0f08;
+  --surface: #141a0f;
+  --surface-soft: #1f2a16;
+  --text: #e8f2dc;
+  --muted: #9db38a;
+  --accent: #8bc34a;
+  --accent-soft: #cdeea6;
+  --border: #2c3d22;
+  --border-strong: #48622f;
+  --danger: #ff9a9a;
+  --selection: #334d24;
+}
+
+/* Umineko — City of Books: black-plum, burgundy and gold, serif voice. */
+:root[data-theme="umineko"] {
+  color-scheme: dark;
+  --background: #120d10;
+  --surface: #1e1519;
+  --surface-soft: #2b1d23;
+  --text: #f3e6cf;
+  --muted: #bb9f88;
+  --accent: #c9a227;
+  --accent-soft: #e59a7a;
+  --border: #3d2a30;
+  --border-strong: #61434c;
+  --danger: #ff8f8f;
+  --selection: #4a2f35;
+}
+:root[data-theme="umineko"] body {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --header-h: 3.5rem;
+  }
 }

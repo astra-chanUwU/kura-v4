@@ -20,6 +20,10 @@ processes; PostgreSQL remains available. `make db-down` stops it without deletin
 data. Development uses database port **56432**, API port **8094**, and frontend
 port **5174**. These are separate from Kura V3.
 
+Use the `localhost` name, not `127.0.0.1`: browsers only allow passkeys on a
+domain name, so the app redirects loopback-IP visits to `localhost`, and the
+server refuses passkey ceremonies begun at an IP address with that guidance.
+
 `make setup` copies `.env.example` only if `.env` does not exist. The checked-in
 password is for a loopback-only disposable development database; replace it for
 a VPS. Keep `POSTGRES_*` and `DATABASE_URL` consistent. PostgreSQL bootstrap
@@ -37,19 +41,34 @@ credentials only take effect on first initialization of its volume.
 | `make generate` | Regenerate sqlc bindings and mockery mocks |
 | `make migration name=description` | Create a goose migration |
 | `make migrate` | Apply migrations to the configured database |
+| `node --env-file=.env scripts/run.mjs go run -tags dev ./cmd/kura seed <dir> [dir...]` | Import sample picture folders as board posts (duplicates skipped) |
 | `make format` | Format Go and frontend source |
 | `make build` | Build Vite and embed its assets into `bin/kura` |
 
 Go tools are pinned in `go.mod`; pnpm dependencies are pinned in the lockfile.
 Use `pnpm`, not npm/yarn. Generation checks compare file contents and never
-stage changes. No Playwright is installed or used.
+stage changes.
 
 The `dev` build tag lets Go tests run without a frontend build. A production
 build intentionally requires the real frontend output; `make build` supplies it.
 
 ## What is implemented
 
-- React app shell, Home/About routes, CSS Modules and semantic theme variables.
+- React image-board shell, CSS Modules and semantic theme variables, with four
+  themes (Kura Dark, Safebooru, Rule34, Umineko) picked from the nav.
+- Accounts with passwords, passkeys (WebAuthn) and recovery keys, backed by
+  PostgreSQL sessions with HttpOnly cookies. Public reads never imply write
+  access: uploads, favorites, lists and tagging require sign-in.
+- Uploads (images, GIFs, MP4/WebM) with content-hash deduplication, thumbnails
+  and dimension probing. Posts have no title; they are found by tags and the
+  artist credit. The upload dialog closes itself on success and reports that
+  new pictures land at the top of the board and in **Me → Contributions**,
+  which lists everything the signed-in user has added.
+- SFW/NSFW rating per post with server-side gating: NSFW posts are hidden
+  from anonymous visitors and from accounts until they opt in with an 18+
+  confirmation in Me → Sign-in & security.
+- Tag search with suggestions, favorites, public/private lists, profiles with
+  contribution counts, and a `seed` command that imports sample folders.
 - A real `GET /api/v1/site` route reading site settings through every backend
   layer; frontend loading, connection-error and retry states.
 - Separate `/health/live` and `/health/ready` endpoints and consistent API errors
@@ -62,19 +81,32 @@ build intentionally requires the real frontend output; `make build` supplies it.
   cleanup. Storage is not exposed as a public static directory.
 - VPS Compose configuration, embedded-frontend production build, CI and graceful shutdown.
 
-This is the foundation, not the complete media library. Accounts/sessions,
-viewer/editor/admin permissions, private mode, uploads, thumbnail handlers,
-collections, search, moderation and admin settings UI are subsequent work. The
-accepted authentication design is PostgreSQL sessions with HttpOnly cookies;
-there is no login UI or anonymous write API in this scaffold.
+## Responsive layout
+
+The UI is designed for phone, tablet and desktop widths:
+
+- **Nav** stays on one compact row at every width. Long display names truncate
+  with an ellipsis next to the avatar; the theme picker shrinks on phones, and
+  “Create account” drops off only below 380px (it remains on the sign-in page).
+- **Board** shows two thumbnails per row on phones. The sticky search bar takes
+  the full row on tablets (≤900px) with layout controls wrapping beneath it;
+  on phones the desktop column/width pickers hide, leaving search and Upload.
+  There is no horizontal scrolling at 390px, 768px or 820px.
+- **Me, posts and forms** use full-width fields on small screens, the Me tabs
+  become an icon-only scrollable row, post tag forms stretch instead of
+  truncating, and form text is 16px on phones so iOS Safari does not zoom on
+  focus. The upload dialog becomes a bottom sheet with full-width actions.
 
 ## Code map
 
 ```text
-cmd/kura/                 serve and migrate commands
+cmd/kura/                 serve, migrate, seed and audit commands
 internal/app/             dependency construction and lifecycle
 internal/controllers/     HTTP parsing and responses
-internal/site/            site business behavior (future domains sit alongside it)
+internal/accounts/        accounts, passkeys, sessions and recovery keys
+internal/board/           posts, uploads, thumbnails and search index
+internal/collections/     favorites and lists
+internal/site/            site settings behavior
 internal/jobs/            worker behavior
 internal/repository/      persistence composition and transactions
 internal/dao/             SQL access and generated sqlc bindings
