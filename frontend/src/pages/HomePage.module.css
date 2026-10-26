@@ -107,16 +107,20 @@
   cursor: pointer;
 }
 
-.searchBar {
+/* Search + tag strip stick together as one head: it grows with the
+   selected-tag row instead of covering the strip below it. */
+.boardHead {
   position: sticky;
   top: var(--header-h);
   z-index: 30;
+  background: var(--background);
+}
+.searchBar {
   display: flex;
   gap: 0.6rem;
   align-items: center;
   flex-wrap: wrap;
   padding: 0.85rem 0;
-  border-bottom: 1px solid var(--border);
   background: var(--background);
 }
 .searchBar input {
@@ -131,7 +135,6 @@
 .searchBar button {
   padding: 0.45rem 0.7rem;
   border: 1px solid var(--border-strong);
-  border-radius: 0.35rem;
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
@@ -210,6 +213,69 @@
 }
 .suggestionCount {
   color: var(--muted);
+}
+
+.viewportTags {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.9rem 0 1rem;
+  background: var(--background);
+  font-size: 0.82rem;
+  min-height: 2.4rem;
+  margin-bottom: 0.25rem;
+  /* border removed — sticky double-border looked heavy on scroll */
+}
+.viewportTags::-webkit-scrollbar {
+  display: none;
+}
+.viewportChip {
+  flex-shrink: 0;
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.42rem 0.78rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.82rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+.viewportChip:hover {
+  background: var(--surface-soft);
+  border-color: var(--accent);
+}
+.viewportChip:active {
+  transform: scale(0.97);
+}
+.viewportChipCount {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+.viewportEmpty {
+  flex-shrink: 0;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.viewportCta {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .toTop {
@@ -315,6 +381,19 @@
   .grid {
     gap: 0.75rem;
   }
+  .viewportTags {
+    gap: 0.5rem;
+    padding: 0.7rem 0 0.85rem;
+    /* edge-to-edge scroll with fade hint */
+    margin-inline: calc(50% - 50vw);
+    padding-inline: clamp(1rem, 4vw, 3.5rem);
+    box-sizing: border-box;
+    width: 100vw;
+  }
+  .viewportChip {
+    padding: 0.38rem 0.7rem;
+    font-size: 0.8rem;
+  }
 }
 
 /* Phone: two thumbnails per row; desktop-only layout pickers hide so
@@ -342,5 +421,24 @@
   .toTop {
     right: 0.9rem;
     bottom: 0.9rem;
+  }
+  .viewportTags {
+    gap: 0.45rem;
+    padding: 0.65rem 0 0.75rem;
+    min-height: auto;
+    margin-inline: calc(50% - 50vw);
+    padding-inline: 0.9rem;
+    width: 100vw;
+    /* snap scrolling for thumb-friendly swipe */
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: 0.9rem;
+  }
+  .viewportChip {
+    padding: 0.34rem 0.62rem;
+    font-size: 0.78rem;
+    scroll-snap-align: start;
+  }
+  .viewportChipCount {
+    font-size: 0.7rem;
   }
 }

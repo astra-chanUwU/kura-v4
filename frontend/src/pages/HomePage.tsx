@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PostCard } from "../components/PostCard";
 import { UploadDialog } from "../components/UploadDialog";
@@ -11,6 +12,7 @@ import {
   usePosts,
 } from "../hooks/useKura";
 import { useSite } from "../hooks/useSite";
+import { useViewportTags } from "../hooks/useViewportTags";
 import styles from "./HomePage.module.css";
 
 export function HomePage() {
@@ -128,6 +130,15 @@ export function HomePage() {
   };
   const shownPosts = search.active ? search.results : posts;
 
+  // Dynamic viewport-based recommendations: observe which cards are on screen
+  // and surface their most frequent tags (like Safebooru but for infinite scroll).
+  // Limited to 12, excludes already-selected tags, re-computes as you scroll.
+  const { recommended: viewportTags, observe: observePost } = useViewportTags(
+    shownPosts,
+    selectedTags,
+    12,
+  );
+
   const failed = error ?? siteError;
 
   return (
@@ -165,155 +176,203 @@ export function HomePage() {
           </button>
         </p>
       )}
-      <div className={styles.searchBar}>
-        {selectedTags.length > 0 && (
-          <div className={styles.chipRow} aria-label="Selected tags (posts must match all)">
-            {selectedTags.map((tag) => (
-              <span key={tag} className={styles.chip}>
-                {tag}
+      {/* One sticky head for search + tag strip: as a single block it grows
+          with the selected-tag row, so the strip is never covered by it. */}
+      <div className={styles.boardHead}>
+        <div className={styles.searchBar}>
+          {selectedTags.length > 0 && (
+            <div className={styles.chipRow} aria-label="Selected tags (posts must match all)">
+              {selectedTags.map((tag) => (
+                <span key={tag} className={styles.chip}>
+                  {tag}
+                  <button
+                    type="button"
+                    aria-label={`Remove tag ${tag}`}
+                    onClick={() => {
+                      setSelectedTags((prev) => prev.filter((t) => t !== tag));
+                      goToBoardTop();
+                    }}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className={styles.searchBox}>
+            <input
+              type="search"
+              value={searchText}
+              onChange={(e) => {
+                setSearchText(e.target.value);
+                setHighlight(0);
+              }}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => {
+                // Delay so a suggestion click registers first.
+                setTimeout(() => setSearchFocused(false), 120);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                  e.preventDefault();
+                  const delta = e.key === "ArrowDown" ? 1 : -1;
+                  setHighlight((h) =>
+                    Math.max(0, Math.min(search.suggestions.length - 1, h + delta)),
+                  );
+                } else if (e.key === "Enter" && searchFocused) {
+                  e.preventDefault();
+                  if (tagTokens(searchText).length > 1) {
+                    addTagsFromText(searchText);
+                  } else {
+                    const pick = search.suggestions[highlight] ?? search.suggestions[0];
+                    if (pick) addTag(pick.tag);
+                    else addTagsFromText(searchText);
+                  }
+                } else if (e.key === "Backspace" && searchText === "" && selectedTags.length > 0) {
+                  setSelectedTags((prev) => prev.slice(0, -1));
+                  goToBoardTop();
+                } else if (e.key === "Escape") {
+                  setSearchFocused(false);
+                }
+              }}
+              placeholder={selectedTags.length > 0 ? "Add a tag…" : "Search tags…"}
+              aria-label="Search the board"
+            />
+            {searchFocused && search.suggestions.length > 0 && (
+              <ul className={styles.suggestions} aria-label="Tag suggestions">
+                {search.suggestions.map((s, i) => (
+                  <li key={s.tag}>
+                    <button
+                      type="button"
+                      aria-label={`Add tag ${s.tag}`}
+                      className={i === highlight ? styles.suggestionActive : ""}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        addTag(s.tag);
+                      }}
+                    >
+                      <span>{s.tag}</span>
+                      <span className={styles.suggestionCount}>{s.count}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {search.active &&
+            (search.searching ? (
+              <span className={styles.searchMeta}>Searching…</span>
+            ) : (
+              <>
+                <span className={styles.searchMeta}>
+                  {search.results.length} result{search.results.length === 1 ? "" : "s"}
+                  {selectedTags.length > 0 ? " with all selected tags" : ""}
+                </span>
                 <button
                   type="button"
-                  aria-label={`Remove tag ${tag}`}
                   onClick={() => {
-                    setSelectedTags((prev) => prev.filter((t) => t !== tag));
+                    setSearchText("");
+                    setSelectedTags([]);
                     goToBoardTop();
                   }}
                 >
-                  ×
+                  Clear
                 </button>
-              </span>
+              </>
             ))}
-          </div>
-        )}
-        <div className={styles.searchBox}>
-          <input
-            type="search"
-            value={searchText}
-            onChange={(e) => {
-              setSearchText(e.target.value);
-              setHighlight(0);
-            }}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => {
-              // Delay so a suggestion click registers first.
-              setTimeout(() => setSearchFocused(false), 120);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-                e.preventDefault();
-                const delta = e.key === "ArrowDown" ? 1 : -1;
-                setHighlight((h) =>
-                  Math.max(0, Math.min(search.suggestions.length - 1, h + delta)),
-                );
-              } else if (e.key === "Enter" && searchFocused) {
-                e.preventDefault();
-                if (tagTokens(searchText).length > 1) {
-                  addTagsFromText(searchText);
-                } else {
-                  const pick = search.suggestions[highlight] ?? search.suggestions[0];
-                  if (pick) addTag(pick.tag);
-                  else addTagsFromText(searchText);
-                }
-              } else if (e.key === "Backspace" && searchText === "" && selectedTags.length > 0) {
-                setSelectedTags((prev) => prev.slice(0, -1));
-                goToBoardTop();
-              } else if (e.key === "Escape") {
-                setSearchFocused(false);
-              }
-            }}
-            placeholder={selectedTags.length > 0 ? "Add a tag…" : "Search tags…"}
-            aria-label="Search the board"
-          />
-          {searchFocused && search.suggestions.length > 0 && (
-            <ul className={styles.suggestions} aria-label="Tag suggestions">
-              {search.suggestions.map((s, i) => (
-                <li key={s.tag}>
-                  <button
-                    type="button"
-                    aria-label={`Add tag ${s.tag}`}
-                    className={i === highlight ? styles.suggestionActive : ""}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      addTag(s.tag);
-                    }}
-                  >
-                    <span>{s.tag}</span>
-                    <span className={styles.suggestionCount}>{s.count}</span>
-                  </button>
-                </li>
+          <div className={styles.viewControls} role="group" aria-label="Board layout">
+            <span className={styles.viewGroup} role="group" aria-label="Columns">
+              {[0, 1, 2, 3, 4, 6].map((cols) => (
+                <button
+                  key={cols}
+                  type="button"
+                  aria-pressed={view.cols === cols}
+                  className={view.cols === cols ? styles.viewActive : ""}
+                  title={
+                    cols === 0 ? "Automatic columns" : `${cols} column${cols === 1 ? "" : "s"}`
+                  }
+                  onClick={() => changeView({ ...view, cols })}
+                >
+                  {cols === 0 ? "Auto" : cols}
+                </button>
               ))}
-            </ul>
-          )}
-        </div>
-        {search.active &&
-          (search.searching ? (
-            <span className={styles.searchMeta}>Searching…</span>
-          ) : (
-            <>
-              <span className={styles.searchMeta}>
-                {search.results.length} result{search.results.length === 1 ? "" : "s"}
-                {selectedTags.length > 0 ? " with all selected tags" : ""}
-              </span>
+            </span>
+            {signedIn && (
               <button
                 type="button"
+                className={styles.uploadButton}
                 onClick={() => {
-                  setSearchText("");
-                  setSelectedTags([]);
-                  goToBoardTop();
+                  setDroppedFiles([]);
+                  setUploadOpen(true);
                 }}
               >
-                Clear
+                ⬆ Upload
               </button>
-            </>
-          ))}
-        <div className={styles.viewControls} role="group" aria-label="Board layout">
-          <span className={styles.viewGroup} role="group" aria-label="Columns">
-            {[0, 1, 2, 3, 4, 6].map((cols) => (
+            )}
+            <span className={styles.viewGroup} role="group" aria-label="Page width">
               <button
-                key={cols}
                 type="button"
-                aria-pressed={view.cols === cols}
-                className={view.cols === cols ? styles.viewActive : ""}
-                title={cols === 0 ? "Automatic columns" : `${cols} column${cols === 1 ? "" : "s"}`}
-                onClick={() => changeView({ ...view, cols })}
+                aria-pressed={!view.wide}
+                className={!view.wide ? styles.viewActive : ""}
+                title="Narrow, centered page"
+                onClick={() => changeView({ ...view, wide: false })}
               >
-                {cols === 0 ? "Auto" : cols}
+                Narrow
               </button>
-            ))}
-          </span>
-          {signedIn && (
-            <button
-              type="button"
-              className={styles.uploadButton}
-              onClick={() => {
-                setDroppedFiles([]);
-                setUploadOpen(true);
-              }}
-            >
-              ⬆ Upload
-            </button>
-          )}
-          <span className={styles.viewGroup} role="group" aria-label="Page width">
-            <button
-              type="button"
-              aria-pressed={!view.wide}
-              className={!view.wide ? styles.viewActive : ""}
-              title="Narrow, centered page"
-              onClick={() => changeView({ ...view, wide: false })}
-            >
-              Narrow
-            </button>
-            <button
-              type="button"
-              aria-pressed={view.wide}
-              className={view.wide ? styles.viewActive : ""}
-              title="Use the full width of the screen"
-              onClick={() => changeView({ ...view, wide: true })}
-            >
-              Wide
-            </button>
-          </span>
+              <button
+                type="button"
+                aria-pressed={view.wide}
+                className={view.wide ? styles.viewActive : ""}
+                title="Use the full width of the screen"
+                onClick={() => changeView({ ...view, wide: true })}
+              >
+                Wide
+              </button>
+            </span>
+          </div>
         </div>
+
+        {/* Viewport-aware tag strip: top tags from visible posts. It lives in
+          the sticky board head, so it stays visible while scrolling. When
+          the current view has no tags it keeps its place with a default
+          prompt instead of vanishing. */}
+        {!loading && !failed && shownPosts.length > 0 && (
+          <div className={styles.viewportTags} aria-label="Tags in current view">
+            {viewportTags.length > 0 ? (
+              viewportTags.map((t) => (
+                <button
+                  key={t.tag}
+                  type="button"
+                  className={styles.viewportChip}
+                  aria-label={`Add tag ${t.tag}`}
+                  onClick={() => addTag(t.tag)}
+                >
+                  {t.tag} <span className={styles.viewportChipCount}>· {t.count}</span>
+                </button>
+              ))
+            ) : (
+              <>
+                <span className={styles.viewportEmpty}>No tags detected</span>
+                {signedIn ? (
+                  <button
+                    type="button"
+                    className={`${styles.viewportChip} ${styles.viewportCta}`}
+                    onClick={() => {
+                      setDroppedFiles([]);
+                      setUploadOpen(true);
+                    }}
+                  >
+                    Start contributing
+                  </button>
+                ) : (
+                  <Link to="/register" className={`${styles.viewportChip} ${styles.viewportCta}`}>
+                    Start contributing
+                  </Link>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {(loading || siteLoading) && <p className={styles.message}>Loading…</p>}
@@ -344,7 +403,9 @@ export function HomePage() {
       {shownPosts.length > 0 && (
         <div className={styles.grid} data-cols={view.cols || undefined}>
           {shownPosts.map((post) => (
-            <PostCard key={post.id} post={post} />
+            <div key={post.id} ref={(el) => observePost(el, post.id)} data-post-id={post.id}>
+              <PostCard post={post} />
+            </div>
           ))}
         </div>
       )}
