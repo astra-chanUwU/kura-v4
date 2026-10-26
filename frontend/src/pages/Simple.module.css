@@ -55,6 +55,12 @@
   font-size: 0.9rem;
   width: fit-content;
 }
+/* Unsaved changes: highlight the save action until it is pressed. */
+.saveDirty {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px var(--selection);
+  font-weight: 700;
+}
 .tabs {
   display: flex;
   gap: 0.5rem;
@@ -178,6 +184,42 @@
   color: var(--muted);
   font-size: 0.75rem;
   font-weight: 400;
+}
+
+/* Me page: profile goes two-column on landscape desktops; security
+   stays one generous column (two narrow columns read badly there),
+   with bigger cards and a password field that fills its row. */
+.profileGrid,
+.securityGrid {
+  display: grid;
+  gap: 1.25rem;
+  align-items: start;
+}
+.securityGrid {
+  max-width: 46rem;
+}
+.securityGrid .card {
+  padding: 1.5rem;
+  gap: 0.8rem;
+}
+.securityGrid .inlineForm {
+  flex-wrap: nowrap;
+}
+.securityGrid .inlineForm input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.65rem 0.8rem;
+}
+.securityGrid .inlineForm button {
+  flex: none;
+}
+@media (min-width: 1024px) and (orientation: landscape) {
+  .profileGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .profileGrid .form {
+    max-width: none;
+  }
 }
 
 /* Tablet and phone. */

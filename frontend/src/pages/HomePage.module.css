@@ -169,6 +169,39 @@
   padding: 0;
   font-size: 0.9rem;
 }
+.chipExcluded {
+  border-color: var(--danger);
+  background: var(--surface);
+  color: var(--danger);
+  text-decoration: line-through;
+}
+/* Staged but not applied yet (Filter not pressed). */
+.chipPending {
+  border-style: dashed;
+  opacity: 0.75;
+}
+.filterControls {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.filterButton,
+.filterActive {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  font-weight: 600;
+}
+.filterActive {
+  border-color: var(--accent) !important;
+  background: var(--selection) !important;
+  box-shadow: 0 0 0 2px var(--selection);
+}
+.chipExcluded button {
+  color: var(--danger);
+  text-decoration: none;
+}
 .searchBox {
   position: relative;
   flex: 1 1 16rem;
@@ -209,6 +242,38 @@
   text-align: left;
 }
 .suggestions .suggestionActive {
+  background: var(--surface-soft);
+}
+.suggestionRow {
+  display: flex;
+  align-items: stretch;
+  gap: 0.15rem;
+  min-width: 0;
+}
+/* Higher specificity than `.suggestions button` (width: 100%): the tag
+   button takes the free space, + / - stay fixed-size squares. */
+.suggestions .suggestionMain {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  gap: 0.5rem;
+}
+.suggestions .suggestionSide {
+  flex: 0 0 1.9rem;
+  width: 1.9rem;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+}
+.suggestions .suggestionInclude {
+  color: var(--accent);
+}
+.suggestions .suggestionExclude {
+  color: var(--danger);
+}
+.suggestions .suggestionSide:hover {
   background: var(--surface-soft);
 }
 .suggestionCount {
@@ -266,6 +331,49 @@
   font-size: 0.74rem;
   font-variant-numeric: tabular-nums;
 }
+/* One pill per viewport tag: - on the left, tag in the middle, + on the right. */
+.viewportTag {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.viewportTagMain,
+.viewportTagSide {
+  border: none;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.82rem;
+  line-height: 1.1;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.viewportTagMain {
+  padding: 0.42rem 0.3rem;
+}
+.viewportTagSide {
+  flex: 0 0 1.7rem;
+  width: 1.7rem;
+  padding: 0.42rem 0;
+  font-size: 0.95rem;
+}
+.viewportExclude {
+  color: var(--danger);
+  border-right: 1px solid var(--border);
+}
+.viewportInclude {
+  color: var(--accent);
+  border-left: 1px solid var(--border);
+}
+.viewportTagMain:hover,
+.viewportTagSide:hover {
+  background: var(--surface-soft);
+}
 .viewportEmpty {
   flex-shrink: 0;
   color: var(--muted);
@@ -301,23 +409,25 @@
   pointer-events: auto;
 }
 
-.grid[data-cols="1"] {
-  grid-template-columns: 1fr;
-  max-width: 54rem;
-  margin-inline: auto;
-  width: 100%;
+/* Rows mode: one detail row per picture. */
+.rows {
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 1rem;
 }
-.grid[data-cols="2"] {
-  grid-template-columns: repeat(2, 1fr);
+
+/* Large screens: keep tiles from becoming billboards. The grid stays
+   fluid inside each band; bands only raise the minimum tile size. */
+@media (min-width: 1601px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  }
 }
-.grid[data-cols="3"] {
-  grid-template-columns: repeat(3, 1fr);
-}
-.grid[data-cols="4"] {
-  grid-template-columns: repeat(4, 1fr);
-}
-.grid[data-cols="6"] {
-  grid-template-columns: repeat(6, 1fr);
+@media (min-width: 2560px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+    gap: 1.25rem;
+  }
 }
 
 .viewControls {
@@ -399,13 +509,9 @@
 /* Phone: two thumbnails per row; desktop-only layout pickers hide so
    search + Upload stay on one usable row. */
 @media (max-width: 700px) {
-  .grid,
-  .grid[data-cols] {
+  .grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 0.6rem;
-  }
-  .grid[data-cols="1"] {
-    grid-template-columns: 1fr;
   }
   .viewGroup {
     display: none;

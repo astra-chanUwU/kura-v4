@@ -1,7 +1,34 @@
 .page {
   display: grid;
   gap: 1rem;
-  max-width: 56rem;
+  max-width: 80rem;
+}
+.layout {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+.mediaCol {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+/* Landscape desktop (e.g. 1920x1080): media and details side by side,
+   details sticky so tags stay reachable while the picture is tall.
+   Portrait / narrow screens keep the stacked layout. */
+@media (min-width: 1024px) and (orientation: landscape) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, 25rem);
+  }
+  .details {
+    position: sticky;
+    top: calc(var(--header-h) + 1rem);
+    max-height: calc(100dvh - var(--header-h) - 2rem);
+    overflow-y: auto;
+  }
+  .full {
+    max-height: calc(100dvh - var(--header-h) - 3rem);
+  }
 }
 .page h1 {
   margin: 0;

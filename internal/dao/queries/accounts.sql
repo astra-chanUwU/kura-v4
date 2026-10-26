@@ -1,18 +1,18 @@
 -- name: CreateUserWithID :one
-INSERT INTO users (id, username, display_name) VALUES ($1, $2, $3) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw;
+INSERT INTO users (id, username, display_name) VALUES ($1, $2, $3) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags;
 
 -- name: CreateUser :one
-INSERT INTO users (username, display_name) VALUES ($1, $2) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw;
+INSERT INTO users (username, display_name) VALUES ($1, $2) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags;
 
 -- name: GetUserByUsername :one
-SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw FROM users WHERE username = $1;
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags FROM users WHERE username = $1;
 
 -- name: GetUserByID :one
-SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw FROM users WHERE id = $1;
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags FROM users WHERE id = $1;
 
 -- name: UpdateProfile :one
 UPDATE users SET display_name=$2, bio=$3, location=$4, website=$5, updated_at=now()
-WHERE id=$1 RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw;
+WHERE id=$1 RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags;
 
 -- name: UpsertPassword :exec
 INSERT INTO password_credentials (user_id, password_hash) VALUES ($1,$2)
@@ -74,3 +74,6 @@ UPDATE users SET avatar_key=$2, avatar_type=$3, updated_at=now() WHERE id=$1;
 
 -- name: UpdateShowNSFW :exec
 UPDATE users SET show_nsfw=$2, nsfw_ack_at = CASE WHEN $2 THEN now() ELSE nsfw_ack_at END, updated_at=now() WHERE id=$1;
+
+-- name: UpdateTagPreferences :exec
+UPDATE users SET default_include_tags=$2, default_exclude_tags=$3, updated_at=now() WHERE id=$1;

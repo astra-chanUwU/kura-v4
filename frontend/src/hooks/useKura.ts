@@ -127,9 +127,21 @@ const searchFuse = (index: Post[]) =>
  * like a booru; any remaining free text fuzzy-matches within that set.
  * Autocomplete suggestions come from the tags already in the index.
  */
-export function usePostSearch(query: string, selectedTags: string[], wantIndex: boolean) {
+export function usePostSearch(
+  query: string,
+  selectedTags: string[],
+  excludedTags: string[],
+  wantIndex: boolean,
+  appliedQuery = "",
+  stagedTags: string[] = [],
+) {
+  // `query` is live input: it only drives autocomplete suggestions.
+  // Results are deliberate — they follow the applied tags plus the
+  // query as it was when Filter was pressed (`appliedQuery`), so
+  // staging several tags costs no re-filtering in between.
   const trimmed = query.trim();
-  const active = trimmed.length > 0 || selectedTags.length > 0;
+  const appliedTrimmed = appliedQuery.trim();
+  const active = appliedTrimmed.length > 0 || selectedTags.length > 0 || excludedTags.length > 0;
   const index = useQuery({
     queryKey: queryKeys.searchIndex(),
     queryFn: ({ signal }) => api.searchIndex(signal),
@@ -150,13 +162,18 @@ export function usePostSearch(query: string, selectedTags: string[], wantIndex: 
 
   const suggestions = useMemo(() => {
     if (!index.data) return [];
-    const available = tagCounts.filter((t) => !selectedTags.includes(t.tag));
+    const available = tagCounts.filter(
+      (t) =>
+        !selectedTags.includes(t.tag) &&
+        !excludedTags.includes(t.tag) &&
+        !stagedTags.includes(t.tag),
+    );
     if (trimmed.length < 1) return available.slice(0, 8);
     return new Fuse(available, { keys: ["tag"], threshold: 0.35, ignoreLocation: true })
       .search(trimmed)
       .slice(0, 8)
       .map((r) => r.item);
-  }, [index.data, tagCounts, selectedTags, trimmed]);
+  }, [index.data, tagCounts, selectedTags, excludedTags, stagedTags, trimmed]);
 
   const results = useMemo(() => {
     if (!active || !index.data) return [];
@@ -164,14 +181,17 @@ export function usePostSearch(query: string, selectedTags: string[], wantIndex: 
     if (selectedTags.length > 0) {
       base = base.filter((post) => selectedTags.every((tag) => post.tags.includes(tag)));
     }
-    if (trimmed.length >= 2) {
+    if (excludedTags.length > 0) {
+      base = base.filter((post) => !excludedTags.some((tag) => post.tags.includes(tag)));
+    }
+    if (appliedTrimmed.length >= 2) {
       return searchFuse(base)
-        .search(trimmed)
+        .search(appliedTrimmed)
         .slice(0, 200)
         .map((r) => r.item);
     }
     return base.slice(0, 200);
-  }, [active, index.data, selectedTags, trimmed]);
+  }, [active, index.data, selectedTags, excludedTags, appliedTrimmed]);
 
   return {
     active,
@@ -376,6 +396,8 @@ export function useAccountActions() {
     }) => api.updateProfile(body).then(refresh),
     setPreferences: (showNsfw: boolean, over18: boolean) =>
       api.setPreferences(showNsfw, over18).then(refresh),
+    setTagPreferences: (includeTags: string[], excludeTags: string[]) =>
+      api.setTagPreferences(includeTags, excludeTags).then(refresh),
     setAvatar: (file: File) => api.setAvatar(file).then(refresh),
     removeAvatar: () => api.removeAvatar().then(refresh),
     setPassword: (password: string) => api.setPassword(password).then(refresh),

@@ -54,7 +54,7 @@ func (h *Auth) meResponseWithKey(c fiber.Ctx, user model.User, recoveryKey strin
 	if err != nil {
 		return writeError(c, err)
 	}
-	return c.JSON(dto.Me{User: userDTO(user), Security: securityDTO(sec), Preferences: dto.Preferences{ShowNSFW: user.ShowNSFW}, RecoveryKey: recoveryKey})
+	return c.JSON(dto.Me{User: userDTO(user), Security: securityDTO(sec), Preferences: preferencesDTO(user), RecoveryKey: recoveryKey})
 }
 
 func (h *Auth) RegisterRoutes(api fiber.Router) {
@@ -69,6 +69,7 @@ func (h *Auth) RegisterRoutes(api fiber.Router) {
 	api.Patch("/me/profile", h.updateProfile)
 	api.Post("/auth/recover", h.recover)
 	api.Patch("/me/preferences", h.updatePreferences)
+	api.Patch("/me/tag-preferences", h.updateTagPreferences)
 	api.Post("/me/avatar", h.setAvatar)
 	api.Delete("/me/avatar", h.removeAvatar)
 	api.Post("/me/password", h.setPassword)
@@ -92,7 +93,7 @@ func (h *Auth) register(c fiber.Ctx) error {
 	if err != nil {
 		return writeError(c, err)
 	}
-	return c.Status(201).JSON(dto.Me{User: userDTO(user), Security: securityDTO(sec), Preferences: dto.Preferences{ShowNSFW: user.ShowNSFW}, RecoveryKey: key})
+	return c.Status(201).JSON(dto.Me{User: userDTO(user), Security: securityDTO(sec), Preferences: preferencesDTO(user), RecoveryKey: key})
 }
 
 func (h *Auth) login(c fiber.Ctx) error {
@@ -282,6 +283,25 @@ func (h *Auth) updatePreferences(c fiber.Ctx) error {
 		return fiber.NewError(400, "Invalid request.")
 	}
 	if err := h.accounts.SetShowNSFW(c.Context(), user.ID, in.ShowNSFW, in.Over18); err != nil {
+		return writeError(c, err)
+	}
+	updated, err := h.accounts.GetUser(c.Context(), user.ID)
+	if err != nil {
+		return writeError(c, err)
+	}
+	return h.meResponse(c, updated)
+}
+
+func (h *Auth) updateTagPreferences(c fiber.Ctx) error {
+	user, err := requireUser(c)
+	if err != nil {
+		return err
+	}
+	var in dto.UpdateTagPreferences
+	if err := c.Bind().Body(&in); err != nil {
+		return fiber.NewError(400, "Invalid request.")
+	}
+	if err := h.accounts.SetTagPreferences(c.Context(), user.ID, in.IncludeTags, in.ExcludeTags); err != nil {
 		return writeError(c, err)
 	}
 	updated, err := h.accounts.GetUser(c.Context(), user.ID)

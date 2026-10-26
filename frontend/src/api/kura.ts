@@ -69,6 +69,8 @@ export const api = {
     sendJSON<Post>(`/posts/${postId}/meta`, "PATCH", { artist, tags, rating }),
   setPreferences: (show_nsfw: boolean, over_18: boolean) =>
     sendJSON<Me>("/me/preferences", "PATCH", { show_nsfw, over_18 }),
+  setTagPreferences: (include_tags: string[], exclude_tags: string[]) =>
+    sendJSON<Me>("/me/tag-preferences", "PATCH", { include_tags, exclude_tags }),
   setPassword: (password: string) => sendJSON<Me>("/me/password", "POST", { password }),
   removePassword: () => sendJSON<Me>("/me/password", "DELETE"),
   removePasskey: (id: string) => sendJSON<Me>(`/me/passkeys/${id}`, "DELETE"),

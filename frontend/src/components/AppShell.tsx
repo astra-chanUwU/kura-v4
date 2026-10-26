@@ -5,10 +5,10 @@ import { useMe } from "../hooks/useKura";
 import styles from "./AppShell.module.css";
 
 const THEMES = [
-  { id: "kura", label: "Kura Dark" },
-  { id: "safebooru", label: "Safebooru" },
-  { id: "rule34", label: "Rule34" },
-  { id: "umineko", label: "Umineko" },
+  { id: "kura", label: "Kura Dark", swatch: "#b49afa" },
+  { id: "safebooru", label: "Safebooru", swatch: "#0b6bcb" },
+  { id: "rule34", label: "Rule34", swatch: "#8bc34a" },
+  { id: "umineko", label: "Umineko", swatch: "#c9a227" },
 ] as const;
 
 export function AppShell() {
@@ -30,9 +30,6 @@ export function AppShell() {
           Kura
         </Link>
         <nav aria-label="Main navigation" className={styles.nav}>
-          <Link to="/" activeProps={{ className: styles.active }} activeOptions={{ exact: true }}>
-            Images
-          </Link>
           {!loading &&
             (user ? (
               <Link to="/me" activeProps={{ className: styles.active }} className={styles.userLink}>
@@ -63,7 +60,7 @@ export function AppShell() {
         <div className={styles.themeWrap}>
           <ThemedSelect label="Theme" value={theme} onChange={applyTheme}>
             {THEMES.map((t) => (
-              <option key={t.id} value={t.id}>
+              <option key={t.id} value={t.id} data-swatch={t.swatch}>
                 {t.label}
               </option>
             ))}

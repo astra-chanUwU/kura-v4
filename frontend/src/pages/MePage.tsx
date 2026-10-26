@@ -14,7 +14,9 @@ import { RecoveryKeyPanel } from "../components/RecoveryKeyPanel";
 import { ShareProfileButton } from "../components/ShareProfileButton";
 import { shortError, useToasts } from "../components/Toasts";
 import {
+  normalizeTagToken,
   passkeysSupported,
+  tagTokens,
   useAccountActions,
   useAuthActions,
   useFavorites,
@@ -61,6 +63,10 @@ export function MePage() {
   const [locationDraft, setLocationDraft] = useState<string | null>(null);
   const [websiteDraft, setWebsiteDraft] = useState<string | null>(null);
   const [shownKey, setShownKey] = useState("");
+  const [includeDraft, setIncludeDraft] = useState<string[] | null>(null);
+  const [excludeDraft, setExcludeDraft] = useState<string[] | null>(null);
+  const [includeInput, setIncludeInput] = useState("");
+  const [excludeInput, setExcludeInput] = useState("");
   const [showAgeGate, setShowAgeGate] = useState(false);
   const [tipDismissed, setTipDismissed] = useState(() => localStorage.getItem(DISMISS_KEY) === "1");
   const favorites = useFavorites(tab === "favorites");
@@ -82,6 +88,16 @@ export function MePage() {
   }
   const { user, security, preferences } = me;
   const showPasskeyTip = !tipDismissed && security.passkeys.length === 0 && passkeysSupported();
+  const profileDirty =
+    (displayDraft !== null && displayDraft !== user.display_name) ||
+    (bioDraft !== null && bioDraft !== user.bio) ||
+    (locationDraft !== null && locationDraft !== user.location) ||
+    (websiteDraft !== null && websiteDraft !== user.website);
+  const savedIncludeTags = preferences.default_include_tags ?? [];
+  const savedExcludeTags = preferences.default_exclude_tags ?? [];
+  const tagsDirty =
+    (includeDraft !== null && JSON.stringify(includeDraft) !== JSON.stringify(savedIncludeTags)) ||
+    (excludeDraft !== null && JSON.stringify(excludeDraft) !== JSON.stringify(savedExcludeTags));
 
   const run = (action: Promise<unknown>, ok: string) => {
     setError("");
@@ -95,7 +111,7 @@ export function MePage() {
   };
 
   return (
-    <section className={styles.page} aria-labelledby="me-title" style={{ maxWidth: "64rem" }}>
+    <section className={styles.page} aria-labelledby="me-title" style={{ maxWidth: "80rem" }}>
       <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
         <label
           title={
@@ -255,67 +271,212 @@ export function MePage() {
       {notice && <p className={styles.hint}>{notice}</p>}
 
       {tab === "profile" && (
-        <form
-          className={styles.form}
-          style={{ maxWidth: "32rem" }}
-          onSubmit={(event) => {
-            event.preventDefault();
-            run(
-              account.updateProfile({
-                display_name: displayDraft ?? user.display_name,
-                bio: bioDraft ?? user.bio,
-                location: locationDraft ?? user.location,
-                website: websiteDraft ?? user.website,
-              }),
-              "Profile saved.",
-            );
-            setDisplayDraft(null);
-            setBioDraft(null);
-            setLocationDraft(null);
-            setWebsiteDraft(null);
-          }}
-        >
-          <label>
-            Display name{" "}
-            <span className={styles.count}>{(displayDraft ?? user.display_name).length}/60</span>
-            <input
-              value={displayDraft ?? user.display_name}
-              onChange={(e) => setDisplayDraft(e.target.value)}
-              required
-              maxLength={60}
-            />
-          </label>
-          <label>
-            Bio <span className={styles.count}>{(bioDraft ?? user.bio).length}/500 characters</span>
-            <textarea
-              value={bioDraft ?? user.bio}
-              onChange={(e) => setBioDraft(e.target.value)}
-              maxLength={500}
-              rows={4}
-              placeholder="Tell people a little about you and what you collect…"
-            />
-          </label>
-          <label>
-            Location{" "}
-            <span className={styles.count}>{(locationDraft ?? user.location).length}/80</span>
-            <input
-              value={locationDraft ?? user.location}
-              onChange={(e) => setLocationDraft(e.target.value)}
-              maxLength={80}
-            />
-          </label>
-          <label>
-            Website{" "}
-            <span className={styles.count}>{(websiteDraft ?? user.website).length}/200</span>
-            <input
-              value={websiteDraft ?? user.website}
-              onChange={(e) => setWebsiteDraft(e.target.value)}
-              maxLength={200}
-              placeholder="https://…"
-            />
-          </label>
-          <button type="submit">Save profile</button>
-        </form>
+        <div className={styles.profileGrid}>
+          <form
+            className={styles.form}
+            style={{ maxWidth: "32rem" }}
+            onSubmit={(event) => {
+              event.preventDefault();
+              run(
+                account.updateProfile({
+                  display_name: displayDraft ?? user.display_name,
+                  bio: bioDraft ?? user.bio,
+                  location: locationDraft ?? user.location,
+                  website: websiteDraft ?? user.website,
+                }),
+                "Profile saved.",
+              );
+              setDisplayDraft(null);
+              setBioDraft(null);
+              setLocationDraft(null);
+              setWebsiteDraft(null);
+            }}
+          >
+            <label>
+              Display name{" "}
+              <span className={styles.count}>{(displayDraft ?? user.display_name).length}/60</span>
+              <input
+                value={displayDraft ?? user.display_name}
+                onChange={(e) => setDisplayDraft(e.target.value)}
+                required
+                maxLength={60}
+              />
+            </label>
+            <label>
+              Bio{" "}
+              <span className={styles.count}>{(bioDraft ?? user.bio).length}/500 characters</span>
+              <textarea
+                value={bioDraft ?? user.bio}
+                onChange={(e) => setBioDraft(e.target.value)}
+                maxLength={500}
+                rows={4}
+                placeholder="Tell people a little about you and what you collect…"
+              />
+            </label>
+            <label>
+              Location{" "}
+              <span className={styles.count}>{(locationDraft ?? user.location).length}/80</span>
+              <input
+                value={locationDraft ?? user.location}
+                onChange={(e) => setLocationDraft(e.target.value)}
+                maxLength={80}
+              />
+            </label>
+            <label>
+              Website{" "}
+              <span className={styles.count}>{(websiteDraft ?? user.website).length}/200</span>
+              <input
+                value={websiteDraft ?? user.website}
+                onChange={(e) => setWebsiteDraft(e.target.value)}
+                maxLength={200}
+                placeholder="https://…"
+              />
+            </label>
+            <button type="submit" className={profileDirty ? styles.saveDirty : undefined}>
+              Save profile
+            </button>
+          </form>
+
+          <div className={styles.card}>
+            <h2>Default board tags</h2>
+            <p className={styles.muted}>
+              Applied every time you open the board. Always show posts with your tags; never show
+              posts with your excluded tags. On the board you can still change them for the session,
+              or type <code>-tag</code> to exclude.
+            </p>
+            {(
+              [
+                {
+                  label: "Always show",
+                  placeholder: "Add a tag…",
+                  tags: includeDraft ?? preferences.default_include_tags ?? [],
+                  input: includeInput,
+                  setInput: setIncludeInput,
+                  add: (raw: string) => {
+                    const tokens = tagTokens(raw);
+                    if (tokens.length === 0) return;
+                    const current = includeDraft ?? preferences.default_include_tags ?? [];
+                    setIncludeDraft([...new Set([...current, ...tokens])]);
+                    const excluded = excludeDraft ?? preferences.default_exclude_tags ?? [];
+                    setExcludeDraft(excluded.filter((t) => !tokens.includes(t)));
+                    setIncludeInput("");
+                  },
+                  remove: (tag: string) => {
+                    const current = includeDraft ?? preferences.default_include_tags ?? [];
+                    setIncludeDraft(current.filter((t) => t !== tag));
+                  },
+                },
+                {
+                  label: "Never show",
+                  placeholder: "Add an excluded tag…",
+                  tags: excludeDraft ?? preferences.default_exclude_tags ?? [],
+                  input: excludeInput,
+                  setInput: setExcludeInput,
+                  add: (raw: string) => {
+                    const tokens = tagTokens(raw.replace(/^-+/, ""));
+                    if (tokens.length === 0) return;
+                    const current = excludeDraft ?? preferences.default_exclude_tags ?? [];
+                    setExcludeDraft([...new Set([...current, ...tokens])]);
+                    const included = includeDraft ?? preferences.default_include_tags ?? [];
+                    setIncludeDraft(included.filter((t) => !tokens.includes(t)));
+                    setExcludeInput("");
+                  },
+                  remove: (tag: string) => {
+                    const current = excludeDraft ?? preferences.default_exclude_tags ?? [];
+                    setExcludeDraft(current.filter((t) => t !== tag));
+                  },
+                },
+              ] as const
+            ).map((field) => (
+              <div key={field.label} style={{ marginTop: "0.9rem" }}>
+                <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{field.label}</span>
+                <div
+                  style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", margin: "0.45rem 0" }}
+                >
+                  {field.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      style={{
+                        display: "inline-flex",
+                        gap: "0.3rem",
+                        alignItems: "center",
+                        padding: "0.2rem 0.55rem",
+                        border: "1px solid var(--border-strong)",
+                        borderRadius: "999px",
+                        background: "var(--surface-soft)",
+                        fontSize: "0.8rem",
+                      }}
+                    >
+                      {field.label === "Never show" ? `−${tag}` : tag}
+                      <button
+                        type="button"
+                        aria-label={`Remove ${tag}`}
+                        onClick={() => field.remove(tag)}
+                        style={{
+                          border: "none",
+                          background: "none",
+                          color: "var(--muted)",
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {field.tags.length === 0 && <span className={styles.muted}>None</span>}
+                </div>
+                <form
+                  className={styles.inlineForm}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    field.add(field.input);
+                  }}
+                >
+                  <input
+                    value={field.input}
+                    onChange={(e) => field.setInput(e.target.value)}
+                    placeholder={field.placeholder}
+                    aria-label={`${field.label} tag`}
+                  />
+                  <button type="submit" disabled={!normalizeTagToken(field.input)}>
+                    Add
+                  </button>
+                </form>
+              </div>
+            ))}
+            <div className={styles.actions} style={{ marginTop: "1rem" }}>
+              <button
+                type="button"
+                className={tagsDirty ? styles.saveDirty : undefined}
+                onClick={() => {
+                  run(
+                    account.setTagPreferences(
+                      includeDraft ?? preferences.default_include_tags ?? [],
+                      excludeDraft ?? preferences.default_exclude_tags ?? [],
+                    ),
+                    "Default board tags saved.",
+                  );
+                  setIncludeDraft(null);
+                  setExcludeDraft(null);
+                }}
+              >
+                Save board tags
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIncludeDraft([]);
+                  setExcludeDraft([]);
+                  setIncludeInput("");
+                  setExcludeInput("");
+                }}
+              >
+                Clear both
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {tab === "contributions" && (
@@ -422,7 +583,7 @@ export function MePage() {
       )}
 
       {tab === "security" && (
-        <div style={{ display: "grid", gap: "1.25rem", maxWidth: "32rem" }}>
+        <div className={styles.securityGrid}>
           <div className={styles.card}>
             <h2>Content</h2>
             <label
@@ -614,7 +775,7 @@ export function MePage() {
             </div>
           )}
 
-          <div className={styles.actions}>
+          <div className={styles.actions} style={{ gridColumn: "1 / -1" }}>
             <button
               type="button"
               onClick={() => {

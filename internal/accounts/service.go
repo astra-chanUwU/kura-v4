@@ -57,6 +57,7 @@ type Repository interface {
 	TakeChallenge(ctx context.Context, id string) (model.Challenge, error)
 	SetAvatar(ctx context.Context, userID, key, contentType string) error
 	UpdateShowNSFW(ctx context.Context, userID string, show bool) error
+	UpdateTagPreferences(ctx context.Context, userID string, includeTags, excludeTags []string) error
 	SetRecoveryKey(ctx context.Context, userID string, keyHash []byte) error
 	GetRecoveryKey(ctx context.Context, userID string) ([]byte, time.Time, error)
 	// RecoverAccount atomically replaces the password and recovery key and
@@ -408,6 +409,52 @@ func (s *Service) SetShowNSFW(ctx context.Context, userID string, show, over18 b
 		return ErrAdultConfirmationRequired
 	}
 	return s.repo.UpdateShowNSFW(ctx, userID, show)
+}
+
+// SetTagPreferences records the account's default board tag filters.
+// Tags are normalized the booru way; a tag in both lists is excluded
+// (exclusion wins), so the stored lists never overlap.
+func (s *Service) SetTagPreferences(ctx context.Context, userID string, includeTags, excludeTags []string) error {
+	includeTags = normalizeTagList(includeTags)
+	excludeTags = normalizeTagList(excludeTags)
+	excluded := make(map[string]bool, len(excludeTags))
+	for _, t := range excludeTags {
+		excluded[t] = true
+	}
+	kept := includeTags[:0]
+	for _, t := range includeTags {
+		if !excluded[t] {
+			kept = append(kept, t)
+		}
+	}
+	return s.repo.UpdateTagPreferences(ctx, userID, kept, excludeTags)
+}
+
+var tagCleanRE = regexp.MustCompile(`[^a-z0-9_-]+`)
+
+// normalizeTagList mirrors board.NormalizeTags without importing the
+// board service: split on spaces/commas, lowercase, underscores join.
+func normalizeTagList(in []string) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, raw := range in {
+		for _, token := range strings.FieldsFunc(raw, func(r rune) bool {
+			return r == ' ' || r == '\t' || r == ',' || r == '\n'
+		}) {
+			tag := tagCleanRE.ReplaceAllString(strings.ToLower(strings.TrimSpace(token)), "_")
+			tag = strings.ReplaceAll(tag, "-", "_")
+			tag = strings.Trim(tag, "_")
+			if tag == "" || len(tag) > 40 || seen[tag] {
+				continue
+			}
+			seen[tag] = true
+			out = append(out, tag)
+			if len(out) >= 30 {
+				return out
+			}
+		}
+	}
+	return out
 }
 
 // RemoveAvatar clears the profile picture.

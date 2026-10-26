@@ -1,0 +1,137 @@
+.item {
+  position: relative;
+}
+
+.controlsRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Same grid behaviour as the main board. */
+.listGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 1rem;
+}
+.rowsList {
+  display: grid;
+  gap: 0.75rem;
+}
+@media (min-width: 1601px) {
+  .listGrid {
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  }
+}
+@media (min-width: 2560px) {
+  .listGrid {
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+    gap: 1.25rem;
+  }
+}
+@media (max-width: 700px) {
+  .listGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+}
+
+/* Wide means the same here as on the board: break out of the centered
+   shell column and use the whole screen. */
+.pageWide {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  padding-inline: clamp(1rem, 4vw, 3.5rem);
+  box-sizing: border-box;
+}
+
+/* Pick number, bottom-right of the picture. */
+.rank {
+  position: absolute;
+  right: 0.4rem;
+  bottom: 0.4rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.7rem;
+  height: 1.7rem;
+  padding: 0 0.35rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* Small step buttons at the picture's bottom-left, sized for touch. */
+.moveControls {
+  position: absolute;
+  left: 0.4rem;
+  bottom: 0.4rem;
+  z-index: 2;
+  display: inline-flex;
+  gap: 0.3rem;
+}
+.moveControls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.moveControls button:hover:not(:disabled) {
+  background: var(--surface-soft);
+}
+.moveControls button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.moveControls button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.removeRow {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 1.25rem;
+}
+
+.remove {
+  background: none;
+  border: none;
+  padding: 0.15rem 0.25rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.item:hover .remove,
+.item:focus-within .remove,
+.remove:focus-visible {
+  opacity: 1;
+}
+
+.remove:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+@media (hover: none) {
+  .remove {
+    opacity: 1;
+  }
+}

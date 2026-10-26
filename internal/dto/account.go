@@ -45,7 +45,15 @@ type UpdatePostMeta struct {
 
 // Preferences are the account's content settings.
 type Preferences struct {
-	ShowNSFW bool `json:"show_nsfw"`
+	ShowNSFW           bool     `json:"show_nsfw"`
+	DefaultIncludeTags []string `json:"default_include_tags"`
+	DefaultExcludeTags []string `json:"default_exclude_tags"`
+}
+
+// UpdateTagPreferences replaces the account's default board tag filters.
+type UpdateTagPreferences struct {
+	IncludeTags []string `json:"include_tags"`
+	ExcludeTags []string `json:"exclude_tags"`
 }
 
 // UpdatePreferences changes content settings; enabling NSFW requires

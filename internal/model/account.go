@@ -13,6 +13,9 @@ type User struct {
 	AvatarKey   string
 	AvatarType  string
 	ShowNSFW    bool
+	// Default board tag filters, applied when the board loads.
+	DefaultIncludeTags []string
+	DefaultExcludeTags []string
 }
 
 type Passkey struct {

@@ -40,8 +40,14 @@ func tsPtr(t sql.NullTime) *time.Time {
 	return &v
 }
 
-func userFrom(id uuid.UUID, username, display, bio, location, website string, created time.Time, avatarKey, avatarType string, showNSFW bool) model.User {
-	return model.User{ID: id.String(), Username: username, DisplayName: display, Bio: bio, Location: location, Website: website, CreatedAt: created, AvatarKey: avatarKey, AvatarType: avatarType, ShowNSFW: showNSFW}
+func userFrom(id uuid.UUID, username, display, bio, location, website string, created time.Time, avatarKey, avatarType string, showNSFW bool, includeTags, excludeTags []string) model.User {
+	if includeTags == nil {
+		includeTags = []string{}
+	}
+	if excludeTags == nil {
+		excludeTags = []string{}
+	}
+	return model.User{ID: id.String(), Username: username, DisplayName: display, Bio: bio, Location: location, Website: website, CreatedAt: created, AvatarKey: avatarKey, AvatarType: avatarType, ShowNSFW: showNSFW, DefaultIncludeTags: includeTags, DefaultExcludeTags: excludeTags}
 }
 
 func (d *AccountsDAO) CreateUser(ctx context.Context, username, display string) (model.User, error) {
@@ -49,7 +55,7 @@ func (d *AccountsDAO) CreateUser(ctx context.Context, username, display string) 
 	if err != nil {
 		return model.User{}, err
 	}
-	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw), nil
+	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags), nil
 }
 func (d *AccountsDAO) CreateUserWithID(ctx context.Context, id, username, display string) (model.User, error) {
 	uid, err := parseUUID(id)
@@ -60,14 +66,14 @@ func (d *AccountsDAO) CreateUserWithID(ctx context.Context, id, username, displa
 	if err != nil {
 		return model.User{}, err
 	}
-	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw), nil
+	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags), nil
 }
 func (d *AccountsDAO) GetUserByUsername(ctx context.Context, username string) (model.User, error) {
 	r, err := d.q.GetUserByUsername(ctx, username)
 	if err != nil {
 		return model.User{}, err
 	}
-	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw), nil
+	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags), nil
 }
 func (d *AccountsDAO) GetUserByID(ctx context.Context, id string) (model.User, error) {
 	uid, err := parseUUID(id)
@@ -78,7 +84,7 @@ func (d *AccountsDAO) GetUserByID(ctx context.Context, id string) (model.User, e
 	if err != nil {
 		return model.User{}, err
 	}
-	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw), nil
+	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags), nil
 }
 func (d *AccountsDAO) UpdateProfile(ctx context.Context, u model.User) (model.User, error) {
 	uid, err := parseUUID(u.ID)
@@ -89,7 +95,20 @@ func (d *AccountsDAO) UpdateProfile(ctx context.Context, u model.User) (model.Us
 	if err != nil {
 		return model.User{}, err
 	}
-	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw), nil
+	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags), nil
+}
+func (d *AccountsDAO) UpdateTagPreferences(ctx context.Context, userID string, includeTags, excludeTags []string) error {
+	uid, err := parseUUID(userID)
+	if err != nil {
+		return err
+	}
+	if includeTags == nil {
+		includeTags = []string{}
+	}
+	if excludeTags == nil {
+		excludeTags = []string{}
+	}
+	return d.q.UpdateTagPreferences(ctx, sqlcgen.UpdateTagPreferencesParams{ID: uid, DefaultIncludeTags: includeTags, DefaultExcludeTags: excludeTags})
 }
 func (d *AccountsDAO) UpdateShowNSFW(ctx context.Context, userID string, show bool) error {
 	uid, err := parseUUID(userID)

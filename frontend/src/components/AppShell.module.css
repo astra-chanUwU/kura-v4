@@ -140,8 +140,8 @@
   .userName {
     max-width: 4.5rem;
   }
-  .themeWrap select {
-    max-width: 7.5rem;
+  .themeWrap {
+    max-width: 9rem;
   }
   .main {
     padding: 1rem 0.75rem 2rem;

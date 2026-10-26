@@ -7,12 +7,18 @@ import { HomePage } from "./HomePage";
 const board = vi.hoisted(() => ({
   posts: [] as Post[],
   signedIn: false,
+  includeTags: [] as string[],
+  excludeTags: [] as string[],
+  urlSearch: {} as { tags?: string; exclude?: string; q?: string },
+  navigate: vi.fn(),
 }));
 
 vi.mock("../hooks/useSite");
 vi.mock("@tanstack/react-router", async () => {
   const React = await import("react");
   return {
+    useSearch: () => board.urlSearch,
+    useNavigate: () => board.navigate,
     Link: ({
       to,
       params,
@@ -49,7 +55,16 @@ vi.mock("../hooks/useKura", () => ({
   ],
   useDebouncedValue: (value: unknown) => value,
   useMe: () => ({
-    me: undefined,
+    me: board.signedIn
+      ? {
+          user: { id: "u1", username: "ana" },
+          preferences: {
+            show_nsfw: false,
+            default_include_tags: board.includeTags,
+            default_exclude_tags: board.excludeTags,
+          },
+        }
+      : undefined,
     user: undefined,
     loading: false,
     signedIn: board.signedIn,
@@ -66,10 +81,14 @@ vi.mock("../hooks/useKura", () => ({
   }),
   // Faithful to the real hook's contract: selected tags filter the board
   // with AND semantics, so adding a tag swaps in the filtered result list.
-  usePostSearch: (_query: string, selectedTags: string[]) => {
-    const active = selectedTags.length > 0;
+  usePostSearch: (_query: string, selectedTags: string[], excludedTags: string[] = []) => {
+    const active = selectedTags.length > 0 || excludedTags.length > 0;
     const results = active
-      ? board.posts.filter((post) => selectedTags.every((tag) => post.tags.includes(tag)))
+      ? board.posts.filter(
+          (post) =>
+            selectedTags.every((tag) => post.tags.includes(tag)) &&
+            !excludedTags.some((tag) => post.tags.includes(tag)),
+        )
       : [];
     return {
       active,
@@ -110,6 +129,11 @@ describe("image board states", () => {
   beforeEach(() => {
     board.posts = [];
     board.signedIn = false;
+    board.includeTags = [];
+    board.excludeTags = [];
+    board.urlSearch = {};
+    board.navigate.mockClear();
+    sessionStorage.clear();
   });
   it("offers recovery when the API is unavailable", () => {
     const retry = vi.fn();
@@ -188,6 +212,116 @@ describe("image board states", () => {
     const head = strip.closest('[class*="boardHead"]');
     expect(head).not.toBeNull();
     expect(head).toContainElement(screen.getByLabelText("Search the board"));
+  });
+  it("pre-loads the signed-in user's saved default tags", () => {
+    board.posts = [
+      { ...untaggedPost, id: "p1", tags: ["anime", "girl"] },
+      { ...untaggedPost, id: "p2", tags: ["anime", "landscape"] },
+      { ...untaggedPost, id: "p3", tags: ["girl"] },
+    ];
+    board.signedIn = true;
+    board.includeTags = ["anime"];
+    board.excludeTags = ["landscape"];
+    mockUseSite.mockReturnValue({
+      site: { name: "My archive", description: "" },
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+    });
+    render(<HomePage />);
+    expect(screen.getByRole("button", { name: "Remove tag anime" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remove excluded tag landscape" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/1 result/)).toBeInTheDocument();
+  });
+  it("excludes a tag typed with a leading dash", () => {
+    board.posts = [
+      { ...untaggedPost, id: "p1", tags: ["anime"] },
+      { ...untaggedPost, id: "p2", tags: ["gif"] },
+    ];
+    mockUseSite.mockReturnValue({
+      site: { name: "My archive", description: "" },
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+    });
+    render(<HomePage />);
+    const input = screen.getByLabelText("Search the board");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "-gif" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByRole("button", { name: "Remove excluded tag gif" })).toBeInTheDocument();
+    // Staged only: nothing filters until Filter is pressed.
+    expect(screen.queryByText(/result/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Filter/ }));
+    expect(screen.getByText(/1 result/)).toBeInTheDocument();
+  });
+  it("stages several tags and filters once on Filter", () => {
+    board.posts = [
+      { ...untaggedPost, id: "p1", tags: ["yuri", "cute", "white_hair"] },
+      { ...untaggedPost, id: "p2", tags: ["yuri", "cute"] },
+      { ...untaggedPost, id: "p3", tags: ["yuri", "white_hair"] },
+    ];
+    mockUseSite.mockReturnValue({
+      site: { name: "My archive", description: "" },
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+    });
+    render(<HomePage />);
+    fireEvent.click(screen.getByRole("button", { name: "Add tag yuri" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add tag cute" }));
+    expect(screen.getByRole("button", { name: "Remove tag yuri" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove tag cute" })).toBeInTheDocument();
+    const filterButton = screen.getByRole("button", { name: /Filter/ });
+    expect(filterButton).toHaveTextContent(/^Filter$/);
+    expect(filterButton).toHaveAccessibleName("Filter (2 unapplied changes)");
+    expect(screen.queryByText(/results with all selected tags/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Filter/ }));
+    expect(screen.getByText(/2 results with all selected tags/)).toBeInTheDocument();
+    // The applied filter is written to the URL for Back/Forward.
+    expect(board.navigate).toHaveBeenCalledWith({
+      to: "/",
+      search: { tags: "yuri,cute", exclude: undefined, q: undefined },
+    });
+  });
+  it("restores the filter from the URL and lets it win over defaults", () => {
+    board.posts = [
+      { ...untaggedPost, id: "p1", tags: ["anime", "girl"] },
+      { ...untaggedPost, id: "p2", tags: ["anime", "landscape"] },
+      { ...untaggedPost, id: "p3", tags: ["girl"] },
+    ];
+    board.signedIn = true;
+    board.includeTags = ["landscape"];
+    board.urlSearch = { tags: "anime", exclude: "landscape" };
+    mockUseSite.mockReturnValue({
+      site: { name: "My archive", description: "" },
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+    });
+    render(<HomePage />);
+    expect(screen.getByRole("button", { name: "Remove tag anime" })).toBeInTheDocument();
+    expect(screen.getByText(/1 result/)).toBeInTheDocument();
+  });
+  it("excludes a tag from the viewport strip's minus button", () => {
+    board.posts = [
+      { ...untaggedPost, id: "p1", tags: ["anime", "girl"] },
+      { ...untaggedPost, id: "p2", tags: ["anime", "landscape"] },
+    ];
+    mockUseSite.mockReturnValue({
+      site: { name: "My archive", description: "" },
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+    });
+    render(<HomePage />);
+    expect(screen.getByRole("button", { name: "Include tag girl" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Exclude tag girl" }));
+    expect(screen.getByRole("button", { name: "Remove excluded tag girl" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Filter/ }));
+    expect(screen.getByText(/1 result/)).toBeInTheDocument();
   });
   it("shows detected tags instead of the no-tags default", () => {
     board.posts = [{ ...untaggedPost, tags: ["anime"] }];

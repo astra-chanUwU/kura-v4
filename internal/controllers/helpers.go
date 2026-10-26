@@ -111,6 +111,18 @@ func listsDTO(lists []model.List) []dto.List {
 	return out
 }
 
+func preferencesDTO(u model.User) dto.Preferences {
+	include := u.DefaultIncludeTags
+	if include == nil {
+		include = []string{}
+	}
+	exclude := u.DefaultExcludeTags
+	if exclude == nil {
+		exclude = []string{}
+	}
+	return dto.Preferences{ShowNSFW: u.ShowNSFW, DefaultIncludeTags: include, DefaultExcludeTags: exclude}
+}
+
 func securityDTO(sec model.AccountSecurity) dto.Security {
 	out := dto.Security{HasPassword: sec.HasPassword, Passkeys: []dto.Passkey{}, HasRecoveryKey: sec.HasRecoveryKey}
 	if sec.RecoveryKeyCreatedAt != nil {

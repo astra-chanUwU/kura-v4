@@ -67,6 +67,8 @@ export interface Security {
 }
 export interface Preferences {
   show_nsfw: boolean;
+  default_include_tags: string[];
+  default_exclude_tags: string[];
 }
 export interface Me {
   user: User;

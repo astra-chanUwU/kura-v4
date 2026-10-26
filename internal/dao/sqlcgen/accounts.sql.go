@@ -55,7 +55,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (username, display_name) VALUES ($1, $2) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw
+INSERT INTO users (username, display_name) VALUES ($1, $2) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags
 `
 
 type CreateUserParams struct {
@@ -64,16 +64,18 @@ type CreateUserParams struct {
 }
 
 type CreateUserRow struct {
-	ID          uuid.UUID
-	Username    string
-	DisplayName string
-	Bio         string
-	Location    string
-	Website     string
-	CreatedAt   time.Time
-	AvatarKey   string
-	AvatarType  string
-	ShowNsfw    bool
+	ID                 uuid.UUID
+	Username           string
+	DisplayName        string
+	Bio                string
+	Location           string
+	Website            string
+	CreatedAt          time.Time
+	AvatarKey          string
+	AvatarType         string
+	ShowNsfw           bool
+	DefaultIncludeTags []string
+	DefaultExcludeTags []string
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
@@ -90,12 +92,14 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 		&i.AvatarKey,
 		&i.AvatarType,
 		&i.ShowNsfw,
+		pq.Array(&i.DefaultIncludeTags),
+		pq.Array(&i.DefaultExcludeTags),
 	)
 	return i, err
 }
 
 const createUserWithID = `-- name: CreateUserWithID :one
-INSERT INTO users (id, username, display_name) VALUES ($1, $2, $3) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw
+INSERT INTO users (id, username, display_name) VALUES ($1, $2, $3) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags
 `
 
 type CreateUserWithIDParams struct {
@@ -105,16 +109,18 @@ type CreateUserWithIDParams struct {
 }
 
 type CreateUserWithIDRow struct {
-	ID          uuid.UUID
-	Username    string
-	DisplayName string
-	Bio         string
-	Location    string
-	Website     string
-	CreatedAt   time.Time
-	AvatarKey   string
-	AvatarType  string
-	ShowNsfw    bool
+	ID                 uuid.UUID
+	Username           string
+	DisplayName        string
+	Bio                string
+	Location           string
+	Website            string
+	CreatedAt          time.Time
+	AvatarKey          string
+	AvatarType         string
+	ShowNsfw           bool
+	DefaultIncludeTags []string
+	DefaultExcludeTags []string
 }
 
 func (q *Queries) CreateUserWithID(ctx context.Context, arg CreateUserWithIDParams) (CreateUserWithIDRow, error) {
@@ -131,6 +137,8 @@ func (q *Queries) CreateUserWithID(ctx context.Context, arg CreateUserWithIDPara
 		&i.AvatarKey,
 		&i.AvatarType,
 		&i.ShowNsfw,
+		pq.Array(&i.DefaultIncludeTags),
+		pq.Array(&i.DefaultExcludeTags),
 	)
 	return i, err
 }
@@ -227,20 +235,22 @@ func (q *Queries) GetSessionUserID(ctx context.Context, tokenHash []byte) (uuid.
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw FROM users WHERE id = $1
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags FROM users WHERE id = $1
 `
 
 type GetUserByIDRow struct {
-	ID          uuid.UUID
-	Username    string
-	DisplayName string
-	Bio         string
-	Location    string
-	Website     string
-	CreatedAt   time.Time
-	AvatarKey   string
-	AvatarType  string
-	ShowNsfw    bool
+	ID                 uuid.UUID
+	Username           string
+	DisplayName        string
+	Bio                string
+	Location           string
+	Website            string
+	CreatedAt          time.Time
+	AvatarKey          string
+	AvatarType         string
+	ShowNsfw           bool
+	DefaultIncludeTags []string
+	DefaultExcludeTags []string
 }
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error) {
@@ -257,25 +267,29 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow
 		&i.AvatarKey,
 		&i.AvatarType,
 		&i.ShowNsfw,
+		pq.Array(&i.DefaultIncludeTags),
+		pq.Array(&i.DefaultExcludeTags),
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw FROM users WHERE username = $1
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags FROM users WHERE username = $1
 `
 
 type GetUserByUsernameRow struct {
-	ID          uuid.UUID
-	Username    string
-	DisplayName string
-	Bio         string
-	Location    string
-	Website     string
-	CreatedAt   time.Time
-	AvatarKey   string
-	AvatarType  string
-	ShowNsfw    bool
+	ID                 uuid.UUID
+	Username           string
+	DisplayName        string
+	Bio                string
+	Location           string
+	Website            string
+	CreatedAt          time.Time
+	AvatarKey          string
+	AvatarType         string
+	ShowNsfw           bool
+	DefaultIncludeTags []string
+	DefaultExcludeTags []string
 }
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUserByUsernameRow, error) {
@@ -292,6 +306,8 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUs
 		&i.AvatarKey,
 		&i.AvatarType,
 		&i.ShowNsfw,
+		pq.Array(&i.DefaultIncludeTags),
+		pq.Array(&i.DefaultExcludeTags),
 	)
 	return i, err
 }
@@ -460,7 +476,7 @@ func (q *Queries) UpdateAvatar(ctx context.Context, arg UpdateAvatarParams) erro
 
 const updateProfile = `-- name: UpdateProfile :one
 UPDATE users SET display_name=$2, bio=$3, location=$4, website=$5, updated_at=now()
-WHERE id=$1 RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw
+WHERE id=$1 RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags
 `
 
 type UpdateProfileParams struct {
@@ -472,16 +488,18 @@ type UpdateProfileParams struct {
 }
 
 type UpdateProfileRow struct {
-	ID          uuid.UUID
-	Username    string
-	DisplayName string
-	Bio         string
-	Location    string
-	Website     string
-	CreatedAt   time.Time
-	AvatarKey   string
-	AvatarType  string
-	ShowNsfw    bool
+	ID                 uuid.UUID
+	Username           string
+	DisplayName        string
+	Bio                string
+	Location           string
+	Website            string
+	CreatedAt          time.Time
+	AvatarKey          string
+	AvatarType         string
+	ShowNsfw           bool
+	DefaultIncludeTags []string
+	DefaultExcludeTags []string
 }
 
 func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (UpdateProfileRow, error) {
@@ -504,6 +522,8 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (U
 		&i.AvatarKey,
 		&i.AvatarType,
 		&i.ShowNsfw,
+		pq.Array(&i.DefaultIncludeTags),
+		pq.Array(&i.DefaultExcludeTags),
 	)
 	return i, err
 }
@@ -519,6 +539,21 @@ type UpdateShowNSFWParams struct {
 
 func (q *Queries) UpdateShowNSFW(ctx context.Context, arg UpdateShowNSFWParams) error {
 	_, err := q.db.ExecContext(ctx, updateShowNSFW, arg.ID, arg.ShowNsfw)
+	return err
+}
+
+const updateTagPreferences = `-- name: UpdateTagPreferences :exec
+UPDATE users SET default_include_tags=$2, default_exclude_tags=$3, updated_at=now() WHERE id=$1
+`
+
+type UpdateTagPreferencesParams struct {
+	ID                 uuid.UUID
+	DefaultIncludeTags []string
+	DefaultExcludeTags []string
+}
+
+func (q *Queries) UpdateTagPreferences(ctx context.Context, arg UpdateTagPreferencesParams) error {
+	_, err := q.db.ExecContext(ctx, updateTagPreferences, arg.ID, pq.Array(arg.DefaultIncludeTags), pq.Array(arg.DefaultExcludeTags))
 	return err
 }
 

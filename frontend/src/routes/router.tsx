@@ -23,7 +23,21 @@ const rootRoute = createRootRoute({
     </section>
   ),
 });
-const homeRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: HomePage });
+const homeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/",
+  component: HomePage,
+  // The board's applied filter lives in the URL (?tags=a,b&exclude=c&q=x)
+  // so Back/Forward restore the search you were exploring.
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { tags?: string; exclude?: string; q?: string } => ({
+    tags: typeof search.tags === "string" && search.tags !== "" ? search.tags : undefined,
+    exclude:
+      typeof search.exclude === "string" && search.exclude !== "" ? search.exclude : undefined,
+    q: typeof search.q === "string" && search.q !== "" ? search.q : undefined,
+  }),
+});
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",

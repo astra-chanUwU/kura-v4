@@ -1,6 +1,8 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { BoardViewControls } from "../components/BoardViewControls";
 import { PostCard } from "../components/PostCard";
+import { PostRow } from "../components/PostRow";
 import { UploadDialog } from "../components/UploadDialog";
 import uploadStyles from "../components/UploadDialog.module.css";
 import {
@@ -11,12 +13,13 @@ import {
   usePostSearch,
   usePosts,
 } from "../hooks/useKura";
+import { useBoardView } from "../hooks/useBoardView";
 import { useSite } from "../hooks/useSite";
 import { useViewportTags } from "../hooks/useViewportTags";
 import styles from "./HomePage.module.css";
 
 export function HomePage() {
-  const { signedIn } = useMe();
+  const { signedIn, me } = useMe();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [droppedFiles, setDroppedFiles] = useState<File[]>([]);
   const [uploadNotice, setUploadNotice] = useState("");
@@ -46,21 +49,7 @@ export function HomePage() {
     return () => observer.disconnect();
   }, [hasMore, loadingMore, loadMore]);
   // Board layout preference: column count (0 = auto) and page width.
-  const [view, setView] = useState<{ cols: number; wide: boolean }>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("kura-board-view") ?? "{}") as {
-        cols?: number;
-        wide?: boolean;
-      };
-      return { cols: typeof saved.cols === "number" ? saved.cols : 0, wide: !!saved.wide };
-    } catch {
-      return { cols: 0, wide: false };
-    }
-  });
-  const changeView = (next: { cols: number; wide: boolean }) => {
-    setView(next);
-    localStorage.setItem("kura-board-view", JSON.stringify(next));
-  };
+  const { view, changeView } = useBoardView();
   // Dragging files anywhere over the board offers the upload dialog.
   useEffect(() => {
     if (!signedIn) return;
@@ -93,17 +82,150 @@ export function HomePage() {
     };
   }, [signedIn]);
 
-  const [searchText, setSearchText] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  // The applied filter lives in the URL (?tags=a,b&exclude=c&q=x), so
+  // Back/Forward restore the search you were exploring. Draft tags are
+  // staged locally and only enter the URL when Filter is pressed.
+  const urlSearch = useSearch({ strict: false }) as {
+    tags?: string;
+    exclude?: string;
+    q?: string;
+  };
+  const navigate = useNavigate();
+  const parseUrlTags = (value?: string): string[] =>
+    value
+      ? [
+          ...new Set(
+            value
+              .split(",")
+              .map((t) => normalizeTagToken(t))
+              .filter(Boolean),
+          ),
+        ]
+      : [];
+  const urlKey = `${urlSearch.tags ?? ""}|${urlSearch.exclude ?? ""}|${urlSearch.q ?? ""}`;
+  const hasUrlFilter = !!(urlSearch.tags || urlSearch.exclude || urlSearch.q);
+  const writeUrl = (include: string[], exclude: string[], q: string) => {
+    void navigate({
+      to: "/",
+      search: {
+        tags: include.length > 0 ? include.join(",") : undefined,
+        exclude: exclude.length > 0 ? exclude.join(",") : undefined,
+        q: q !== "" ? q : undefined,
+      },
+    });
+  };
+
+  const [searchText, setSearchText] = useState(() => urlSearch.q ?? "");
+  // Draft tags: chips the user is staging. They do not filter anything
+  // until Filter is pressed — then they become the applied tags below.
+  const [selectedTags, setSelectedTags] = useState<string[]>(() => parseUrlTags(urlSearch.tags));
+  const [excludedTags, setExcludedTags] = useState<string[]>(() => parseUrlTags(urlSearch.exclude));
+  const [appliedTags, setAppliedTags] = useState<string[]>(() => parseUrlTags(urlSearch.tags));
+  const [appliedExcludedTags, setAppliedExcludedTags] = useState<string[]>(() =>
+    parseUrlTags(urlSearch.exclude),
+  );
+  const [appliedQuery, setAppliedQuery] = useState(() => urlSearch.q ?? "");
   const [searchFocused, setSearchFocused] = useState(false);
+
+  // URL changed under us (Back/Forward, a link): adopt it wholesale —
+  // draft resets to the applied filter.
+  const lastUrlKey = useRef(urlKey);
+  useEffect(() => {
+    if (lastUrlKey.current === urlKey) return;
+    lastUrlKey.current = urlKey;
+    const include = parseUrlTags(urlSearch.tags);
+    const exclude = parseUrlTags(urlSearch.exclude);
+    setSelectedTags(include);
+    setExcludedTags(exclude);
+    setAppliedTags(include);
+    setAppliedExcludedTags(exclude);
+    setAppliedQuery(urlSearch.q ?? "");
+    setSearchText(urlSearch.q ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlKey]);
+
+  // Pre-load the signed-in user's saved default tags once per account —
+  // but only on a plain "/" visit. A URL filter wins, now and for the
+  // rest of this mount (Clear must not resurrect the defaults).
+  const defaultsAppliedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!me || defaultsAppliedFor.current === me.user.id) return;
+    defaultsAppliedFor.current = me.user.id;
+    if (hasUrlFilter) return;
+    // Clear was pressed this tab session: don't resurrect defaults on
+    // a Back-remount. A new tab (fresh sessionStorage) gets defaults.
+    if (sessionStorage.getItem("kura-board-no-defaults") === "1") return;
+    setSelectedTags(me.preferences.default_include_tags ?? []);
+    setExcludedTags(me.preferences.default_exclude_tags ?? []);
+    setAppliedTags(me.preferences.default_include_tags ?? []);
+    setAppliedExcludedTags(me.preferences.default_exclude_tags ?? []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me, hasUrlFilter]);
+  const applyDefaults = () => {
+    if (!me) return;
+    sessionStorage.removeItem("kura-board-no-defaults");
+    const include = me.preferences.default_include_tags ?? [];
+    const exclude = me.preferences.default_exclude_tags ?? [];
+    setSelectedTags(include);
+    setExcludedTags(exclude);
+    setAppliedTags(include);
+    setAppliedExcludedTags(exclude);
+    setAppliedQuery("");
+    setSearchText("");
+    writeUrl(include, exclude, "");
+    goToBoardTop();
+  };
+  // Deliberate search: one press applies the whole staged filter — and
+  // writes it to the URL, so Back returns here after viewing a picture.
+  const applyFilters = () => {
+    sessionStorage.removeItem("kura-board-no-defaults");
+    setAppliedTags(selectedTags);
+    setAppliedExcludedTags(excludedTags);
+    setAppliedQuery(searchText.trim());
+    writeUrl(selectedTags, excludedTags, searchText.trim());
+    goToBoardTop();
+  };
+  const clearFilters = () => {
+    sessionStorage.setItem("kura-board-no-defaults", "1");
+    setSearchText("");
+    setSelectedTags([]);
+    setExcludedTags([]);
+    setAppliedTags([]);
+    setAppliedExcludedTags([]);
+    setAppliedQuery("");
+    writeUrl([], [], "");
+    goToBoardTop();
+  };
+  const pendingCount =
+    selectedTags.filter((t) => !appliedTags.includes(t)).length +
+    appliedTags.filter((t) => !selectedTags.includes(t)).length +
+    excludedTags.filter((t) => !appliedExcludedTags.includes(t)).length +
+    appliedExcludedTags.filter((t) => !excludedTags.includes(t)).length +
+    (searchText.trim() !== appliedQuery ? 1 : 0);
+  const filtersDirty = pendingCount > 0;
+  const hasDefaults =
+    !!me &&
+    ((me.preferences.default_include_tags ?? []).length > 0 ||
+      (me.preferences.default_exclude_tags ?? []).length > 0);
+  const differsFromDefaults =
+    hasDefaults &&
+    (JSON.stringify(selectedTags) !== JSON.stringify(me?.preferences.default_include_tags ?? []) ||
+      JSON.stringify(excludedTags) !== JSON.stringify(me?.preferences.default_exclude_tags ?? []));
   const [highlight, setHighlight] = useState(0);
   // Keystrokes update the input instantly, but filtering (and anything
   // network-adjacent) only sees the debounced value, 200ms behind.
   const debouncedSearchText = useDebouncedValue(searchText, 200);
   const search = usePostSearch(
     debouncedSearchText,
-    selectedTags,
-    searchFocused || selectedTags.length > 0,
+    appliedTags,
+    appliedExcludedTags,
+    searchFocused ||
+      selectedTags.length > 0 ||
+      excludedTags.length > 0 ||
+      appliedTags.length > 0 ||
+      appliedExcludedTags.length > 0,
+    appliedQuery,
+    [...selectedTags, ...excludedTags],
   );
   // Changing the tag set means a new result list: jump back to the
   // start of the board instead of leaving the user mid-scroll.
@@ -112,21 +234,42 @@ export function HomePage() {
   const addTag = (tag: string) => {
     const normalized = normalizeTagToken(tag);
     if (normalized) {
+      setExcludedTags((prev) => prev.filter((t) => t !== normalized));
       setSelectedTags((prev) => (prev.includes(normalized) ? prev : [...prev, normalized]));
     }
     setSearchText("");
     setHighlight(0);
-    goToBoardTop();
   };
-  // Booru-style entry: "anime girl white_hair yuri" becomes one chip per tag.
-  const addTagsFromText = (text: string) => {
-    const tokens = tagTokens(text);
-    if (tokens.length > 0) {
-      setSelectedTags((prev) => [...new Set([...prev, ...tokens])]);
+  const addExcludedTag = (tag: string) => {
+    const normalized = normalizeTagToken(tag);
+    if (normalized) {
+      setSelectedTags((prev) => prev.filter((t) => t !== normalized));
+      setExcludedTags((prev) => (prev.includes(normalized) ? prev : [...prev, normalized]));
     }
     setSearchText("");
     setHighlight(0);
-    goToBoardTop();
+  };
+  // Booru-style entry: "anime girl white_hair -gif" — plain tokens are
+  // required tags, "-tag" tokens are excluded tags, one chip each.
+  const addTagsFromText = (text: string) => {
+    const include: string[] = [];
+    const exclude: string[] = [];
+    for (const raw of text.split(/[\s,]+/)) {
+      if (!raw) continue;
+      const isExclude = raw.startsWith("-") && raw.length > 1;
+      const normalized = normalizeTagToken(isExclude ? raw.slice(1) : raw);
+      if (normalized) (isExclude ? exclude : include).push(normalized);
+    }
+    if (include.length > 0) {
+      setExcludedTags((prev) => prev.filter((t) => !include.includes(t)));
+      setSelectedTags((prev) => [...new Set([...prev, ...include])]);
+    }
+    if (exclude.length > 0) {
+      setSelectedTags((prev) => prev.filter((t) => !exclude.includes(t)));
+      setExcludedTags((prev) => [...new Set([...prev, ...exclude])]);
+    }
+    setSearchText("");
+    setHighlight(0);
   };
   const shownPosts = search.active ? search.results : posts;
 
@@ -135,7 +278,7 @@ export function HomePage() {
   // Limited to 12, excludes already-selected tags, re-computes as you scroll.
   const { recommended: viewportTags, observe: observePost } = useViewportTags(
     shownPosts,
-    selectedTags,
+    [...selectedTags, ...excludedTags, ...appliedTags, ...appliedExcludedTags],
     12,
   );
 
@@ -180,18 +323,33 @@ export function HomePage() {
           with the selected-tag row, so the strip is never covered by it. */}
       <div className={styles.boardHead}>
         <div className={styles.searchBar}>
-          {selectedTags.length > 0 && (
-            <div className={styles.chipRow} aria-label="Selected tags (posts must match all)">
+          {(selectedTags.length > 0 || excludedTags.length > 0) && (
+            <div className={styles.chipRow} aria-label="Tag filters">
               {selectedTags.map((tag) => (
-                <span key={tag} className={styles.chip}>
+                <span
+                  key={`in-${tag}`}
+                  className={`${styles.chip} ${appliedTags.includes(tag) ? "" : styles.chipPending}`}
+                >
                   {tag}
                   <button
                     type="button"
                     aria-label={`Remove tag ${tag}`}
-                    onClick={() => {
-                      setSelectedTags((prev) => prev.filter((t) => t !== tag));
-                      goToBoardTop();
-                    }}
+                    onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {excludedTags.map((tag) => (
+                <span
+                  key={`ex-${tag}`}
+                  className={`${styles.chip} ${styles.chipExcluded} ${appliedExcludedTags.includes(tag) ? "" : styles.chipPending}`}
+                >
+                  −{tag}
+                  <button
+                    type="button"
+                    aria-label={`Remove excluded tag ${tag}`}
+                    onClick={() => setExcludedTags((prev) => prev.filter((t) => t !== tag))}
                   >
                     ×
                   </button>
@@ -221,31 +379,58 @@ export function HomePage() {
                   );
                 } else if (e.key === "Enter" && searchFocused) {
                   e.preventDefault();
-                  if (tagTokens(searchText).length > 1) {
+                  if (searchText.trim() === "") {
+                    // Enter on an empty box submits the staged filter.
+                    applyFilters();
+                  } else if (
+                    searchText.trim().startsWith("-") ||
+                    searchText.trim().includes(" -") ||
+                    tagTokens(searchText).length > 1
+                  ) {
                     addTagsFromText(searchText);
                   } else {
                     const pick = search.suggestions[highlight] ?? search.suggestions[0];
                     if (pick) addTag(pick.tag);
                     else addTagsFromText(searchText);
                   }
-                } else if (e.key === "Backspace" && searchText === "" && selectedTags.length > 0) {
-                  setSelectedTags((prev) => prev.slice(0, -1));
-                  goToBoardTop();
+                } else if (
+                  e.key === "Backspace" &&
+                  searchText === "" &&
+                  (selectedTags.length > 0 || excludedTags.length > 0)
+                ) {
+                  if (selectedTags.length > 0) setSelectedTags((prev) => prev.slice(0, -1));
+                  else setExcludedTags((prev) => prev.slice(0, -1));
                 } else if (e.key === "Escape") {
                   setSearchFocused(false);
                 }
               }}
-              placeholder={selectedTags.length > 0 ? "Add a tag…" : "Search tags…"}
+              placeholder={
+                selectedTags.length > 0 || excludedTags.length > 0
+                  ? "Add a tag… (-tag excludes)"
+                  : "Search tags… (-tag excludes)"
+              }
               aria-label="Search the board"
             />
             {searchFocused && search.suggestions.length > 0 && (
               <ul className={styles.suggestions} aria-label="Tag suggestions">
                 {search.suggestions.map((s, i) => (
-                  <li key={s.tag}>
+                  <li key={s.tag} className={styles.suggestionRow}>
+                    <button
+                      type="button"
+                      aria-label={`Exclude tag ${s.tag}`}
+                      title={`Exclude ${s.tag}`}
+                      className={`${styles.suggestionSide} ${styles.suggestionExclude}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        addExcludedTag(s.tag);
+                      }}
+                    >
+                      −
+                    </button>
                     <button
                       type="button"
                       aria-label={`Add tag ${s.tag}`}
-                      className={i === highlight ? styles.suggestionActive : ""}
+                      className={`${styles.suggestionMain} ${i === highlight ? styles.suggestionActive : ""}`}
                       onMouseDown={(e) => {
                         e.preventDefault();
                         addTag(s.tag);
@@ -254,49 +439,67 @@ export function HomePage() {
                       <span>{s.tag}</span>
                       <span className={styles.suggestionCount}>{s.count}</span>
                     </button>
+                    <button
+                      type="button"
+                      aria-label={`Include tag ${s.tag}`}
+                      title={`Include ${s.tag}`}
+                      className={`${styles.suggestionSide} ${styles.suggestionInclude}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        addTag(s.tag);
+                      }}
+                    >
+                      +
+                    </button>
                   </li>
                 ))}
               </ul>
+            )}
+          </div>
+          <div className={styles.filterControls}>
+            <button
+              type="button"
+              className={filtersDirty ? styles.filterActive : styles.filterButton}
+              onClick={applyFilters}
+              aria-label={
+                filtersDirty
+                  ? `Filter (${pendingCount} unapplied change${pendingCount === 1 ? "" : "s"})`
+                  : "Filter"
+              }
+            >
+              Filter
+            </button>
+            {(selectedTags.length > 0 ||
+              excludedTags.length > 0 ||
+              appliedTags.length > 0 ||
+              appliedExcludedTags.length > 0 ||
+              searchText.trim() !== "" ||
+              appliedQuery !== "") && (
+              <button type="button" onClick={clearFilters}>
+                Clear
+              </button>
+            )}
+            {differsFromDefaults && (
+              <button type="button" onClick={applyDefaults}>
+                My defaults
+              </button>
             )}
           </div>
           {search.active &&
             (search.searching ? (
               <span className={styles.searchMeta}>Searching…</span>
             ) : (
-              <>
-                <span className={styles.searchMeta}>
-                  {search.results.length} result{search.results.length === 1 ? "" : "s"}
-                  {selectedTags.length > 0 ? " with all selected tags" : ""}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchText("");
-                    setSelectedTags([]);
-                    goToBoardTop();
-                  }}
-                >
-                  Clear
-                </button>
-              </>
+              <span className={styles.searchMeta}>
+                {search.results.length} result{search.results.length === 1 ? "" : "s"}
+                {appliedTags.length > 0 ? " with all selected tags" : ""}
+                {appliedExcludedTags.length > 0
+                  ? `, excluding ${appliedExcludedTags.length} tag${appliedExcludedTags.length === 1 ? "" : "s"}`
+                  : ""}
+                {filtersDirty ? " · unapplied changes" : ""}
+              </span>
             ))}
-          <div className={styles.viewControls} role="group" aria-label="Board layout">
-            <span className={styles.viewGroup} role="group" aria-label="Columns">
-              {[0, 1, 2, 3, 4, 6].map((cols) => (
-                <button
-                  key={cols}
-                  type="button"
-                  aria-pressed={view.cols === cols}
-                  className={view.cols === cols ? styles.viewActive : ""}
-                  title={
-                    cols === 0 ? "Automatic columns" : `${cols} column${cols === 1 ? "" : "s"}`
-                  }
-                  onClick={() => changeView({ ...view, cols })}
-                >
-                  {cols === 0 ? "Auto" : cols}
-                </button>
-              ))}
-            </span>
+          <div className={styles.viewControls}>
+            <BoardViewControls view={view} onChange={changeView} />
             {signedIn && (
               <button
                 type="button"
@@ -309,26 +512,6 @@ export function HomePage() {
                 ⬆ Upload
               </button>
             )}
-            <span className={styles.viewGroup} role="group" aria-label="Page width">
-              <button
-                type="button"
-                aria-pressed={!view.wide}
-                className={!view.wide ? styles.viewActive : ""}
-                title="Narrow, centered page"
-                onClick={() => changeView({ ...view, wide: false })}
-              >
-                Narrow
-              </button>
-              <button
-                type="button"
-                aria-pressed={view.wide}
-                className={view.wide ? styles.viewActive : ""}
-                title="Use the full width of the screen"
-                onClick={() => changeView({ ...view, wide: true })}
-              >
-                Wide
-              </button>
-            </span>
           </div>
         </div>
 
@@ -340,15 +523,34 @@ export function HomePage() {
           <div className={styles.viewportTags} aria-label="Tags in current view">
             {viewportTags.length > 0 ? (
               viewportTags.map((t) => (
-                <button
-                  key={t.tag}
-                  type="button"
-                  className={styles.viewportChip}
-                  aria-label={`Add tag ${t.tag}`}
-                  onClick={() => addTag(t.tag)}
-                >
-                  {t.tag} <span className={styles.viewportChipCount}>· {t.count}</span>
-                </button>
+                <span key={t.tag} className={styles.viewportTag}>
+                  <button
+                    type="button"
+                    className={`${styles.viewportTagSide} ${styles.viewportExclude}`}
+                    aria-label={`Exclude tag ${t.tag}`}
+                    title={`Exclude ${t.tag}`}
+                    onClick={() => addExcludedTag(t.tag)}
+                  >
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.viewportTagMain}
+                    aria-label={`Add tag ${t.tag}`}
+                    onClick={() => addTag(t.tag)}
+                  >
+                    {t.tag} <span className={styles.viewportChipCount}>· {t.count}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.viewportTagSide} ${styles.viewportInclude}`}
+                    aria-label={`Include tag ${t.tag}`}
+                    title={`Include ${t.tag}`}
+                    onClick={() => addTag(t.tag)}
+                  >
+                    +
+                  </button>
+                </span>
               ))
             ) : (
               <>
@@ -396,19 +598,32 @@ export function HomePage() {
       )}
       {search.active && !search.searching && search.results.length === 0 && (
         <div className={styles.empty}>
-          <p>Nothing matches “{searchText.trim()}”</p>
-          <p>Try a different spelling, an artist name, or a tag like “gif”.</p>
+          <p>
+            {searchText.trim()
+              ? `Nothing matches “${searchText.trim()}”`
+              : "Nothing matches your tag filters"}
+          </p>
+          <p>Try removing a tag, a different spelling, or a tag like “gif”.</p>
         </div>
       )}
-      {shownPosts.length > 0 && (
-        <div className={styles.grid} data-cols={view.cols || undefined}>
-          {shownPosts.map((post) => (
-            <div key={post.id} ref={(el) => observePost(el, post.id)} data-post-id={post.id}>
-              <PostCard post={post} />
-            </div>
-          ))}
-        </div>
-      )}
+      {shownPosts.length > 0 &&
+        (view.mode === "rows" ? (
+          <div className={styles.rows}>
+            {shownPosts.map((post) => (
+              <div key={post.id} ref={(el) => observePost(el, post.id)} data-post-id={post.id}>
+                <PostRow post={post} onTagClick={addTag} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.grid}>
+            {shownPosts.map((post) => (
+              <div key={post.id} ref={(el) => observePost(el, post.id)} data-post-id={post.id}>
+                <PostCard post={post} />
+              </div>
+            ))}
+          </div>
+        ))}
       <button
         type="button"
         aria-label="Back to top"

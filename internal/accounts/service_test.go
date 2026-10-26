@@ -235,6 +235,21 @@ func TestSetAndRemoveAvatar(t *testing.T) {
 	require.NoError(t, svc.RemoveAvatar(ctx, "u1"))
 }
 
+func TestSetTagPreferencesNormalizesAndExcludeWins(t *testing.T) {
+	ctx := context.Background()
+	repo := NewMockRepository(t)
+	// Booru normalization: spaces split, case/underscores fold, dupes
+	// dropped, gif excluded even though it was also in the include list.
+	repo.EXPECT().UpdateTagPreferences(ctx, "u1",
+		[]string{"white_hair", "anime"},
+		[]string{"gif"}).Return(nil)
+	svc, err := NewService(repo, "http://localhost:5174", nil)
+	require.NoError(t, err)
+	require.NoError(t, svc.SetTagPreferences(ctx, "u1",
+		[]string{"White_Hair", "white_hair", "GIF", "anime"},
+		[]string{"gif"}))
+}
+
 func TestShowNSFWRequiresAdultConfirmation(t *testing.T) {
 	ctx := context.Background()
 	repo := NewMockRepository(t)

@@ -99,18 +99,20 @@ type SiteSetting struct {
 }
 
 type User struct {
-	ID          uuid.UUID
-	Username    string
-	DisplayName string
-	Bio         string
-	Location    string
-	Website     string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	AvatarKey   string
-	AvatarType  string
-	ShowNsfw    bool
-	NsfwAckAt   sql.NullTime
+	ID                 uuid.UUID
+	Username           string
+	DisplayName        string
+	Bio                string
+	Location           string
+	Website            string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	AvatarKey          string
+	AvatarType         string
+	ShowNsfw           bool
+	NsfwAckAt          sql.NullTime
+	DefaultIncludeTags []string
+	DefaultExcludeTags []string
 }
 
 type WebauthnChallenge struct {
