@@ -19,6 +19,22 @@ export function ListPage({ id }: { id: string }) {
   const toasts = useToasts();
   const [copied, setCopied] = useState(false);
   const [editError, setEditError] = useState("");
+  const [editDirty, setEditDirty] = useState(false);
+  const editFormRef = useRef<HTMLFormElement>(null);
+
+  // Unsaved-changes check for the edit form (title/description inputs are
+  // uncontrolled, so compare FormData against the saved list).
+  const checkEditDirty = (visibility?: string) => {
+    const form = editFormRef.current;
+    if (!form || !data) return;
+    const fd = new FormData(form);
+    setEditDirty(
+      String(fd.get("title") ?? "") !== data.list.title ||
+        String(fd.get("description") ?? "") !== (data.list.description ?? "") ||
+        (visibility ?? String(fd.get("visibility") ?? data.list.visibility)) !==
+          data.list.visibility,
+    );
+  };
 
   // Local order shown while present; cleared back to the server order
   // whenever the query items change.
@@ -137,7 +153,9 @@ export function ListPage({ id }: { id: string }) {
 
       {isOwner && (
         <form
+          ref={editFormRef}
           className={styles.inlineForm}
+          onChange={() => checkEditDirty()}
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
@@ -148,6 +166,7 @@ export function ListPage({ id }: { id: string }) {
                 visibility: String(form.get("visibility") ?? list.visibility),
               })
               .then(() => {
+                setEditDirty(false);
                 refresh();
                 toasts.push("List saved.", "success");
               })
@@ -161,11 +180,18 @@ export function ListPage({ id }: { id: string }) {
             aria-label="List description"
             placeholder="Description"
           />
-          <ThemedSelect name="visibility" label="Visibility" defaultValue={list.visibility}>
+          <ThemedSelect
+            name="visibility"
+            label="Visibility"
+            defaultValue={list.visibility}
+            onChange={(value) => checkEditDirty(value)}
+          >
             <option value="private">Private — only me</option>
             <option value="public">Public — anyone with the link</option>
           </ThemedSelect>
-          <button type="submit">Save list</button>
+          <button type="submit" className={editDirty ? styles.saveDirty : undefined}>
+            Save list
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -214,21 +240,21 @@ export function ListPage({ id }: { id: string }) {
                 <div className={listStyles.moveControls}>
                   <button
                     type="button"
-                    aria-label="Move earlier"
-                    title="Move earlier"
+                    aria-label={view.mode === "rows" ? "Move up" : "Move earlier"}
+                    title={view.mode === "rows" ? "Move up" : "Move earlier"}
                     disabled={index === 0}
                     onClick={() => moveItem(post.id, index - 1)}
                   >
-                    ←
+                    {view.mode === "rows" ? "↑" : "←"}
                   </button>
                   <button
                     type="button"
-                    aria-label="Move later"
-                    title="Move later"
+                    aria-label={view.mode === "rows" ? "Move down" : "Move later"}
+                    title={view.mode === "rows" ? "Move down" : "Move later"}
                     disabled={index === visible.length - 1}
                     onClick={() => moveItem(post.id, index + 1)}
                   >
-                    →
+                    {view.mode === "rows" ? "↓" : "→"}
                   </button>
                 </div>
               )}

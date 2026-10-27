@@ -30,6 +30,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 vi.mock("../components/PostCard", () => ({
   PostCard: ({ post }: { post: Post }) => <div data-testid={`card-${post.id}`}>{post.id}</div>,
+  PostActions: () => <span />,
 }));
 vi.mock("../components/ThemedSelect", () => ({
   ThemedSelect: () => <span />,
@@ -85,5 +86,32 @@ describe("list reorder controls", () => {
     // Local order updates in place (this is what FLIP then animates).
     const cards = screen.getAllByTestId(/^card-/).map((el) => el.getAttribute("data-testid"));
     expect(cards).toEqual(["card-p2", "card-p1", "card-p3"]);
+  });
+
+  it("uses up/down arrows in Rows mode", () => {
+    localStorage.setItem("kura-board-view", JSON.stringify({ mode: "rows", wide: false }));
+    hoisted.items = [makePost("p1"), makePost("p2"), makePost("p3")];
+    hoisted.reorderList.mockClear();
+    render(<ListPage id="l1" />);
+    expect(screen.queryByRole("button", { name: "Move later" })).not.toBeInTheDocument();
+    const down = screen.getAllByRole("button", { name: "Move down" });
+    const up = screen.getAllByRole("button", { name: "Move up" });
+    expect(up[0]).toBeDisabled();
+    expect(down[down.length - 1]).toBeDisabled();
+    fireEvent.click(down[0]!);
+    expect(hoisted.reorderList).toHaveBeenCalledWith("l1", ["p2", "p1", "p3"]);
+    localStorage.removeItem("kura-board-view");
+  });
+
+  it("highlights Save list only while edits are unsaved", () => {
+    localStorage.removeItem("kura-board-view");
+    hoisted.items = [makePost("p1")];
+    render(<ListPage id="l1" />);
+    const save = screen.getByRole("button", { name: "Save list" });
+    expect(save.className).not.toMatch(/saveDirty/);
+    fireEvent.change(screen.getByLabelText("List title"), { target: { value: "New title" } });
+    expect(save.className).toMatch(/saveDirty/);
+    fireEvent.change(screen.getByLabelText("List title"), { target: { value: "Faves" } });
+    expect(save.className).not.toMatch(/saveDirty/);
   });
 });
