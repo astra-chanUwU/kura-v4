@@ -376,19 +376,35 @@ func (s *Service) SetAvatar(ctx context.Context, userID, key, contentType string
 	return s.repo.SetAvatar(ctx, userID, key, contentType)
 }
 
-// StoreAvatar stores picture bytes content-addressed and records them.
-func (s *Service) StoreAvatar(ctx context.Context, userID string, r io.Reader, contentType string) error {
+// StoreAvatar stores a downscaled copy of the picture — never the
+// uploaded original — and records it as a JPEG. A picture no decoder can
+// read is rejected rather than stored, so what is stored is always a
+// small file that is safe to serve at any size.
+func (s *Service) StoreAvatar(ctx context.Context, userID string, r io.Reader, _ string) error {
 	if s.media == nil {
 		return ErrNotFound
 	}
-	key, _, err := s.media.PutHashed(ctx, r)
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}
-	return s.repo.SetAvatar(ctx, userID, key, contentType)
+	resized, err := resizedAvatarJPEG(ctx, data)
+	if err != nil {
+		return invalid("That picture could not be read — try a JPEG or PNG instead.")
+	}
+	key, _, err := s.media.PutHashed(ctx, bytes.NewReader(resized))
+	if err != nil {
+		return err
+	}
+	return s.repo.SetAvatar(ctx, userID, key, "image/jpeg")
 }
 
-// Avatar opens the user's profile picture, if they have one.
+// Avatar opens the user's profile picture, if they have one. Pictures
+// stored before avatars were downscaled on upload are converted on
+// first open and the converted copy is stored back, like post
+// thumbnails; afterwards the small JPEG is served as-is. When a legacy
+// picture cannot be converted (no decoder, no ffmpeg), the original is
+// served so the avatar still renders.
 func (s *Service) Avatar(ctx context.Context, userID string) (model.User, io.ReadCloser, error) {
 	user, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil || user.AvatarKey == "" || s.media == nil {
@@ -398,7 +414,28 @@ func (s *Service) Avatar(ctx context.Context, userID string) (model.User, io.Rea
 		return user, nil, err
 	}
 	file, err := s.media.Open(ctx, user.AvatarKey)
-	return user, file, err
+	if err != nil {
+		return user, nil, err
+	}
+	data, err := io.ReadAll(file)
+	_ = file.Close()
+	if err != nil {
+		return user, nil, err
+	}
+	if !avatarNeedsResize(data, user.AvatarType) {
+		return user, io.NopCloser(bytes.NewReader(data)), nil
+	}
+	resized, err := resizedAvatarJPEG(ctx, data)
+	if err != nil {
+		return user, io.NopCloser(bytes.NewReader(data)), nil
+	}
+	user.AvatarType = "image/jpeg"
+	if key, _, putErr := s.media.PutHashed(ctx, bytes.NewReader(resized)); putErr == nil {
+		if setErr := s.repo.SetAvatar(ctx, userID, key, "image/jpeg"); setErr == nil {
+			user.AvatarKey = key
+		}
+	}
+	return user, io.NopCloser(bytes.NewReader(resized)), nil
 }
 
 var ErrAdultConfirmationRequired = errors.New("confirm that you are 18 or older to show NSFW posts")
