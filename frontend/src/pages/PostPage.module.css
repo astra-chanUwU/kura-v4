@@ -243,23 +243,14 @@
   border-color: var(--accent);
 }
 
-/* History lives below the media/details layout in its own full-width
-   card, so long tag diffs never squeeze into the sticky sidebar. */
+/* History lives below the media/details layout as a plain full-width
+   section — same background as the page, no card border — with its
+   entries as single-column rows, like the staff History page. */
 .historySection {
   display: grid;
   gap: 0.6rem;
-  padding: 1rem;
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  background: var(--surface);
 }
 .historyTitle {
   margin: 0;
   font-size: 1.05rem;
-}
-@media (min-width: 1024px) {
-  .historySection ol {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-  }
 }
