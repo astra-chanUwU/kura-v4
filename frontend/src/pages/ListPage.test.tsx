@@ -41,6 +41,7 @@ vi.mock("../components/Toasts", () => ({
   useToasts: () => ({ push: vi.fn() }),
   shortError: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
+vi.mock("../hooks/usePrefetchPost", () => ({ usePrefetchPost: () => ({}) }));
 vi.mock("../hooks/useKura", () => ({
   useList: () => ({
     data: {

@@ -32,6 +32,7 @@ vi.mock("@tanstack/react-router", async () => {
       React.createElement("a", { href: to.replace("$id", params?.id ?? ""), ...props }, children),
   };
 });
+vi.mock("../hooks/usePrefetchPost", () => ({ usePrefetchPost: () => ({}) }));
 vi.mock("../hooks/useKura", () => ({
   normalizeTagToken: (raw: string) =>
     raw

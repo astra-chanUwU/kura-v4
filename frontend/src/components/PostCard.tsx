@@ -8,6 +8,7 @@ import {
   usePostActions,
   useToggleFavorite,
 } from "../hooks/useKura";
+import { usePrefetchPost } from "../hooks/usePrefetchPost";
 import { ThemedSelect } from "./ThemedSelect";
 import { shortError, useToasts } from "./Toasts";
 import styles from "./PostCard.module.css";
@@ -183,6 +184,7 @@ export function PostActions({ post }: { post: Post }) {
  * No title or owner text on the board — those live on the post page.
  */
 export function PostCard({ post }: { post: Post }) {
+  const prefetch = usePrefetchPost(post);
   return (
     <article className={styles.card}>
       <Link
@@ -190,6 +192,7 @@ export function PostCard({ post }: { post: Post }) {
         params={{ id: post.id }}
         className={styles.media}
         aria-label="Open post"
+        {...prefetch}
       >
         <img src={post.thumbnail_url} alt="" loading="lazy" />
       </Link>

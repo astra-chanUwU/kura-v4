@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { Post } from "../types/api";
+import { usePrefetchPost } from "../hooks/usePrefetchPost";
 import { PostActions } from "./PostCard";
 import styles from "./PostRow.module.css";
 
@@ -22,6 +23,7 @@ function formatSize(bytes: number): string {
  * onTagClick is given (the board), otherwise they link to a board
  * search for that tag. */
 export function PostRow({ post, onTagClick }: { post: Post; onTagClick?: (tag: string) => void }) {
+  const prefetch = usePrefetchPost(post);
   const type = TYPE_LABEL[post.content_type] ?? post.content_type;
   const dims = post.width > 0 && post.height > 0 ? `${post.width}×${post.height}` : null;
   return (
@@ -31,6 +33,7 @@ export function PostRow({ post, onTagClick }: { post: Post; onTagClick?: (tag: s
         params={{ id: post.id }}
         className={styles.media}
         aria-label="Open post"
+        {...prefetch}
       >
         <img src={post.thumbnail_url} alt="" loading="lazy" />
       </Link>
