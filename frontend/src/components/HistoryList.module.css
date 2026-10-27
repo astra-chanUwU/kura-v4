@@ -26,9 +26,65 @@
   font-size: 0.85rem;
 }
 .diff {
-  margin: 0.3rem 0 0;
+  list-style: none;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
   font-size: 0.9rem;
   overflow-wrap: anywhere;
+}
+.diffLine {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.35rem;
+}
+.sign {
+  flex: 0 0 1ch;
+  font-weight: 700;
+  text-align: center;
+}
+.added {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+}
+.removed {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+.removed .diffText {
+  text-decoration: line-through;
+}
+.unchanged {
+  color: var(--muted);
+}
+.legend {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.legendAdded {
+  color: var(--success);
+  font-weight: 650;
+}
+.legendRemoved {
+  color: var(--danger);
+  font-weight: 650;
+}
+.legendUnchanged {
+  color: var(--muted);
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 .rollback {
   margin-left: auto;
