@@ -5,6 +5,7 @@ import { PostCard } from "../components/PostCard";
 import { PostRow } from "../components/PostRow";
 import { UploadDialog } from "../components/UploadDialog";
 import uploadStyles from "../components/UploadDialog.module.css";
+import { searchFromFilter } from "../domain/boardFilter";
 import {
   normalizeTagToken,
   tagTokens,
@@ -272,6 +273,13 @@ export function HomePage() {
     setHighlight(0);
   };
   const shownPosts = search.active ? search.results : posts;
+  // Opening a picture carries the applied filter (defaults included),
+  // so the post page's Previous/Next stay inside this result set.
+  const postSearch = searchFromFilter({
+    tags: appliedTags,
+    exclude: appliedExcludedTags,
+    q: appliedQuery,
+  });
 
   // Dynamic viewport-based recommendations: observe which cards are on screen
   // and surface their most frequent tags (like Safebooru but for infinite scroll).
@@ -611,7 +619,7 @@ export function HomePage() {
           <div className={styles.rows}>
             {shownPosts.map((post) => (
               <div key={post.id} ref={(el) => observePost(el, post.id)} data-post-id={post.id}>
-                <PostRow post={post} onTagClick={addTag} />
+                <PostRow post={post} onTagClick={addTag} search={postSearch} />
               </div>
             ))}
           </div>
@@ -619,7 +627,7 @@ export function HomePage() {
           <div className={styles.grid}>
             {shownPosts.map((post) => (
               <div key={post.id} ref={(el) => observePost(el, post.id)} data-post-id={post.id}>
-                <PostCard post={post} />
+                <PostCard post={post} search={postSearch} />
               </div>
             ))}
           </div>

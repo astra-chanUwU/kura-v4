@@ -35,6 +35,73 @@
   font-size: 1.35rem;
   overflow-wrap: anywhere;
 }
+/* Previous/Next through the board sequence the post was opened from. */
+.stepper {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.backLink {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.backLink:hover {
+  color: var(--accent);
+}
+.filterLabel {
+  overflow: hidden;
+  max-width: 28rem;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stepControls {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.stepButton {
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.35rem;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+a.stepButton:hover {
+  border-color: var(--accent);
+}
+a.stepButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.stepDisabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.position {
+  min-width: 4.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
 .full {
   width: 100%;
   max-height: 75vh;
@@ -134,6 +201,13 @@
 @media (max-width: 640px) {
   .page h1 {
     font-size: 1.15rem;
+  }
+  .stepControls {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .filterLabel {
+    max-width: 14rem;
   }
   .full {
     max-height: 62vh;

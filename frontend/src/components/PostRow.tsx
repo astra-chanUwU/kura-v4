@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import type { BoardSearch } from "../domain/boardFilter";
 import type { Post } from "../types/api";
 import { usePrefetchPost } from "../hooks/usePrefetchPost";
 import { PostActions } from "./PostCard";
@@ -21,8 +22,17 @@ function formatSize(bytes: number): string {
 /** One picture per row: thumbnail left, full details right. Used by the
  * board's and lists' Rows view. Tag chips stage the tag when
  * onTagClick is given (the board), otherwise they link to a board
- * search for that tag. */
-export function PostRow({ post, onTagClick }: { post: Post; onTagClick?: (tag: string) => void }) {
+ * search for that tag. `search` is the board filter the post page
+ * steps through. */
+export function PostRow({
+  post,
+  onTagClick,
+  search,
+}: {
+  post: Post;
+  onTagClick?: (tag: string) => void;
+  search?: BoardSearch;
+}) {
   const prefetch = usePrefetchPost(post);
   const type = TYPE_LABEL[post.content_type] ?? post.content_type;
   const dims = post.width > 0 && post.height > 0 ? `${post.width}×${post.height}` : null;
@@ -31,6 +41,7 @@ export function PostRow({ post, onTagClick }: { post: Post; onTagClick?: (tag: s
       <Link
         to="/posts/$id"
         params={{ id: post.id }}
+        search={search}
         className={styles.media}
         aria-label="Open post"
         {...prefetch}

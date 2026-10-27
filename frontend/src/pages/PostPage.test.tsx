@@ -4,6 +4,16 @@ import type { Post } from "../types/api";
 import { PostPage } from "./PostPage";
 
 const updatePostMeta = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const navigate = vi.hoisted(() => vi.fn());
+const neighbors = vi.hoisted(() => ({
+  current: { index: -1, total: 0, ready: false } as {
+    index: number;
+    total: number;
+    ready: boolean;
+    prev?: { id: string };
+    next?: { id: string };
+  },
+}));
 
 const post: Post = {
   id: "p1",
@@ -30,19 +40,29 @@ vi.mock("@tanstack/react-router", async () => {
     Link: ({
       to,
       params,
+      search,
+      replace: _replace,
       children,
       ...props
     }: {
       to: string;
       params?: Record<string, string>;
+      search?: Record<string, string | undefined>;
+      replace?: boolean;
       children?: React.ReactNode;
     }) => {
       let href = to;
       for (const [k, v] of Object.entries(params ?? {})) href = href.replace(`$${k}`, v);
+      const query = new URLSearchParams(
+        Object.entries(search ?? {}).filter((e): e is [string, string] => e[1] !== undefined),
+      ).toString();
+      if (query) href += `?${query}`;
       return React.createElement("a", { href, ...props }, children);
     },
+    useNavigate: () => navigate,
   };
 });
+vi.mock("../hooks/usePrefetchPost", () => ({ usePrefetchNeighbors: () => undefined }));
 vi.mock("../components/PostCard", () => ({ PostActions: () => null }));
 vi.mock("../components/HistoryList", () => ({ HistoryList: () => null }));
 vi.mock("../components/Toasts", () => ({
@@ -71,6 +91,7 @@ vi.mock("../hooks/useKura", () => ({
     loading: false,
   }),
   usePost: () => ({ data: post, isPending: false, error: null }),
+  usePostNeighbors: () => neighbors.current,
   usePostActions: () => ({ updatePostMeta }),
   usePostHistory: () => ({ data: [], isPending: false, error: null }),
   useStaffActions: () => ({
@@ -114,6 +135,60 @@ describe("PostPage staged editing", () => {
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
     expect(screen.getByText("keep_me")).toBeInTheDocument();
     expect(updatePostMeta).not.toHaveBeenCalled();
+  });
+
+  it("steps to previous/next inside the board filter, keeping it in the URL", () => {
+    neighbors.current = {
+      index: 4,
+      total: 57,
+      ready: true,
+      prev: { id: "p0" },
+      next: { id: "p2" },
+    };
+    navigate.mockClear();
+    render(<PostPage id="p1" search={{ tags: "yuri,cute", exclude: "nsfw" }} />);
+
+    expect(screen.getByText("5 / 57")).toBeInTheDocument();
+    expect(screen.getByText("yuri cute −nsfw")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Previous picture" })).toHaveAttribute(
+      "href",
+      "/posts/p0?tags=yuri%2Ccute&exclude=nsfw",
+    );
+    expect(screen.getByRole("link", { name: "Next picture" })).toHaveAttribute(
+      "href",
+      "/posts/p2?tags=yuri%2Ccute&exclude=nsfw",
+    );
+    expect(screen.getByRole("link", { name: /Board/ })).toHaveAttribute(
+      "href",
+      "/?tags=yuri%2Ccute&exclude=nsfw",
+    );
+
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(navigate).toHaveBeenLastCalledWith({
+      to: "/posts/$id",
+      params: { id: "p2" },
+      search: { tags: "yuri,cute", exclude: "nsfw" },
+      replace: true,
+    });
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ params: { id: "p0" } }));
+  });
+
+  it("leaves arrow keys to text fields and asks before dropping unsaved edits", () => {
+    neighbors.current = { index: 0, total: 2, ready: true, next: { id: "p2" } };
+    navigate.mockClear();
+    render(<PostPage id="p1" />);
+    expect(screen.queryByRole("link", { name: "Previous picture" })).not.toBeInTheDocument();
+
+    const input = screen.getByLabelText("Add a tag");
+    fireEvent.keyDown(input, { key: "ArrowRight" });
+    expect(navigate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove tag keep_me" }));
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(navigate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Discard and leave" }));
+    expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ params: { id: "p2" } }));
   });
 
   it("links the picture and a Full size link to the raw file in a new tab", () => {

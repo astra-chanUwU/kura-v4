@@ -10,6 +10,13 @@ import Fuse from "fuse.js";
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEntry, Post } from "../types/api";
 import type { Role } from "../domain/roles";
+import {
+  filterPosts,
+  neighborsOf,
+  normalizeTagToken,
+  type BoardFilter,
+  type Neighbors,
+} from "../domain/boardFilter";
 import { api, DuplicatePostError } from "../api/kura";
 
 /** The existing post when an upload was a duplicate, else undefined. */
@@ -85,15 +92,7 @@ export function useDebouncedValue<T>(value: T, delay = 200): T {
   return debounced;
 }
 
-// Mirror of the server's booru-style tag normalization: spaces and
-// commas separate tags, underscores join words inside a tag.
-export function normalizeTagToken(raw: string): string {
-  return raw
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, "_")
-    .replace(/-/g, "_")
-    .replace(/^_+|_+$/g, "");
-}
+export { normalizeTagToken };
 
 export function tagTokens(text: string): string[] {
   return [
@@ -105,19 +104,6 @@ export function tagTokens(text: string): string[] {
     ),
   ];
 }
-
-// Search is tag-based, not filename-based: free text matches tags
-// (and the artist credit), never the file-derived title.
-const searchFuse = (index: Post[]) =>
-  new Fuse(index, {
-    keys: [
-      { name: "tags", weight: 0.7 },
-      { name: "artist", weight: 0.3 },
-    ],
-    threshold: 0.4,
-    ignoreLocation: true,
-    minMatchCharLength: 2,
-  });
 
 /**
  * Search over the whole board. The server sends a lightweight index of
@@ -178,20 +164,11 @@ export function usePostSearch(
 
   const results = useMemo(() => {
     if (!active || !index.data) return [];
-    let base = index.data;
-    if (selectedTags.length > 0) {
-      base = base.filter((post) => selectedTags.every((tag) => post.tags.includes(tag)));
-    }
-    if (excludedTags.length > 0) {
-      base = base.filter((post) => !excludedTags.some((tag) => post.tags.includes(tag)));
-    }
-    if (appliedTrimmed.length >= 2) {
-      return searchFuse(base)
-        .search(appliedTrimmed)
-        .slice(0, 200)
-        .map((r) => r.item);
-    }
-    return base.slice(0, 200);
+    return filterPosts(index.data, {
+      tags: selectedTags,
+      exclude: excludedTags,
+      q: appliedTrimmed,
+    }).slice(0, 200);
   }, [active, index.data, selectedTags, excludedTags, appliedTrimmed]);
 
   return {
@@ -206,6 +183,33 @@ export function usePostSearch(
 
 export function usePost(id: string) {
   return useQuery({ queryKey: queryKeys.post(id), queryFn: ({ signal }) => api.post(id, signal) });
+}
+
+/**
+ * Where a post sits in the board sequence for `filter` — the same order
+ * and matching the board uses — so the post page can step to the
+ * previous/next picture without dropping the viewer's filters.
+ */
+export function usePostNeighbors(id: string, filter: BoardFilter): Neighbors & { ready: boolean } {
+  const index = useQuery({
+    queryKey: queryKeys.searchIndex(),
+    queryFn: ({ signal }) => api.searchIndex(signal),
+    staleTime: 5 * 60_000,
+  });
+  const tagsKey = filter.tags.join(",");
+  const excludeKey = filter.exclude.join(",");
+  const sequence = useMemo(
+    () =>
+      index.data
+        ? filterPosts(index.data, {
+            tags: tagsKey ? tagsKey.split(",") : [],
+            exclude: excludeKey ? excludeKey.split(",") : [],
+            q: filter.q,
+          })
+        : [],
+    [index.data, tagsKey, excludeKey, filter.q],
+  );
+  return { ...neighborsOf(sequence, id), ready: !!index.data };
 }
 
 export function useFavorites(enabled: boolean) {

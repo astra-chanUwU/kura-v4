@@ -1,5 +1,6 @@
 import { createRootRoute, createRoute, createRouter, Link } from "@tanstack/react-router";
 import { AppShell } from "../components/AppShell";
+import { validateBoardSearch } from "../domain/boardFilter";
 import { AuthPage } from "../pages/AuthPage";
 import { HomePage } from "../pages/HomePage";
 import { ListPage } from "../pages/ListPage";
@@ -32,14 +33,7 @@ const homeRoute = createRoute({
   component: HomePage,
   // The board's applied filter lives in the URL (?tags=a,b&exclude=c&q=x)
   // so Back/Forward restore the search you were exploring.
-  validateSearch: (
-    search: Record<string, unknown>,
-  ): { tags?: string; exclude?: string; q?: string } => ({
-    tags: typeof search.tags === "string" && search.tags !== "" ? search.tags : undefined,
-    exclude:
-      typeof search.exclude === "string" && search.exclude !== "" ? search.exclude : undefined,
-    q: typeof search.q === "string" && search.q !== "" ? search.q : undefined,
-  }),
+  validateSearch: validateBoardSearch,
 });
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -75,9 +69,13 @@ const recoverRoute = createRoute({
 const postRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/posts/$id",
+  // Opened from the board, a post carries the board's filter so
+  // Previous/Next step through that filtered sequence.
+  validateSearch: validateBoardSearch,
   component: () => {
     const { id } = postRoute.useParams();
-    return <PostPage id={id} />;
+    const search = postRoute.useSearch();
+    return <PostPage id={id} search={search} />;
   },
 });
 const profileRoute = createRoute({

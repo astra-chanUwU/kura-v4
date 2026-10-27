@@ -1,10 +1,11 @@
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HistoryList } from "../components/HistoryList";
 import { IconEye, IconEyeOff, IconTrash } from "../components/icons";
 import { PostActions } from "../components/PostCard";
 import { shortError, useToasts } from "../components/Toasts";
+import { filterFromSearch, isFilterActive, type BoardSearch } from "../domain/boardFilter";
 import { atLeast } from "../domain/roles";
 import {
   tagTokens,
@@ -12,8 +13,10 @@ import {
   usePost,
   usePostActions,
   usePostHistory,
+  usePostNeighbors,
   useStaffActions,
 } from "../hooks/useKura";
+import { usePrefetchNeighbors } from "../hooks/usePrefetchPost";
 import type { ChangeEntry } from "../types/api";
 import styles from "./PostPage.module.css";
 
@@ -38,8 +41,24 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function PostPage({ id }: { id: string }) {
+type PendingNav = { to: "board" } | { to: "post"; id: string };
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  // Arrow keys belong to text fields, selects and video seeking.
+  return (
+    target.isContentEditable ||
+    ["INPUT", "TEXTAREA", "SELECT", "VIDEO", "AUDIO"].includes(target.tagName)
+  );
+}
+
+export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch }) {
   const { data: post, isPending, error } = usePost(id);
+  const navigate = useNavigate();
+  const filter = filterFromSearch(search);
+  const nav = usePostNeighbors(id, filter);
+  usePrefetchNeighbors(nav.prev, nav.next);
+  const [pendingNav, setPendingNav] = useState<PendingNav | null>(null);
   const { signedIn, user } = useMe();
   const { updatePostMeta } = usePostActions();
   const staff = useStaffActions();
@@ -69,19 +88,58 @@ export function PostPage({ id }: { id: string }) {
     setMetaError("");
   }
 
+  // Staged editing: tag/artist/rating changes sit in drafts and only hit
+  // the server on Save — one save, one history entry, one rollback point.
+  const dirty =
+    !!post &&
+    ((artistDraft !== null && artistDraft.trim() !== post.artist) ||
+      (tagsDraft !== null && JSON.stringify(tagsDraft) !== JSON.stringify(post.tags)) ||
+      (ratingDraft !== null && ratingDraft !== post.rating));
+
+  // Stepping replaces the history entry, so browser Back still returns
+  // to the board instead of walking back through every picture.
+  const follow = (target: PendingNav) => {
+    if (target.to === "board") void navigate({ to: "/", search });
+    else void navigate({ to: "/posts/$id", params: { id: target.id }, search, replace: true });
+  };
+  const requestNav = (target: PendingNav) => {
+    if (dirty) setPendingNav(target);
+    else follow(target);
+  };
+  const guardLink = (target: PendingNav) => (event: ReactMouseEvent) => {
+    if (!dirty) return;
+    event.preventDefault();
+    setPendingNav(target);
+  };
+
+  // ←/→ step through the board sequence; never while typing, with a
+  // modifier held, or while a dialog or menu has the user's attention.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.shiftKey || isTypingTarget(event.target)) return;
+      if (document.querySelector('[role="dialog"], [role="menu"]')) return;
+      const target = event.key === "ArrowLeft" ? nav.prev : nav.next;
+      if (!target) return;
+      event.preventDefault();
+      requestNav({ to: "post", id: target.id });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   if (isPending) return <p>Loading…</p>;
   if (error || !post) return <p role="alert">That picture could not be found.</p>;
   const isVideo = post.content_type.startsWith("video/");
-
-  // Staged editing: tag/artist/rating changes sit in drafts and only hit
-  // the server on Save — one save, one history entry, one rollback point.
   const artist = artistDraft ?? post.artist;
   const tags = tagsDraft ?? post.tags;
   const rating = ratingDraft ?? post.rating;
-  const dirty =
-    (artistDraft !== null && artistDraft.trim() !== post.artist) ||
-    (tagsDraft !== null && JSON.stringify(tagsDraft) !== JSON.stringify(post.tags)) ||
-    (ratingDraft !== null && ratingDraft !== post.rating);
+  const filterLabel = [
+    ...filter.tags,
+    ...filter.exclude.map((t) => `−${t}`),
+    ...(filter.q ? [`“${filter.q}”`] : []),
+  ].join(" ");
 
   const discardDrafts = () => {
     setArtistDraft(null);
@@ -106,6 +164,68 @@ export function PostPage({ id }: { id: string }) {
 
   return (
     <section className={styles.page} aria-labelledby="post-title">
+      <nav className={styles.stepper} aria-label="Browse pictures">
+        <Link
+          to="/"
+          search={search}
+          className={styles.backLink}
+          onClick={guardLink({ to: "board" })}
+        >
+          ← Board
+          {isFilterActive(filter) && (
+            <span className={styles.filterLabel} title={filterLabel}>
+              {filterLabel}
+            </span>
+          )}
+        </Link>
+        <div className={styles.stepControls}>
+          {nav.prev ? (
+            <Link
+              to="/posts/$id"
+              params={{ id: nav.prev.id }}
+              search={search}
+              replace
+              className={styles.stepButton}
+              aria-label="Previous picture"
+              title="Previous picture (←)"
+              onClick={guardLink({ to: "post", id: nav.prev.id })}
+            >
+              ‹ Prev
+            </Link>
+          ) : (
+            <span className={`${styles.stepButton} ${styles.stepDisabled}`} aria-disabled="true">
+              ‹ Prev
+            </span>
+          )}
+          {nav.ready && (
+            <span className={styles.position}>
+              {nav.index >= 0
+                ? `${nav.index + 1} / ${nav.total}`
+                : isFilterActive(filter)
+                  ? "Not in this filter"
+                  : "Not on the board"}
+            </span>
+          )}
+          {nav.next ? (
+            <Link
+              to="/posts/$id"
+              params={{ id: nav.next.id }}
+              search={search}
+              replace
+              className={styles.stepButton}
+              aria-label="Next picture"
+              title="Next picture (→)"
+              onClick={guardLink({ to: "post", id: nav.next.id })}
+            >
+              Next ›
+            </Link>
+          ) : (
+            <span className={`${styles.stepButton} ${styles.stepDisabled}`} aria-disabled="true">
+              Next ›
+            </span>
+          )}
+        </div>
+      </nav>
       <h1 id="post-title">{post.artist || "Picture"}</h1>
       <div className={styles.layout}>
         <div className={styles.mediaCol}>
@@ -383,6 +503,20 @@ export function PostPage({ id }: { id: string }) {
               toasts.push("Post deleted. Find it under Staff → Hidden & deleted.", "success"),
             )
             .catch((e: unknown) => toasts.push(shortError(e), "error"));
+        }}
+      />
+      <ConfirmDialog
+        open={pendingNav !== null}
+        title="Discard unsaved changes?"
+        message="Your tag, artist and rating edits on this picture have not been saved."
+        confirmLabel="Discard and leave"
+        destructive
+        onCancel={() => setPendingNav(null)}
+        onConfirm={() => {
+          const target = pendingNav;
+          setPendingNav(null);
+          discardDrafts();
+          if (target) follow(target);
         }}
       />
     </section>

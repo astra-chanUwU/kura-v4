@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import type { BoardSearch } from "../domain/boardFilter";
 import type { Post } from "../types/api";
 import {
   useListActions,
@@ -182,14 +183,16 @@ export function PostActions({ post }: { post: Post }) {
 /**
  * Board tile: just a thumbnail, with Save / + List overlaid on top.
  * No title or owner text on the board — those live on the post page.
+ * `search` is the board filter the post page steps through.
  */
-export function PostCard({ post }: { post: Post }) {
+export function PostCard({ post, search }: { post: Post; search?: BoardSearch }) {
   const prefetch = usePrefetchPost(post);
   return (
     <article className={styles.card}>
       <Link
         to="/posts/$id"
         params={{ id: post.id }}
+        search={search}
         className={styles.media}
         aria-label="Open post"
         {...prefetch}
