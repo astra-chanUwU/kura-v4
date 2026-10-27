@@ -51,45 +51,20 @@ func Seed(ctx context.Context, cfg config.Config, dirs []string, log *slog.Logge
 			if walkErr != nil {
 				return walkErr
 			}
-			if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") || !seedExts[strings.ToLower(filepath.Ext(entry.Name()))] {
+			if entry.IsDir() || !isSeedMedia(entry.Name()) {
 				return nil
 			}
-			sha, size, contentType, err := hashFile(path)
+			_, wasSkipped, err := importSeedFile(ctx, store, svc, path, entry.Name(), nil, func(contentType, sha string, meta board.SeedMeta) []string {
+				return seedTags(dir, contentType, sha, meta.Tags)
+			})
 			if err != nil {
 				return err
 			}
-			if !board.IsAllowedMedia(contentType) {
-				skipped++ // e.g. an HTML error page saved with a .gif name
-				return nil
+			if wasSkipped {
+				skipped++ // duplicate hash, or a non-media file saved with an image extension
+			} else {
+				imported++
 			}
-			exists, err := svc.ExistsBySHA(ctx, sha)
-			if err != nil {
-				return err
-			}
-			if exists {
-				skipped++
-				return nil
-			}
-			file, err := os.Open(path) //nolint:gosec // operator-supplied seed path
-			if err != nil {
-				return err
-			}
-			key, _, putErr := store.PutHashed(ctx, file)
-			closeErr := file.Close()
-			if putErr != nil {
-				return putErr
-			}
-			if closeErr != nil {
-				return closeErr
-			}
-			meta := board.ParseSeedName(entry.Name())
-			tags := seedTags(dir, contentType, sha, meta.Tags)
-			if _, err := svc.Create(ctx, model.Post{OriginalName: entry.Name(), StorageKey: key, ContentType: contentType, SizeBytes: size,
-				Artist: meta.Artist, Source: meta.Source, SourceID: meta.SourceID, Tags: tags}, sha); err != nil {
-				_ = store.Delete(ctx, key)
-				return err
-			}
-			imported++
 			return nil
 		})
 		if err != nil {
@@ -98,6 +73,78 @@ func Seed(ctx context.Context, cfg config.Config, dirs []string, log *slog.Logge
 	}
 	log.Info("seed complete", "imported", imported, "skipped_duplicates", skipped)
 	return nil
+}
+
+func isSeedMedia(name string) bool {
+	return !strings.HasPrefix(name, ".") && seedExts[strings.ToLower(filepath.Ext(name))]
+}
+
+// seedFile is one media file under a directory passed to seed or demo.
+// Dir is that directory, not the file's parent: folder tags use its base name.
+type seedFile struct {
+	Path string
+	Name string
+	Dir  string
+}
+
+func collectSeedFiles(dirs []string) ([]seedFile, error) {
+	var files []seedFile
+	for _, dir := range dirs {
+		err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() || !isSeedMedia(entry.Name()) {
+				return nil
+			}
+			files = append(files, seedFile{Path: path, Name: entry.Name(), Dir: dir})
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	return files, nil
+}
+
+// importSeedFile stores one media file and creates its post. skipped is
+// true for a duplicate hash or a type the board will not accept. tagsFor
+// runs only when a post will be created. A nil owner matches `kura seed`.
+func importSeedFile(ctx context.Context, store *storage.Local, svc *board.Service, path, name string, ownerID *string, tagsFor func(contentType, sha string, meta board.SeedMeta) []string) (model.Post, bool, error) {
+	sha, size, contentType, err := hashFile(path)
+	if err != nil {
+		return model.Post{}, false, err
+	}
+	if !board.IsAllowedMedia(contentType) {
+		return model.Post{}, true, nil
+	}
+	exists, err := svc.ExistsBySHA(ctx, sha)
+	if err != nil {
+		return model.Post{}, false, err
+	}
+	if exists {
+		return model.Post{}, true, nil
+	}
+	file, err := os.Open(path) //nolint:gosec // operator-supplied seed path
+	if err != nil {
+		return model.Post{}, false, err
+	}
+	key, _, putErr := store.PutHashed(ctx, file)
+	closeErr := file.Close()
+	if putErr != nil {
+		return model.Post{}, false, putErr
+	}
+	if closeErr != nil {
+		return model.Post{}, false, closeErr
+	}
+	meta := board.ParseSeedName(name)
+	post, err := svc.Create(ctx, model.Post{OwnerID: ownerID, OriginalName: name, StorageKey: key, ContentType: contentType, SizeBytes: size,
+		Artist: meta.Artist, Source: meta.Source, SourceID: meta.SourceID, Tags: tagsFor(contentType, sha, meta)}, sha)
+	if err != nil {
+		_ = store.Delete(ctx, key)
+		return model.Post{}, false, err
+	}
+	return post, false, nil
 }
 
 func hashFile(path string) (string, int64, string, error) {
@@ -177,4 +224,47 @@ func seedTags(dir, contentType, sha string, filenameTags []string) []string {
 		picked++
 	}
 	return board.NormalizeTags(tags)
+}
+
+func sidecarPath(imagePath string) string {
+	return strings.TrimSuffix(imagePath, filepath.Ext(imagePath)) + ".tags"
+}
+
+// readSidecarTags reads a one-line booru tag file next to an image.
+// ok is false when the sidecar is absent (a download may still be in
+// progress); a present file yields its tags, which may be empty.
+func readSidecarTags(imagePath string) (tags []string, ok bool, err error) {
+	data, err := os.ReadFile(sidecarPath(imagePath)) //nolint:gosec // sidecar beside an operator-supplied seed path
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return parseSidecarTags(string(data)), true, nil
+}
+
+// parseSidecarTags takes the first line of a sidecar. Tags are
+// space-separated; anything after the first line is ignored so a
+// partial trailing write does not become extra tags.
+func parseSidecarTags(content string) []string {
+	if i := strings.IndexAny(content, "\r\n"); i >= 0 {
+		content = content[:i]
+	}
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return nil
+	}
+	return strings.Fields(content)
+}
+
+// tagsForSeedFile uses a sidecar's tags plus the seed tag when the
+// sidecar is present. seed stays first so the 30-tag cap cannot drop
+// it. Without a sidecar the fake seedTags set is used, which is what
+// `kura seed` always does.
+func tagsForSeedFile(dir, contentType, sha string, filenameTags, sidecar []string, hasSidecar bool) []string {
+	if !hasSidecar {
+		return seedTags(dir, contentType, sha, filenameTags)
+	}
+	return board.NormalizeTags(append([]string{"seed"}, sidecar...))
 }

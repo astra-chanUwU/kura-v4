@@ -2,9 +2,9 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 ENV_RUN := node --env-file=.env scripts/run.mjs
 
-.PHONY: help setup db-up db-down dev migrate audit migration generate generate-check format format-check lint typecheck test test-go test-integration test-web check build compose-check
+.PHONY: help setup db-up db-down dev migrate audit migration seed-images reseed generate generate-check format format-check lint typecheck test test-go test-integration test-web check build compose-check
 help:
-	@echo "setup | dev | check | build | migrate | migration name=description | generate"
+	@echo "setup | dev | reseed | seed-images [count=600] | check | build | migrate | migration name=description | generate"
 setup:
 	@test -f .env || cp .env.example .env
 	pnpm install --frozen-lockfile
@@ -22,6 +22,16 @@ migration:
 	go tool goose -dir internal/db/migrations create "$(name)" sql
 dev: db-up migrate
 	pnpm dev
+seed-images:
+	node scripts/fetch-safebooru.mjs --count $(or $(count),600)
+# Destroys the dev database and stored media, then rebuilds demo data
+# from .local/seed. The media directory itself stays: a running server
+# holds it open.
+reseed:
+	docker compose down -v
+	mkdir -p .local/media && find .local/media -mindepth 1 -delete
+	$(MAKE) db-up
+	$(ENV_RUN) go run -tags dev ./cmd/kura demo .local/seed
 generate:
 	CGO_ENABLED=0 go tool sqlc generate
 	GOFLAGS=-tags=dev go tool mockery

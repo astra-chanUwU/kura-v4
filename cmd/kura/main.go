@@ -16,8 +16,8 @@ import (
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(log)
-	if len(os.Args) < 2 || (os.Args[1] != "serve" && os.Args[1] != "migrate" && os.Args[1] != "seed" && os.Args[1] != "audit" && os.Args[1] != "promote") {
-		log.Error("usage: kura serve | migrate | seed <dir> [dir...] | audit | promote <username> <role>")
+	if len(os.Args) < 2 || (os.Args[1] != "serve" && os.Args[1] != "migrate" && os.Args[1] != "seed" && os.Args[1] != "demo" && os.Args[1] != "audit" && os.Args[1] != "promote") {
+		log.Error("usage: kura serve | migrate | seed <dir> [dir...] | demo <dir> [dir...] | audit | promote <username> <role>")
 		os.Exit(2)
 	}
 	if os.Args[1] == "promote" && len(os.Args) != 4 {
@@ -26,6 +26,10 @@ func main() {
 	}
 	if os.Args[1] == "seed" && len(os.Args) < 3 {
 		log.Error("usage: kura seed <dir> [dir...]")
+		os.Exit(2)
+	}
+	if os.Args[1] == "demo" && len(os.Args) < 3 {
+		log.Error("usage: kura demo <dir> [dir...]")
 		os.Exit(2)
 	}
 	cfg, err := config.Load()
@@ -51,6 +55,8 @@ func main() {
 		err = app.Audit(ctx, cfg, os.Stdout)
 	} else if os.Args[1] == "seed" {
 		err = app.Seed(ctx, cfg, os.Args[2:], log)
+	} else if os.Args[1] == "demo" {
+		err = app.Demo(ctx, cfg, os.Args[2:], log)
 	} else {
 		err = app.Run(ctx, cfg, log)
 	}

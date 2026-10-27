@@ -309,3 +309,7 @@ func (d *AccountsDAO) UpdateUserRole(ctx context.Context, userID string, role mo
 func (d *AccountsDAO) CountUsersByRole(ctx context.Context, role model.Role) (int64, error) {
 	return d.q.CountUsersByRole(ctx, string(role))
 }
+
+func (d *AccountsDAO) CountUsers(ctx context.Context) (int64, error) {
+	return d.q.CountUsers(ctx)
+}

@@ -34,6 +34,8 @@ credentials only take effect on first initialization of its volume.
 | Command | Purpose |
 | --- | --- |
 | `make dev` | Database, migrations, Go reload and Vite |
+| `make reseed` | **Destroys** the dev database and stored media, then rebuilds demo data (8 accounts, password `kura-demo-2026!`) from `.local/seed`. Use it whenever a schema change makes old data a nuisance |
+| `make seed-images [count=600]` | Download Safebooru pictures plus `.tags` sidecars into `.local/seed/safebooru-anime` until it holds `count` images |
 | `make check` | Formatting, lint, layers, types, generation drift, all tests, Compose validation and production build |
 | `make test-go` | Go unit/HTTP/storage tests, with race detection |
 | `make test-integration` | A temporary PostgreSQL container: migrations and job lease/retry behavior |
@@ -43,6 +45,7 @@ credentials only take effect on first initialization of its volume.
 | `node --env-file=.env scripts/run.mjs go run -tags dev ./cmd/kura promote <username> <role>` | Set a role from the operator shell (bootstrap the first super admin) |
 | `make migrate` | Apply migrations to the configured database |
 | `node --env-file=.env scripts/run.mjs go run -tags dev ./cmd/kura seed <dir> [dir...]` | Import sample picture folders as board posts (duplicates skipped) |
+| `node --env-file=.env scripts/run.mjs go run -tags dev ./cmd/kura demo <dir> [dir...]` | Fill a fresh localhost database with demo accounts, posts, lists and moderation history. Refuses unless there are zero users and the public URL is loopback |
 | `make format` | Format Go and frontend source |
 | `make build` | Build Vite and embed its assets into `bin/kura` |
 
@@ -103,7 +106,7 @@ The UI is designed for phone, tablet and desktop widths:
 ## Code map
 
 ```text
-cmd/kura/                 serve, migrate, seed and audit commands
+cmd/kura/                 serve, migrate, seed, demo, audit and promote commands
 internal/app/             dependency construction and lifecycle
 internal/controllers/     HTTP parsing and responses
 internal/accounts/        accounts, passkeys, sessions and recovery keys

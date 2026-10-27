@@ -89,3 +89,6 @@ UPDATE users SET role=$2, updated_at=now() WHERE id=$1 RETURNING id, username, d
 
 -- name: CountUsersByRole :one
 SELECT count(*) FROM users WHERE role=$1;
+
+-- name: CountUsers :one
+SELECT count(*) FROM users;
