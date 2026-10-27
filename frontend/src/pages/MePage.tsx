@@ -26,6 +26,7 @@ import {
   useMyLists,
   useMyPosts,
 } from "../hooks/useKura";
+import { ROLE_LABELS } from "../domain/roles";
 import styles from "./Simple.module.css";
 
 const DISMISS_KEY = "kura-passkey-tip-dismissed";
@@ -185,7 +186,7 @@ export function MePage() {
         <div>
           <h1 id="me-title">{user.display_name || user.username}</h1>
           <p className={styles.muted}>
-            @{user.username} ·{" "}
+            @{user.username} · {ROLE_LABELS[user.role]} ·{" "}
             <Link to="/u/$username" params={{ username: user.username }}>
               View public profile
             </Link>

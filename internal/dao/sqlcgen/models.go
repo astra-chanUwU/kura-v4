@@ -12,6 +12,19 @@ import (
 	"github.com/google/uuid"
 )
 
+type ChangeHistory struct {
+	ID            uuid.UUID
+	EntityType    string
+	EntityID      uuid.UUID
+	ActorID       uuid.NullUUID
+	ActorUsername string
+	Action        string
+	BeforeState   json.RawMessage
+	AfterState    json.RawMessage
+	RollbackOf    uuid.NullUUID
+	CreatedAt     time.Time
+}
+
 type Favorite struct {
 	UserID    uuid.UUID
 	PostID    uuid.UUID
@@ -72,6 +85,8 @@ type Post struct {
 	Width        int32
 	Height       int32
 	Rating       string
+	HiddenAt     sql.NullTime
+	HiddenBy     uuid.NullUUID
 }
 
 type PostTag struct {
@@ -113,6 +128,7 @@ type User struct {
 	NsfwAckAt          sql.NullTime
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
+	Role               string
 }
 
 type WebauthnChallenge struct {

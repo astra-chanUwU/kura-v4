@@ -4,6 +4,7 @@ import { AuthPage } from "../pages/AuthPage";
 import { HomePage } from "../pages/HomePage";
 import { ListPage } from "../pages/ListPage";
 import { MePage } from "../pages/MePage";
+import { AdminPage } from "../pages/AdminPage";
 import { PostPage } from "../pages/PostPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { RecoverPage } from "../pages/RecoverPage";
@@ -49,6 +50,11 @@ const registerRoute = createRoute({
   component: () => <AuthPage mode="register" />,
 });
 const meRoute = createRoute({ getParentRoute: () => rootRoute, path: "/me", component: MePage });
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin",
+  component: AdminPage,
+});
 const recoverRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/recover",
@@ -85,6 +91,7 @@ export const router = createRouter({
     registerRoute,
     recoverRoute,
     meRoute,
+    adminRoute,
     postRoute,
     profileRoute,
     listRoute,

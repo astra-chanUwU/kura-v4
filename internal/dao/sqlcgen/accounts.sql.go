@@ -14,6 +14,17 @@ import (
 	"github.com/lib/pq"
 )
 
+const countUsersByRole = `-- name: CountUsersByRole :one
+SELECT count(*) FROM users WHERE role=$1
+`
+
+func (q *Queries) CountUsersByRole(ctx context.Context, role string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countUsersByRole, role)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createChallenge = `-- name: CreateChallenge :one
 INSERT INTO webauthn_challenges (purpose, username, user_id, session_data, expires_at) VALUES ($1,$2,$3,$4,$5) RETURNING id
 `
@@ -55,7 +66,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (username, display_name) VALUES ($1, $2) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags
+INSERT INTO users (username, display_name) VALUES ($1, $2) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, role
 `
 
 type CreateUserParams struct {
@@ -76,6 +87,7 @@ type CreateUserRow struct {
 	ShowNsfw           bool
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
+	Role               string
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
@@ -94,12 +106,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 		&i.ShowNsfw,
 		pq.Array(&i.DefaultIncludeTags),
 		pq.Array(&i.DefaultExcludeTags),
+		&i.Role,
 	)
 	return i, err
 }
 
 const createUserWithID = `-- name: CreateUserWithID :one
-INSERT INTO users (id, username, display_name) VALUES ($1, $2, $3) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags
+INSERT INTO users (id, username, display_name) VALUES ($1, $2, $3) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, role
 `
 
 type CreateUserWithIDParams struct {
@@ -121,6 +134,7 @@ type CreateUserWithIDRow struct {
 	ShowNsfw           bool
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
+	Role               string
 }
 
 func (q *Queries) CreateUserWithID(ctx context.Context, arg CreateUserWithIDParams) (CreateUserWithIDRow, error) {
@@ -139,6 +153,7 @@ func (q *Queries) CreateUserWithID(ctx context.Context, arg CreateUserWithIDPara
 		&i.ShowNsfw,
 		pq.Array(&i.DefaultIncludeTags),
 		pq.Array(&i.DefaultExcludeTags),
+		&i.Role,
 	)
 	return i, err
 }
@@ -235,7 +250,7 @@ func (q *Queries) GetSessionUserID(ctx context.Context, tokenHash []byte) (uuid.
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags FROM users WHERE id = $1
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, role FROM users WHERE id = $1
 `
 
 type GetUserByIDRow struct {
@@ -251,6 +266,7 @@ type GetUserByIDRow struct {
 	ShowNsfw           bool
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
+	Role               string
 }
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error) {
@@ -269,12 +285,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow
 		&i.ShowNsfw,
 		pq.Array(&i.DefaultIncludeTags),
 		pq.Array(&i.DefaultExcludeTags),
+		&i.Role,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags FROM users WHERE username = $1
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, role FROM users WHERE username = $1
 `
 
 type GetUserByUsernameRow struct {
@@ -290,6 +307,7 @@ type GetUserByUsernameRow struct {
 	ShowNsfw           bool
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
+	Role               string
 }
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUserByUsernameRow, error) {
@@ -308,6 +326,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUs
 		&i.ShowNsfw,
 		pq.Array(&i.DefaultIncludeTags),
 		pq.Array(&i.DefaultExcludeTags),
+		&i.Role,
 	)
 	return i, err
 }
@@ -361,6 +380,63 @@ func (q *Queries) InsertWebauthnCredential(ctx context.Context, arg InsertWebaut
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const listUsers = `-- name: ListUsers :many
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, role FROM users ORDER BY created_at, username
+`
+
+type ListUsersRow struct {
+	ID                 uuid.UUID
+	Username           string
+	DisplayName        string
+	Bio                string
+	Location           string
+	Website            string
+	CreatedAt          time.Time
+	AvatarKey          string
+	AvatarType         string
+	ShowNsfw           bool
+	DefaultIncludeTags []string
+	DefaultExcludeTags []string
+	Role               string
+}
+
+func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUsersRow{}
+	for rows.Next() {
+		var i ListUsersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.DisplayName,
+			&i.Bio,
+			&i.Location,
+			&i.Website,
+			&i.CreatedAt,
+			&i.AvatarKey,
+			&i.AvatarType,
+			&i.ShowNsfw,
+			pq.Array(&i.DefaultIncludeTags),
+			pq.Array(&i.DefaultExcludeTags),
+			&i.Role,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listWebauthnCredentials = `-- name: ListWebauthnCredentials :many
@@ -476,7 +552,7 @@ func (q *Queries) UpdateAvatar(ctx context.Context, arg UpdateAvatarParams) erro
 
 const updateProfile = `-- name: UpdateProfile :one
 UPDATE users SET display_name=$2, bio=$3, location=$4, website=$5, updated_at=now()
-WHERE id=$1 RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags
+WHERE id=$1 RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, role
 `
 
 type UpdateProfileParams struct {
@@ -500,6 +576,7 @@ type UpdateProfileRow struct {
 	ShowNsfw           bool
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
+	Role               string
 }
 
 func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (UpdateProfileRow, error) {
@@ -524,6 +601,7 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (U
 		&i.ShowNsfw,
 		pq.Array(&i.DefaultIncludeTags),
 		pq.Array(&i.DefaultExcludeTags),
+		&i.Role,
 	)
 	return i, err
 }
@@ -555,6 +633,52 @@ type UpdateTagPreferencesParams struct {
 func (q *Queries) UpdateTagPreferences(ctx context.Context, arg UpdateTagPreferencesParams) error {
 	_, err := q.db.ExecContext(ctx, updateTagPreferences, arg.ID, pq.Array(arg.DefaultIncludeTags), pq.Array(arg.DefaultExcludeTags))
 	return err
+}
+
+const updateUserRole = `-- name: UpdateUserRole :one
+UPDATE users SET role=$2, updated_at=now() WHERE id=$1 RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, role
+`
+
+type UpdateUserRoleParams struct {
+	ID   uuid.UUID
+	Role string
+}
+
+type UpdateUserRoleRow struct {
+	ID                 uuid.UUID
+	Username           string
+	DisplayName        string
+	Bio                string
+	Location           string
+	Website            string
+	CreatedAt          time.Time
+	AvatarKey          string
+	AvatarType         string
+	ShowNsfw           bool
+	DefaultIncludeTags []string
+	DefaultExcludeTags []string
+	Role               string
+}
+
+func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (UpdateUserRoleRow, error) {
+	row := q.db.QueryRowContext(ctx, updateUserRole, arg.ID, arg.Role)
+	var i UpdateUserRoleRow
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.Bio,
+		&i.Location,
+		&i.Website,
+		&i.CreatedAt,
+		&i.AvatarKey,
+		&i.AvatarType,
+		&i.ShowNsfw,
+		pq.Array(&i.DefaultIncludeTags),
+		pq.Array(&i.DefaultExcludeTags),
+		&i.Role,
+	)
+	return i, err
 }
 
 const upsertPassword = `-- name: UpsertPassword :exec

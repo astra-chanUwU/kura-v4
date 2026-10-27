@@ -383,6 +383,72 @@ func (_c *MockRepository_GetPostBySHA_Call) RunAndReturn(run func(ctx context.Co
 	return _c
 }
 
+// InsertHistory provides a mock function for the type MockRepository
+func (_mock *MockRepository) InsertHistory(ctx context.Context, entry model.ChangeEntry) (model.ChangeEntry, error) {
+	ret := _mock.Called(ctx, entry)
+
+	if len(ret) == 0 {
+		panic("no return value specified for InsertHistory")
+	}
+
+	var r0 model.ChangeEntry
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, model.ChangeEntry) (model.ChangeEntry, error)); ok {
+		return returnFunc(ctx, entry)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, model.ChangeEntry) model.ChangeEntry); ok {
+		r0 = returnFunc(ctx, entry)
+	} else {
+		r0 = ret.Get(0).(model.ChangeEntry)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, model.ChangeEntry) error); ok {
+		r1 = returnFunc(ctx, entry)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_InsertHistory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InsertHistory'
+type MockRepository_InsertHistory_Call struct {
+	*mock.Call
+}
+
+// InsertHistory is a helper method to define mock.On call
+//   - ctx context.Context
+//   - entry model.ChangeEntry
+func (_e *MockRepository_Expecter) InsertHistory(ctx any, entry any) *MockRepository_InsertHistory_Call {
+	return &MockRepository_InsertHistory_Call{Call: _e.mock.On("InsertHistory", ctx, entry)}
+}
+
+func (_c *MockRepository_InsertHistory_Call) Run(run func(ctx context.Context, entry model.ChangeEntry)) *MockRepository_InsertHistory_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 model.ChangeEntry
+		if args[1] != nil {
+			arg1 = args[1].(model.ChangeEntry)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_InsertHistory_Call) Return(changeEntry model.ChangeEntry, err error) *MockRepository_InsertHistory_Call {
+	_c.Call.Return(changeEntry, err)
+	return _c
+}
+
+func (_c *MockRepository_InsertHistory_Call) RunAndReturn(run func(ctx context.Context, entry model.ChangeEntry) (model.ChangeEntry, error)) *MockRepository_InsertHistory_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListPostIndex provides a mock function for the type MockRepository
 func (_mock *MockRepository) ListPostIndex(ctx context.Context, includeNSFW bool) ([]model.Post, error) {
 	ret := _mock.Called(ctx, includeNSFW)
@@ -652,6 +718,69 @@ func (_c *MockRepository_ReplacePostMeta_Call) Return(err error) *MockRepository
 }
 
 func (_c *MockRepository_ReplacePostMeta_Call) RunAndReturn(run func(ctx context.Context, p model.Post) error) *MockRepository_ReplacePostMeta_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReplacePostMetaAudited provides a mock function for the type MockRepository
+func (_mock *MockRepository) ReplacePostMetaAudited(ctx context.Context, p model.Post, entry model.ChangeEntry) error {
+	ret := _mock.Called(ctx, p, entry)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReplacePostMetaAudited")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, model.Post, model.ChangeEntry) error); ok {
+		r0 = returnFunc(ctx, p, entry)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_ReplacePostMetaAudited_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReplacePostMetaAudited'
+type MockRepository_ReplacePostMetaAudited_Call struct {
+	*mock.Call
+}
+
+// ReplacePostMetaAudited is a helper method to define mock.On call
+//   - ctx context.Context
+//   - p model.Post
+//   - entry model.ChangeEntry
+func (_e *MockRepository_Expecter) ReplacePostMetaAudited(ctx any, p any, entry any) *MockRepository_ReplacePostMetaAudited_Call {
+	return &MockRepository_ReplacePostMetaAudited_Call{Call: _e.mock.On("ReplacePostMetaAudited", ctx, p, entry)}
+}
+
+func (_c *MockRepository_ReplacePostMetaAudited_Call) Run(run func(ctx context.Context, p model.Post, entry model.ChangeEntry)) *MockRepository_ReplacePostMetaAudited_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 model.Post
+		if args[1] != nil {
+			arg1 = args[1].(model.Post)
+		}
+		var arg2 model.ChangeEntry
+		if args[2] != nil {
+			arg2 = args[2].(model.ChangeEntry)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_ReplacePostMetaAudited_Call) Return(err error) *MockRepository_ReplacePostMetaAudited_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_ReplacePostMetaAudited_Call) RunAndReturn(run func(ctx context.Context, p model.Post, entry model.ChangeEntry) error) *MockRepository_ReplacePostMetaAudited_Call {
 	_c.Call.Return(run)
 	return _c
 }

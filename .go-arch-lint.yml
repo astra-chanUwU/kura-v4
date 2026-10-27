@@ -12,7 +12,7 @@ components:
   main: { in: cmd/kura }
   app: { in: internal/app }
   controllers: { in: internal/controllers }
-  services: { in: [internal/site, internal/jobs, internal/accounts, internal/board, internal/collections] }
+  services: { in: [internal/site, internal/jobs, internal/accounts, internal/board, internal/collections, internal/moderation] }
   repository: { in: internal/repository }
   dao: { in: [internal/dao, internal/dao/sqlcgen] }
   db: { in: internal/db }

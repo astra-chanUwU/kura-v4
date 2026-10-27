@@ -91,7 +91,7 @@ func (h *Posts) get(c fiber.Ctx) error {
 	if err != nil {
 		return writeError(c, err)
 	}
-	if post.Rating == "nsfw" && !viewerSeesNSFW(c) {
+	if !canSeePost(c, post) || (post.Rating == "nsfw" && !viewerSeesNSFW(c)) {
 		return writeError(c, board.ErrNotFound)
 	}
 	return c.JSON(postDTO(post, h.favs(c)))
@@ -151,18 +151,20 @@ func (h *Posts) create(c fiber.Ctx) error {
 		return writeError(c, err)
 	}
 	post.OwnerUsername = user.Username
+	h.board.RecordCreation(c.Context(), *user, post)
 	return c.Status(201).JSON(postDTO(post, h.favs(c)))
 }
 
 func (h *Posts) updateMeta(c fiber.Ctx) error {
-	if _, err := requireUser(c); err != nil {
+	user, err := requireUser(c)
+	if err != nil {
 		return err
 	}
 	var in dto.UpdatePostMeta
 	if err := c.Bind().Body(&in); err != nil {
 		return fiber.NewError(400, "Invalid request.")
 	}
-	post, err := h.board.SetMeta(c.Context(), c.Params("id"), in.Artist, in.Tags, in.Rating)
+	post, err := h.board.SetMetaAs(c.Context(), user, c.Params("id"), in.Artist, in.Tags, in.Rating)
 	if err != nil {
 		return writeError(c, err)
 	}
@@ -171,7 +173,7 @@ func (h *Posts) updateMeta(c fiber.Ctx) error {
 
 func (h *Posts) thumbnail(c fiber.Ctx) error {
 	post, err := h.board.Get(c.Context(), c.Params("id"))
-	if err != nil || (post.Rating == "nsfw" && !viewerSeesNSFW(c)) {
+	if err != nil || !canSeePost(c, post) || (post.Rating == "nsfw" && !viewerSeesNSFW(c)) {
 		return fiber.ErrNotFound
 	}
 	file, contentType, err := h.board.Thumbnail(c.Context(), post)
@@ -185,7 +187,7 @@ func (h *Posts) thumbnail(c fiber.Ctx) error {
 
 func (h *Posts) media(c fiber.Ctx) error {
 	post, err := h.board.Get(c.Context(), c.Params("id"))
-	if err != nil || (post.Rating == "nsfw" && !viewerSeesNSFW(c)) {
+	if err != nil || !canSeePost(c, post) || (post.Rating == "nsfw" && !viewerSeesNSFW(c)) {
 		return fiber.ErrNotFound
 	}
 	file, err := h.board.OpenMedia(c.Context(), post)

@@ -1,7 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { HistoryList } from "../components/HistoryList";
 import { PostActions } from "../components/PostCard";
-import { useMe, usePost, usePostActions } from "../hooks/useKura";
+import { shortError, useToasts } from "../components/Toasts";
+import { atLeast } from "../domain/roles";
+import { useMe, usePost, usePostActions, usePostHistory, useStaffActions } from "../hooks/useKura";
+import type { ChangeEntry } from "../types/api";
 import styles from "./PostPage.module.css";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -27,8 +31,14 @@ function formatBytes(bytes: number): string {
 
 export function PostPage({ id }: { id: string }) {
   const { data: post, isPending, error } = usePost(id);
-  const { signedIn } = useMe();
+  const { signedIn, user } = useMe();
   const { updatePostMeta } = usePostActions();
+  const staff = useStaffActions();
+  const toasts = useToasts();
+  const history = usePostHistory(id, signedIn);
+  const [busyId, setBusyId] = useState("");
+  const isModerator = !!user && atLeast(user.role, "moderator");
+  const isAdmin = !!user && atLeast(user.role, "admin");
   const [newTag, setNewTag] = useState("");
   const [artistDraft, setArtistDraft] = useState<string | null>(null);
   const [metaError, setMetaError] = useState("");
@@ -83,6 +93,66 @@ export function PostPage({ id }: { id: string }) {
         </div>
 
         <div className={styles.details}>
+          {post.hidden && (
+            <p role="alert" className={styles.error}>
+              This post is hidden from the board. Staff and the uploader can still open it here.
+            </p>
+          )}
+          {(isModerator || isAdmin) && (
+            <p className={styles.detailRow}>
+              <span className={styles.detailLabel}>Staff</span>
+              <span style={{ display: "inline-flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                {post.hidden ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void staff
+                        .unhidePost(post.id)
+                        .then(() => toasts.push("Post is back on the board.", "success"))
+                        .catch((e: unknown) => toasts.push(shortError(e), "error"))
+                    }
+                  >
+                    Unhide
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void staff
+                        .hidePost(post.id)
+                        .then(() => toasts.push("Post hidden from the board.", "success"))
+                        .catch((e: unknown) => toasts.push(shortError(e), "error"))
+                    }
+                  >
+                    Hide
+                  </button>
+                )}
+                {isAdmin && !post.hidden && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          "Delete this post from the board? It can be restored from its history.",
+                        )
+                      )
+                        void staff
+                          .deletePost(post.id)
+                          .then(() =>
+                            toasts.push(
+                              "Post deleted. Restore it from its history below.",
+                              "success",
+                            ),
+                          )
+                          .catch((e: unknown) => toasts.push(shortError(e), "error"));
+                    }}
+                  >
+                    Delete
+                  </button>
+                )}
+              </span>
+            </p>
+          )}
           <p className={styles.detailRow}>
             <span className={styles.detailLabel}>Rating</span>
             {signedIn ? (
@@ -200,6 +270,29 @@ export function PostPage({ id }: { id: string }) {
             <p role="alert" className={styles.error}>
               {metaError}
             </p>
+          )}
+          {signedIn && (
+            <div>
+              <h2 style={{ fontSize: "1rem", margin: "1rem 0 0.5rem" }}>History</h2>
+              {history.isPending && <p className={styles.muted}>Loading…</p>}
+              {history.error && <p className={styles.muted}>History could not be loaded.</p>}
+              <HistoryList
+                entries={history.data ?? []}
+                busyId={busyId}
+                canRollback={(entry: ChangeEntry) => isModerator && entry.action !== "post.created"}
+                onRollback={(entry: ChangeEntry) => {
+                  setBusyId(entry.id);
+                  void staff
+                    .rollback(entry)
+                    .then(() => toasts.push("Change rolled back.", "success"))
+                    .catch((e: unknown) => toasts.push(shortError(e), "error"))
+                    .finally(() => setBusyId(""));
+                }}
+              />
+              {!isModerator && (
+                <p className={styles.muted}>Moderators and above can roll a change back.</p>
+              )}
+            </div>
           )}
         </div>
       </div>

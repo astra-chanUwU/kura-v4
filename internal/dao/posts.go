@@ -29,9 +29,9 @@ func splitTags(csv string) []string {
 	return strings.Split(csv, ",")
 }
 
-func postFrom(id uuid.UUID, owner uuid.NullUUID, orig, key, ct string, size int64, created time.Time, ownerName, artist, source, sourceID, thumbKey, tagsCSV string, width, height int32, rating string) model.Post {
+func postFrom(id uuid.UUID, owner uuid.NullUUID, orig, key, ct string, size int64, created time.Time, ownerName, artist, source, sourceID, thumbKey, tagsCSV string, width, height int32, rating string, hidden bool) model.Post {
 	p := model.Post{ID: id.String(), OriginalName: orig, StorageKey: key, ContentType: ct, SizeBytes: size, CreatedAt: created, OwnerUsername: ownerName,
-		Artist: artist, Source: source, SourceID: sourceID, ThumbnailKey: thumbKey, Tags: splitTags(tagsCSV), Width: int(width), Height: int(height), Rating: rating}
+		Artist: artist, Source: source, SourceID: sourceID, ThumbnailKey: thumbKey, Tags: splitTags(tagsCSV), Width: int(width), Height: int(height), Rating: rating, Hidden: hidden}
 	if owner.Valid {
 		s := owner.UUID.String()
 		p.OwnerID = &s
@@ -53,7 +53,7 @@ func (d *PostsDAO) CreatePost(ctx context.Context, p model.Post, sha string) (mo
 	if err != nil {
 		return model.Post{}, err
 	}
-	out := postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, "", r.Artist, r.Source, r.SourceID, r.ThumbnailKey, "", r.Width, r.Height, r.Rating)
+	out := postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, "", r.Artist, r.Source, r.SourceID, r.ThumbnailKey, "", r.Width, r.Height, r.Rating, r.Hidden)
 	out.Tags = p.Tags
 	return out, nil
 }
@@ -66,7 +66,7 @@ func (d *PostsDAO) GetPost(ctx context.Context, id string) (model.Post, error) {
 	if err != nil {
 		return model.Post{}, err
 	}
-	return postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.ThumbnailKey, r.TagsCsv, r.Width, r.Height, r.Rating), nil
+	return postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.ThumbnailKey, r.TagsCsv, r.Width, r.Height, r.Rating, r.Hidden), nil
 }
 func (d *PostsDAO) ListPosts(ctx context.Context, limit, offset int32, includeNSFW bool) ([]model.Post, error) {
 	rows, err := d.q.ListPosts(ctx, sqlcgen.ListPostsParams{Limit: limit, Offset: offset, Column3: includeNSFW})
@@ -75,7 +75,7 @@ func (d *PostsDAO) ListPosts(ctx context.Context, limit, offset int32, includeNS
 	}
 	out := make([]model.Post, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.ThumbnailKey, r.TagsCsv, r.Width, r.Height, r.Rating))
+		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.ThumbnailKey, r.TagsCsv, r.Width, r.Height, r.Rating, r.Hidden))
 	}
 	return out, nil
 }
@@ -90,7 +90,7 @@ func (d *PostsDAO) ListPostIndex(ctx context.Context, includeNSFW bool) ([]model
 	out := make([]model.Post, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, model.Post{ID: r.ID.String(), Artist: r.Artist, Source: r.Source, SourceID: r.SourceID,
-			ThumbnailKey: r.ThumbnailKey, ContentType: r.ContentType, Width: int(r.Width), Height: int(r.Height), CreatedAt: r.CreatedAt, Tags: splitTags(r.TagsCsv), Rating: r.Rating})
+			ThumbnailKey: r.ThumbnailKey, ContentType: r.ContentType, Width: int(r.Width), Height: int(r.Height), CreatedAt: r.CreatedAt, Tags: splitTags(r.TagsCsv), Rating: r.Rating, Hidden: r.Hidden})
 	}
 	return out, nil
 }
@@ -99,7 +99,7 @@ func (d *PostsDAO) GetPostBySHA(ctx context.Context, sha string) (model.Post, er
 	if err != nil {
 		return model.Post{}, err
 	}
-	return postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.ThumbnailKey, r.TagsCsv, r.Width, r.Height, r.Rating), nil
+	return postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.ThumbnailKey, r.TagsCsv, r.Width, r.Height, r.Rating, r.Hidden), nil
 }
 func (d *PostsDAO) ListPostsByOwner(ctx context.Context, ownerID string) ([]model.Post, error) {
 	uid, err := uuid.Parse(ownerID)
@@ -112,7 +112,7 @@ func (d *PostsDAO) ListPostsByOwner(ctx context.Context, ownerID string) ([]mode
 	}
 	out := make([]model.Post, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.ThumbnailKey, r.TagsCsv, r.Width, r.Height, r.Rating))
+		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.ThumbnailKey, r.TagsCsv, r.Width, r.Height, r.Rating, r.Hidden))
 	}
 	return out, nil
 }
@@ -160,4 +160,18 @@ func (d *PostsDAO) InsertPostTag(ctx context.Context, id, tag string) error {
 		return err
 	}
 	return d.q.InsertPostTag(ctx, sqlcgen.InsertPostTagParams{PostID: uid, Tag: tag})
+}
+
+func (d *PostsDAO) SetPostHidden(ctx context.Context, id string, hidden bool, actorID string) error {
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		return err
+	}
+	var actor uuid.UUID
+	if actorID != "" {
+		if parsed, err := uuid.Parse(actorID); err == nil {
+			actor = parsed
+		}
+	}
+	return d.q.SetPostHidden(ctx, sqlcgen.SetPostHiddenParams{ID: uid, Column2: hidden, Column3: actor})
 }

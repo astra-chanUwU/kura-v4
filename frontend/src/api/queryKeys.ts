@@ -9,4 +9,7 @@ export const queryKeys = {
   myLists: () => ["my-lists"] as const,
   list: (id: string) => ["list", id] as const,
   profile: (username: string) => ["profile", username] as const,
+  adminUsers: () => ["admin-users"] as const,
+  postHistory: (id: string) => ["post-history", id] as const,
+  adminHistory: (actorId?: string) => ["admin-history", actorId ?? ""] as const,
 };

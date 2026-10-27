@@ -15,6 +15,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/collections"
 	"github.com/astra-chanUwU/kura-v4/internal/controllers"
 	"github.com/astra-chanUwU/kura-v4/internal/dto"
+	"github.com/astra-chanUwU/kura-v4/internal/moderation"
 	"github.com/astra-chanUwU/kura-v4/internal/site"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/recover"
@@ -26,6 +27,7 @@ type HTTPDeps struct {
 	Accounts     *accounts.Service
 	Board        *board.Service
 	Collections  *collections.Service
+	Moderation   *moderation.Service
 	Ping         func(context.Context) error
 	Assets       fs.FS
 	Log          *slog.Logger
@@ -84,6 +86,9 @@ func NewHTTP(deps HTTPDeps) *fiber.App {
 		posts.RegisterRoutes(api)
 		posts.RegisterMedia(media)
 		controllers.NewCollections(deps.Collections).RegisterRoutes(api)
+		if deps.Moderation != nil {
+			controllers.NewAdmin(deps.Moderation).RegisterRoutes(api)
+		}
 	}
 	app.Use("/api", func(c fiber.Ctx) error { return fiber.ErrNotFound })
 	app.Use("/health", func(c fiber.Ctx) error { return fiber.ErrNotFound })

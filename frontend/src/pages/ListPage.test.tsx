@@ -19,6 +19,7 @@ const makePost = (id: string): Post => ({
   thumbnail_url: `/media/${id}-thumb.jpg`,
   artist: "",
   rating: "sfw",
+  hidden: false,
   width: 10,
   height: 10,
   source_url: "",

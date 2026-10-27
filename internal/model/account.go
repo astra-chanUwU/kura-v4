@@ -13,6 +13,7 @@ type User struct {
 	AvatarKey   string
 	AvatarType  string
 	ShowNSFW    bool
+	Role        Role
 	// Default board tag filters, applied when the board loads.
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
@@ -73,6 +74,7 @@ type Post struct {
 	Width         int
 	Height        int
 	Rating        string // sfw | nsfw
+	Hidden        bool   // hidden by a moderator/admin; restorable via history
 }
 
 type List struct {

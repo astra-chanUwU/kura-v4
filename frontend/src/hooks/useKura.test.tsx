@@ -28,6 +28,7 @@ const post: Post = {
   thumbnail_url: "/media/posts/p1/thumb",
   artist: "",
   rating: "sfw",
+  hidden: false,
   width: 10,
   height: 10,
   source_url: "",

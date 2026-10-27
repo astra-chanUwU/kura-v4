@@ -4,6 +4,7 @@ package dto
 
 type User struct {
 	ID          string `json:"id"`
+	Role        string `json:"role"`
 	Username    string `json:"username"`
 	DisplayName string `json:"display_name"`
 	Bio         string `json:"bio"`
@@ -32,6 +33,7 @@ type Post struct {
 	Width         int      `json:"width"`
 	Height        int      `json:"height"`
 	Rating        string   `json:"rating"`
+	Hidden        bool     `json:"hidden"`
 	SourceURL     string   `json:"source_url"`
 	Tags          []string `json:"tags"`
 }
@@ -136,4 +138,25 @@ type ReorderInput struct {
 type WebAuthnCeremony struct {
 	CeremonyID string `json:"ceremony_id"`
 	Options    any    `json:"options"`
+}
+
+// Role mirrors model.Role: member | moderator | admin | super_admin.
+// Visitor is anonymous and has no role value.
+type SetRole struct {
+	Role string `json:"role"`
+}
+
+// ChangeEntry is one history row. Before/After decode per entity:
+// post -> PostSnapshot fields; user -> {"role": "..."}.
+type ChangeEntry struct {
+	ID            string         `json:"id"`
+	EntityType    string         `json:"entity_type"`
+	EntityID      string         `json:"entity_id"`
+	ActorID       string         `json:"actor_id"`
+	ActorUsername string         `json:"actor_username"`
+	Action        string         `json:"action"`
+	Before        map[string]any `json:"before"`
+	After         map[string]any `json:"after"`
+	RollbackOf    *string        `json:"rollback_of"`
+	CreatedAt     string         `json:"created_at"`
 }

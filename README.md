@@ -40,6 +40,7 @@ credentials only take effect on first initialization of its volume.
 | `make test-web` | Vitest + React Testing Library |
 | `make generate` | Regenerate sqlc bindings and mockery mocks |
 | `make migration name=description` | Create a goose migration |
+| `node --env-file=.env scripts/run.mjs go run -tags dev ./cmd/kura promote <username> <role>` | Set a role from the operator shell (bootstrap the first super admin) |
 | `make migrate` | Apply migrations to the configured database |
 | `node --env-file=.env scripts/run.mjs go run -tags dev ./cmd/kura seed <dir> [dir...]` | Import sample picture folders as board posts (duplicates skipped) |
 | `make format` | Format Go and frontend source |
@@ -69,6 +70,8 @@ build intentionally requires the real frontend output; `make build` supplies it.
   confirmation in Me → Sign-in & security.
 - Tag search with suggestions, favorites, public/private lists, profiles with
   contribution counts, and a `seed` command that imports sample folders.
+- Roles and change history (below): staff tiers with an append-only audit
+  log and one-click rollback for post and role changes.
 - A real `GET /api/v1/site` route reading site settings through every backend
   layer; frontend loading, connection-error and retry states.
 - Separate `/health/live` and `/health/ready` endpoints and consistent API errors
@@ -186,3 +189,44 @@ Restore into a separate Compose project/volumes: restore PostgreSQL and media fr
 the same backup set, use the matching application version, and check database
 readiness plus original-byte integrity before opening access. Automated backup
 scripts and an operator restore drill are not part of this initial scaffold.
+
+## Roles
+
+Visitor is anonymous (no account): SFW board, search and public profiles/lists
+only — no uploads, tags, favorites or NSFW. Signed-in accounts hold one stored
+role:
+
+| Role | Can do (in addition to the tier below) |
+| --- | --- |
+| Member | Upload, communal tagging, favorites, lists, own profile. The default for new accounts. |
+| Moderator | Fix tags/artist/rating on any post, hide posts from the board, roll back content changes. No permanent deletion, no user management. |
+| Admin | Promote/demote Member <-> Moderator, delete posts (soft — restorable from history), roll back role and content changes. Cannot touch Admins or Super Admins. |
+| Super Admin | Everything an Admin can do, plus create/promote/demote Admins and other Super Admins. At least one Super Admin must always exist. |
+
+Public read access never implies write access, and every staff check is
+enforced server-side (the UI only hides what the API would reject). Bootstrap
+the first Super Admin from the operator shell — shell/DB access is already
+operator trust, and the promotion is still written to history as `cli:promote`:
+
+```sh
+node --env-file=.env scripts/run.mjs go run -tags dev ./cmd/kura promote <username> super_admin
+```
+
+After that, Super Admins and Admins manage roles in the app under **Staff**
+(`/admin`, visible to Moderators and above).
+
+## Change history and rollback
+
+Every change to a post entry (creation, tag/artist/rating edits, hide, unhide,
+soft-delete) and every role change writes an append-only `change_history` row:
+actor, time, action, and the full before/after snapshot (post:
+artist/tags/rating/hidden; user: role). Rows are never edited or deleted.
+
+Rollback restores one row's before snapshot and writes a new `rollback` row
+pointing at it, so undoing a change — a rogue moderator's tag spree, a mistaken
+approval, a role change you reconsider — never erases the evidence, and a
+rollback can itself be rolled back (redo). Moderators and above roll back post
+changes; role rollbacks re-check the same hierarchy as a fresh role change.
+Find history on each post page (any signed-in viewer) and the staff-wide feed
+under **Staff**. Hides and deletes are soft: original bytes are always
+preserved, so a hidden/deleted post can always be brought back.

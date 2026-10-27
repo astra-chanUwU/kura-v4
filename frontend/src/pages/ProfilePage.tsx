@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ShareProfileButton } from "../components/ShareProfileButton";
 import { useProfile } from "../hooks/useKura";
 import styles from "./Profile.module.css";
+import { ROLE_LABELS } from "../domain/roles";
 
 export function ProfilePage({ username }: { username: string }) {
   const { data, isPending, error } = useProfile(username);
@@ -21,7 +22,7 @@ export function ProfilePage({ username }: { username: string }) {
         <div className={styles.headerText}>
           <h1 id="profile-title">{user.display_name || user.username}</h1>
           <p className={styles.muted}>
-            @{user.username}
+            @{user.username} · {ROLE_LABELS[user.role]}
             {user.location ? ` · ${user.location}` : ""}
           </p>
           <p className={styles.stats}>

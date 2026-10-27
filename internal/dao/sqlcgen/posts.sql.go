@@ -25,7 +25,7 @@ func (q *Queries) CountPostsByOwner(ctx context.Context, ownerID uuid.NullUUID) 
 
 const createPost = `-- name: CreatePost :one
 INSERT INTO posts (owner_id, original_name, storage_key, content_type, size_bytes, sha256, artist, source, source_id, thumbnail_key, width, height, rating)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id, owner_id, original_name, storage_key, content_type, size_bytes, created_at, artist, source, source_id, thumbnail_key, width, height, rating
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id, owner_id, original_name, storage_key, content_type, size_bytes, created_at, artist, source, source_id, thumbnail_key, width, height, rating, (hidden_at IS NOT NULL)::bool AS hidden
 `
 
 type CreatePostParams struct {
@@ -59,6 +59,7 @@ type CreatePostRow struct {
 	Width        int32
 	Height       int32
 	Rating       string
+	Hidden       bool
 }
 
 func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreatePostRow, error) {
@@ -93,6 +94,7 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 		&i.Width,
 		&i.Height,
 		&i.Rating,
+		&i.Hidden,
 	)
 	return i, err
 }
@@ -108,7 +110,7 @@ func (q *Queries) DeletePostTags(ctx context.Context, postID uuid.UUID) error {
 
 const getPost = `-- name: GetPost :one
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating,
+  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.id=$1
@@ -129,6 +131,7 @@ type GetPostRow struct {
 	Width         int32
 	Height        int32
 	Rating        string
+	Hidden        bool
 	OwnerUsername string
 	TagsCsv       string
 }
@@ -151,6 +154,7 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 		&i.Width,
 		&i.Height,
 		&i.Rating,
+		&i.Hidden,
 		&i.OwnerUsername,
 		&i.TagsCsv,
 	)
@@ -159,7 +163,7 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 
 const getPostBySHA = `-- name: GetPostBySHA :one
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating,
+  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.sha256=$1 AND $1<>''
@@ -180,6 +184,7 @@ type GetPostBySHARow struct {
 	Width         int32
 	Height        int32
 	Rating        string
+	Hidden        bool
 	OwnerUsername string
 	TagsCsv       string
 }
@@ -202,6 +207,7 @@ func (q *Queries) GetPostBySHA(ctx context.Context, sha256 string) (GetPostBySHA
 		&i.Width,
 		&i.Height,
 		&i.Rating,
+		&i.Hidden,
 		&i.OwnerUsername,
 		&i.TagsCsv,
 	)
@@ -223,9 +229,9 @@ func (q *Queries) InsertPostTag(ctx context.Context, arg InsertPostTagParams) er
 }
 
 const listPostIndex = `-- name: ListPostIndex :many
-SELECT p.id, p.artist, p.source, p.source_id, p.thumbnail_key, p.content_type, p.width, p.height, p.rating, p.created_at,
+SELECT p.id, p.artist, p.source, p.source_id, p.thumbnail_key, p.content_type, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden, p.created_at,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
-FROM posts p WHERE ($1::bool OR p.rating='sfw') ORDER BY p.created_at DESC, p.id DESC
+FROM posts p WHERE p.hidden_at IS NULL AND ($1::bool OR p.rating='sfw') ORDER BY p.created_at DESC, p.id DESC
 `
 
 type ListPostIndexRow struct {
@@ -238,6 +244,7 @@ type ListPostIndexRow struct {
 	Width        int32
 	Height       int32
 	Rating       string
+	Hidden       bool
 	CreatedAt    time.Time
 	TagsCsv      string
 }
@@ -261,6 +268,7 @@ func (q *Queries) ListPostIndex(ctx context.Context, dollar_1 bool) ([]ListPostI
 			&i.Width,
 			&i.Height,
 			&i.Rating,
+			&i.Hidden,
 			&i.CreatedAt,
 			&i.TagsCsv,
 		); err != nil {
@@ -279,10 +287,10 @@ func (q *Queries) ListPostIndex(ctx context.Context, dollar_1 bool) ([]ListPostI
 
 const listPosts = `-- name: ListPosts :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating,
+  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
-FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE ($3::bool OR p.rating='sfw') ORDER BY p.created_at DESC, p.id DESC LIMIT $1 OFFSET $2
+FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.hidden_at IS NULL AND ($3::bool OR p.rating='sfw') ORDER BY p.created_at DESC, p.id DESC LIMIT $1 OFFSET $2
 `
 
 type ListPostsParams struct {
@@ -306,6 +314,7 @@ type ListPostsRow struct {
 	Width         int32
 	Height        int32
 	Rating        string
+	Hidden        bool
 	OwnerUsername string
 	TagsCsv       string
 }
@@ -334,6 +343,7 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 			&i.Width,
 			&i.Height,
 			&i.Rating,
+			&i.Hidden,
 			&i.OwnerUsername,
 			&i.TagsCsv,
 		); err != nil {
@@ -352,7 +362,7 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 
 const listPostsByOwner = `-- name: ListPostsByOwner :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating,
+  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.owner_id=$1 ORDER BY p.created_at DESC, p.id DESC
@@ -373,6 +383,7 @@ type ListPostsByOwnerRow struct {
 	Width         int32
 	Height        int32
 	Rating        string
+	Hidden        bool
 	OwnerUsername string
 	TagsCsv       string
 }
@@ -401,6 +412,7 @@ func (q *Queries) ListPostsByOwner(ctx context.Context, ownerID uuid.NullUUID) (
 			&i.Width,
 			&i.Height,
 			&i.Rating,
+			&i.Hidden,
 			&i.OwnerUsername,
 			&i.TagsCsv,
 		); err != nil {
@@ -440,6 +452,21 @@ type SetPostDimensionsParams struct {
 
 func (q *Queries) SetPostDimensions(ctx context.Context, arg SetPostDimensionsParams) error {
 	_, err := q.db.ExecContext(ctx, setPostDimensions, arg.ID, arg.Width, arg.Height)
+	return err
+}
+
+const setPostHidden = `-- name: SetPostHidden :exec
+UPDATE posts SET hidden_at = CASE WHEN $2::bool THEN now() ELSE NULL END, hidden_by = CASE WHEN $2::bool THEN $3::uuid ELSE NULL END WHERE id=$1
+`
+
+type SetPostHiddenParams struct {
+	ID      uuid.UUID
+	Column2 bool
+	Column3 uuid.UUID
+}
+
+func (q *Queries) SetPostHidden(ctx context.Context, arg SetPostHiddenParams) error {
+	_, err := q.db.ExecContext(ctx, setPostHidden, arg.ID, arg.Column2, arg.Column3)
 	return err
 }
 

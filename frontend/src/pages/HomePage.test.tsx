@@ -119,6 +119,7 @@ const untaggedPost: Post = {
   thumbnail_url: "/media/p1-thumb.jpg",
   artist: "",
   rating: "sfw",
+  hidden: false,
   width: 10,
   height: 10,
   source_url: "",

@@ -8,7 +8,8 @@ import {
 } from "@tanstack/react-query";
 import Fuse from "fuse.js";
 import { useEffect, useMemo, useState } from "react";
-import type { Post } from "../types/api";
+import type { ChangeEntry, Post } from "../types/api";
+import type { Role } from "../domain/roles";
 import { api, DuplicatePostError } from "../api/kura";
 
 /** The existing post when an upload was a duplicate, else undefined. */
@@ -405,5 +406,70 @@ export function useAccountActions() {
     addPasskey: () => api.addPasskey().then(refresh),
     removePasskey: (id: string) => api.removePasskey(id).then(refresh),
     regenerateRecoveryKey: () => api.regenerateRecoveryKey(),
+  };
+}
+
+export function useAdminUsers(enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.adminUsers(),
+    queryFn: ({ signal }) => api.adminUsers(signal),
+    enabled,
+  });
+}
+
+export function useRecentHistory(actorId: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.adminHistory(actorId),
+    queryFn: ({ signal }) => api.recentHistory(actorId, signal),
+    enabled,
+  });
+}
+
+export function usePostHistory(postId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.postHistory(postId),
+    queryFn: ({ signal }) => api.postHistory(postId, signal),
+    enabled,
+  });
+}
+
+export function useStaffActions() {
+  const client = useQueryClient();
+  const refreshPost = (postId: string) => {
+    void client.invalidateQueries({ queryKey: queryKeys.post(postId) });
+    void client.invalidateQueries({ queryKey: queryKeys.posts() });
+    void client.invalidateQueries({ queryKey: queryKeys.searchIndex() });
+    void client.invalidateQueries({ queryKey: queryKeys.postHistory(postId) });
+    void client.invalidateQueries({ queryKey: ["admin-history"] });
+  };
+  return {
+    setUserRole: (userId: string, role: Role) =>
+      api.setUserRole(userId, role).then((u) => {
+        void client.invalidateQueries({ queryKey: queryKeys.adminUsers() });
+        void client.invalidateQueries({ queryKey: ["admin-history"] });
+        return u;
+      }),
+    rollback: (entry: ChangeEntry) =>
+      api.rollback(entry.id).then((created) => {
+        if (entry.entity_type === "post") refreshPost(entry.entity_id);
+        void client.invalidateQueries({ queryKey: queryKeys.adminUsers() });
+        void client.invalidateQueries({ queryKey: ["admin-history"] });
+        return created;
+      }),
+    hidePost: (postId: string) =>
+      api.hidePost(postId).then((p) => {
+        refreshPost(postId);
+        return p;
+      }),
+    unhidePost: (postId: string) =>
+      api.unhidePost(postId).then((p) => {
+        refreshPost(postId);
+        return p;
+      }),
+    deletePost: (postId: string) =>
+      api.deletePost(postId).then((p) => {
+        refreshPost(postId);
+        return p;
+      }),
   };
 }

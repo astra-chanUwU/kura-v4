@@ -16,8 +16,12 @@ import (
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(log)
-	if len(os.Args) < 2 || (os.Args[1] != "serve" && os.Args[1] != "migrate" && os.Args[1] != "seed" && os.Args[1] != "audit") {
-		log.Error("usage: kura serve | migrate | seed <dir> [dir...] | audit")
+	if len(os.Args) < 2 || (os.Args[1] != "serve" && os.Args[1] != "migrate" && os.Args[1] != "seed" && os.Args[1] != "audit" && os.Args[1] != "promote") {
+		log.Error("usage: kura serve | migrate | seed <dir> [dir...] | audit | promote <username> <role>")
+		os.Exit(2)
+	}
+	if os.Args[1] == "promote" && len(os.Args) != 4 {
+		log.Error("usage: kura promote <username> <member|moderator|admin|super_admin>")
 		os.Exit(2)
 	}
 	if os.Args[1] == "seed" && len(os.Args) < 3 {
@@ -41,6 +45,8 @@ func main() {
 		}
 		defer conn.Close()
 		err = db.Migrate(migrateCtx, conn)
+	} else if os.Args[1] == "promote" {
+		err = app.Promote(ctx, cfg, os.Args[2], os.Args[3], os.Stdout)
 	} else if os.Args[1] == "audit" {
 		err = app.Audit(ctx, cfg, os.Stdout)
 	} else if os.Args[1] == "seed" {

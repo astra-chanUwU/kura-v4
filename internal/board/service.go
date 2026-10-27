@@ -20,6 +20,8 @@ type Repository interface {
 	SetPostThumbnail(ctx context.Context, id, key string) error
 	SetPostDimensions(ctx context.Context, id string, width, height int) error
 	ReplacePostMeta(ctx context.Context, p model.Post) error
+	ReplacePostMetaAudited(ctx context.Context, p model.Post, entry model.ChangeEntry) error
+	InsertHistory(ctx context.Context, entry model.ChangeEntry) (model.ChangeEntry, error)
 	ListPostIndex(ctx context.Context, includeNSFW bool) ([]model.Post, error)
 	GetPostBySHA(ctx context.Context, sha string) (model.Post, error)
 	CountPostsByOwner(ctx context.Context, ownerID string) (int64, error)
@@ -124,10 +126,21 @@ func (s *Service) SearchIndex(ctx context.Context, includeNSFW bool) ([]model.Po
 // SetMeta replaces a post's artist and tags (communal tagging: any
 // signed-in user may tag; the controller enforces sign-in).
 func (s *Service) SetMeta(ctx context.Context, id, artist string, tags []string, rating string) (model.Post, error) {
+	return s.setMeta(ctx, nil, id, artist, tags, rating)
+}
+
+// SetMetaAs is SetMeta with an actor: a changed edit is written to the
+// post's change history in the same transaction, so it can be rolled back.
+func (s *Service) SetMetaAs(ctx context.Context, actor *model.User, id, artist string, tags []string, rating string) (model.Post, error) {
+	return s.setMeta(ctx, actor, id, artist, tags, rating)
+}
+
+func (s *Service) setMeta(ctx context.Context, actor *model.User, id, artist string, tags []string, rating string) (model.Post, error) {
 	post, err := s.Get(ctx, id)
 	if err != nil {
 		return model.Post{}, err
 	}
+	before := model.SnapshotOf(post)
 	if rating == "sfw" || rating == "nsfw" {
 		post.Rating = rating
 	}
@@ -137,10 +150,38 @@ func (s *Service) SetMeta(ctx context.Context, id, artist string, tags []string,
 	}
 	post.Artist = artist
 	post.Tags = NormalizeTags(tags)
+	after := model.SnapshotOf(post)
+	if actor != nil && (before.Artist != after.Artist || before.Rating != after.Rating || !equalTags(before.Tags, after.Tags)) {
+		entry := model.ChangeEntry{EntityType: "post", EntityID: post.ID, ActorID: &actor.ID, ActorUsername: actor.Username,
+			Action: "post.meta_updated", Before: model.MarshalPostSnapshot(before), After: model.MarshalPostSnapshot(after)}
+		if err := s.repo.ReplacePostMetaAudited(ctx, post, entry); err != nil {
+			return model.Post{}, err
+		}
+		return post, nil
+	}
 	if err := s.repo.ReplacePostMeta(ctx, post); err != nil {
 		return model.Post{}, err
 	}
 	return post, nil
+}
+
+func equalTags(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// RecordCreation writes the post.created history row for a new post.
+func (s *Service) RecordCreation(ctx context.Context, actor model.User, post model.Post) {
+	empty := model.PostSnapshot{Artist: "", Tags: []string{}, Rating: "sfw", Hidden: false}
+	_, _ = s.repo.InsertHistory(ctx, model.ChangeEntry{EntityType: "post", EntityID: post.ID, ActorID: &actor.ID,
+		ActorUsername: actor.Username, Action: "post.created", Before: model.MarshalPostSnapshot(empty), After: model.MarshalPostSnapshot(model.SnapshotOf(post))})
 }
 
 func (s *Service) Get(ctx context.Context, id string) (model.Post, error) {

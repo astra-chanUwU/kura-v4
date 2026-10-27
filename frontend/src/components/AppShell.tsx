@@ -2,6 +2,7 @@ import { Link, Outlet } from "@tanstack/react-router";
 import { useState } from "react";
 import { ThemedSelect } from "./ThemedSelect";
 import { useMe } from "../hooks/useKura";
+import { atLeast } from "../domain/roles";
 import styles from "./AppShell.module.css";
 
 const THEMES = [
@@ -32,16 +33,29 @@ export function AppShell() {
         <nav aria-label="Main navigation" className={styles.nav}>
           {!loading &&
             (user ? (
-              <Link to="/me" activeProps={{ className: styles.active }} className={styles.userLink}>
-                {user.avatar_url ? (
-                  <img src={user.avatar_url} alt="" className={styles.avatar} />
-                ) : (
-                  <span aria-hidden="true" className={styles.avatarFallback}>
-                    {(user.display_name || user.username).charAt(0).toUpperCase()}
-                  </span>
+              <>
+                {atLeast(user.role, "moderator") && (
+                  <Link to="/admin" activeProps={{ className: styles.active }}>
+                    Staff
+                  </Link>
                 )}
-                <span className={styles.userName}>{user.display_name || `@${user.username}`}</span>
-              </Link>
+                <Link
+                  to="/me"
+                  activeProps={{ className: styles.active }}
+                  className={styles.userLink}
+                >
+                  {user.avatar_url ? (
+                    <img src={user.avatar_url} alt="" className={styles.avatar} />
+                  ) : (
+                    <span aria-hidden="true" className={styles.avatarFallback}>
+                      {(user.display_name || user.username).charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  <span className={styles.userName}>
+                    {user.display_name || `@${user.username}`}
+                  </span>
+                </Link>
+              </>
             ) : (
               <>
                 <Link to="/login" activeProps={{ className: styles.active }}>

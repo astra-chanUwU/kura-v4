@@ -32,3 +32,11 @@ packages:
       structname: "Mock{{.InterfaceName}}"
     interfaces:
       Repository:
+  github.com/astra-chanUwU/kura-v4/internal/moderation:
+    config:
+      dir: "{{.InterfaceDir}}"
+      filename: "{{.InterfaceName | snakecase}}_mock_test.go"
+      pkgname: "{{.SrcPackageName}}"
+      structname: "Mock{{.InterfaceName}}"
+    interfaces:
+      Repository:

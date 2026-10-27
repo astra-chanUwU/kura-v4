@@ -8,8 +8,11 @@ export interface ApiErrorBody {
   message: string;
   request_id: string;
 }
+import type { Role } from "../domain/roles";
+export type { Role };
 export interface User {
   id: string;
+  role: Role;
   username: string;
   display_name: string;
   bio: string;
@@ -29,6 +32,7 @@ export interface Post {
   thumbnail_url: string;
   artist: string;
   rating: "sfw" | "nsfw";
+  hidden: boolean;
   width: number;
   height: number;
   source_url: string;
@@ -80,4 +84,18 @@ export interface Me {
 export interface WebAuthnCeremony {
   ceremony_id: string;
   options: unknown;
+}
+
+/** One append-only history row. before/after are post snapshots ({artist,tags,rating,hidden}) or {"role": "..."} . */
+export interface ChangeEntry {
+  id: string;
+  entity_type: "post" | "user";
+  entity_id: string;
+  actor_id: string;
+  actor_username: string;
+  action: string;
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+  rollback_of: string | null;
+  created_at: string;
 }

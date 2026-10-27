@@ -1,4 +1,14 @@
-import type { ListDetail, ListSummary, Me, Post, Profile, WebAuthnCeremony } from "../types/api";
+import type {
+  ChangeEntry,
+  ListDetail,
+  ListSummary,
+  Me,
+  Post,
+  Profile,
+  User,
+  WebAuthnCeremony,
+} from "../types/api";
+import type { Role } from "../domain/roles";
 import { getJSON, sendJSON, sendRaw } from "./client";
 import { createPasskey, getPasskey } from "./webauthn";
 
@@ -72,6 +82,21 @@ export const api = {
   setTagPreferences: (include_tags: string[], exclude_tags: string[]) =>
     sendJSON<Me>("/me/tag-preferences", "PATCH", { include_tags, exclude_tags }),
   setPassword: (password: string) => sendJSON<Me>("/me/password", "POST", { password }),
+  adminUsers: (signal?: AbortSignal) => getJSON<User[]>("/admin/users", signal),
+  setUserRole: (userId: string, role: Role) =>
+    sendJSON<User>(`/admin/users/${userId}/role`, "PATCH", { role }),
+  recentHistory: (actorId?: string, signal?: AbortSignal) =>
+    getJSON<ChangeEntry[]>(
+      actorId ? `/admin/history?actor_id=${actorId}` : "/admin/history",
+      signal,
+    ),
+  postHistory: (postId: string, signal?: AbortSignal) =>
+    getJSON<ChangeEntry[]>(`/posts/${postId}/history`, signal),
+  rollback: (historyId: string) =>
+    sendJSON<ChangeEntry>(`/admin/history/${historyId}/rollback`, "POST"),
+  hidePost: (postId: string) => sendJSON<Post>(`/posts/${postId}/hide`, "POST"),
+  unhidePost: (postId: string) => sendJSON<Post>(`/posts/${postId}/unhide`, "POST"),
+  deletePost: (postId: string) => sendJSON<Post>(`/posts/${postId}/delete`, "POST"),
   removePassword: () => sendJSON<Me>("/me/password", "DELETE"),
   removePasskey: (id: string) => sendJSON<Me>(`/me/passkeys/${id}`, "DELETE"),
   profile: (username: string, signal?: AbortSignal) =>

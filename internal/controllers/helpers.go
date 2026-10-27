@@ -8,6 +8,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/collections"
 	"github.com/astra-chanUwU/kura-v4/internal/dto"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
+	"github.com/astra-chanUwU/kura-v4/internal/moderation"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -17,11 +18,18 @@ const localUser = "kura_user"
 func writeError(c fiber.Ctx, err error) error {
 	var vErr *accounts.ValidationError
 	var cErr *collections.ValidationError
+	var mErr *moderation.ValidationError
 	switch {
 	case errors.As(err, &vErr):
 		return fiber.NewError(400, vErr.Message)
 	case errors.As(err, &cErr):
 		return fiber.NewError(400, cErr.Message)
+	case errors.As(err, &mErr):
+		return fiber.NewError(400, mErr.Message)
+	case errors.Is(err, moderation.ErrForbidden):
+		return fiber.NewError(403, "You don't have permission to do that.")
+	case errors.Is(err, moderation.ErrNotFound):
+		return fiber.NewError(404, "Not found.")
 	case errors.Is(err, accounts.ErrInvalidCredentials):
 		return fiber.NewError(401, "That username and sign-in didn't match. Check it and try again.")
 	case errors.Is(err, accounts.ErrUsernameTaken):
@@ -73,7 +81,7 @@ func userDTO(u model.User) dto.User {
 		}
 		avatarURL = "/media/avatars/" + u.ID + "?v=" + v
 	}
-	return dto.User{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, Bio: u.Bio, Location: u.Location, Website: u.Website, CreatedAt: u.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), AvatarURL: avatarURL}
+	return dto.User{ID: u.ID, Role: string(u.Role), Username: u.Username, DisplayName: u.DisplayName, Bio: u.Bio, Location: u.Location, Website: u.Website, CreatedAt: u.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), AvatarURL: avatarURL}
 }
 
 func postDTO(p model.Post, favs map[string]bool) dto.Post {
@@ -87,7 +95,7 @@ func postDTO(p model.Post, favs map[string]bool) dto.Post {
 	}
 	return dto.Post{ID: p.ID, OwnerUsername: p.OwnerUsername, ContentType: p.ContentType, SizeBytes: p.SizeBytes,
 		CreatedAt: p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), IsFavorite: favs[p.ID], MediaURL: "/media/posts/" + p.ID,
-		ThumbnailURL: "/media/posts/" + p.ID + "/thumb", Artist: p.Artist, SourceURL: sourceURL, Tags: tags, Width: p.Width, Height: p.Height, Rating: p.Rating}
+		ThumbnailURL: "/media/posts/" + p.ID + "/thumb", Artist: p.Artist, SourceURL: sourceURL, Tags: tags, Width: p.Width, Height: p.Height, Rating: p.Rating, Hidden: p.Hidden}
 }
 
 func postsDTO(posts []model.Post, favs map[string]bool) []dto.Post {
@@ -138,4 +146,20 @@ func securityDTO(sec model.AccountSecurity) dto.Security {
 		out.Passkeys = append(out.Passkeys, dto.Passkey{ID: p.ID, Name: p.Name, CreatedAt: p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), LastUsedAt: last})
 	}
 	return out
+}
+
+// canSeePost reports whether the viewer may see a post at all: hidden
+// posts are staff/owner-only; NSFW gating is applied separately.
+func canSeePost(c fiber.Ctx, p model.Post) bool {
+	if !p.Hidden {
+		return true
+	}
+	u := currentUser(c)
+	if u == nil {
+		return false
+	}
+	if u.Role.AtLeast(model.RoleModerator) {
+		return true
+	}
+	return p.OwnerID != nil && *p.OwnerID == u.ID
 }
