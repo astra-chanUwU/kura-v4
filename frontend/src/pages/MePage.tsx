@@ -27,6 +27,15 @@ import {
   useMyPosts,
 } from "../hooks/useKura";
 import { ROLE_LABELS } from "../domain/roles";
+import {
+  FONT_LABELS,
+  FONTS,
+  THEME_LABELS,
+  THEME_SWATCHES,
+  THEMES,
+  normalizeFont,
+  normalizeTheme,
+} from "../domain/appearance";
 import styles from "./Simple.module.css";
 
 const DISMISS_KEY = "kura-passkey-tip-dismissed";
@@ -64,6 +73,8 @@ export function MePage() {
   const [locationDraft, setLocationDraft] = useState<string | null>(null);
   const [websiteDraft, setWebsiteDraft] = useState<string | null>(null);
   const [shownKey, setShownKey] = useState("");
+  const [themeDraft, setThemeDraft] = useState<string | null>(null);
+  const [fontDraft, setFontDraft] = useState<string | null>(null);
   const [includeDraft, setIncludeDraft] = useState<string[] | null>(null);
   const [excludeDraft, setExcludeDraft] = useState<string[] | null>(null);
   const [includeInput, setIncludeInput] = useState("");
@@ -94,6 +105,11 @@ export function MePage() {
     (bioDraft !== null && bioDraft !== user.bio) ||
     (locationDraft !== null && locationDraft !== user.location) ||
     (websiteDraft !== null && websiteDraft !== user.website);
+  const savedTheme = normalizeTheme(preferences.theme);
+  const savedFont = normalizeFont(preferences.font);
+  const appearanceDirty =
+    (themeDraft !== null && normalizeTheme(themeDraft) !== savedTheme) ||
+    (fontDraft !== null && normalizeFont(fontDraft) !== savedFont);
   const savedIncludeTags = preferences.default_include_tags ?? [];
   const savedExcludeTags = preferences.default_exclude_tags ?? [];
   const tagsDirty =
@@ -337,6 +353,79 @@ export function MePage() {
               Save profile
             </button>
           </form>
+
+          <div className={styles.card}>
+            <h2>Appearance</h2>
+            <p className={styles.muted}>
+              Your default theme and font on every device. Anyone who opens your public profile sees
+              that page in this theme and font, too.
+            </p>
+            <label style={{ display: "grid", gap: "0.3rem", fontSize: "0.85rem" }}>
+              Theme
+              <ThemedSelect
+                label="Default theme"
+                value={themeDraft ?? savedTheme}
+                onChange={setThemeDraft}
+              >
+                {THEMES.map((id) => (
+                  <option key={id} value={id} data-swatch={THEME_SWATCHES[id]}>
+                    {THEME_LABELS[id]}
+                  </option>
+                ))}
+              </ThemedSelect>
+            </label>
+            <label style={{ display: "grid", gap: "0.3rem", fontSize: "0.85rem" }}>
+              Font
+              <ThemedSelect
+                label="Default font"
+                value={fontDraft ?? savedFont}
+                onChange={setFontDraft}
+              >
+                {FONTS.map((id) => (
+                  <option key={id} value={id}>
+                    {FONT_LABELS[id]}
+                  </option>
+                ))}
+              </ThemedSelect>
+            </label>
+            <div
+              data-theme={normalizeTheme(themeDraft ?? savedTheme)}
+              data-font={normalizeFont(fontDraft ?? savedFont)}
+              style={{
+                padding: "0.75rem 0.9rem",
+                border: "1px solid var(--border)",
+                borderRadius: "0.6rem",
+                background: "var(--background)",
+                color: "var(--text)",
+                fontFamily: "var(--font-body)",
+              }}
+            >
+              <strong>Aa</strong> — The quick brown fox.{" "}
+              <span style={{ color: "var(--muted)" }}>
+                {THEME_LABELS[normalizeTheme(themeDraft ?? savedTheme)]} ·{" "}
+                {FONT_LABELS[normalizeFont(fontDraft ?? savedFont)]}
+              </span>
+            </div>
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={appearanceDirty ? styles.saveDirty : undefined}
+                onClick={() => {
+                  run(
+                    account.setAppearance(
+                      normalizeTheme(themeDraft ?? savedTheme),
+                      normalizeFont(fontDraft ?? savedFont),
+                    ),
+                    "Appearance saved.",
+                  );
+                  setThemeDraft(null);
+                  setFontDraft(null);
+                }}
+              >
+                Save appearance
+              </button>
+            </div>
+          </div>
 
           <div className={styles.card}>
             <h2>Default board tags</h2>

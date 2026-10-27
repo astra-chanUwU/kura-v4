@@ -128,7 +128,15 @@ func preferencesDTO(u model.User) dto.Preferences {
 	if exclude == nil {
 		exclude = []string{}
 	}
-	return dto.Preferences{ShowNSFW: u.ShowNSFW, DefaultIncludeTags: include, DefaultExcludeTags: exclude}
+	theme := u.PreferredTheme
+	if theme == "" {
+		theme = "kura"
+	}
+	font := u.PreferredFont
+	if font == "" {
+		font = "system"
+	}
+	return dto.Preferences{ShowNSFW: u.ShowNSFW, DefaultIncludeTags: include, DefaultExcludeTags: exclude, Theme: theme, Font: font}
 }
 
 func securityDTO(sec model.AccountSecurity) dto.Security {

@@ -24,10 +24,12 @@
           );
         }
       } catch (e) {}
-      // Apply the saved theme before first paint (no flash of default).
+      // Apply the saved theme/font before first paint (no flash of default).
       try {
         var t = localStorage.getItem("kura-theme");
         if (t && t !== "kura") document.documentElement.dataset.theme = t;
+        var f = localStorage.getItem("kura-font");
+        if (f && f !== "system") document.documentElement.dataset.font = f;
       } catch (e) {}
     </script>
   </head>

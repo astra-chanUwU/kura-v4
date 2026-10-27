@@ -40,7 +40,7 @@ func tsPtr(t sql.NullTime) *time.Time {
 	return &v
 }
 
-func userFrom(id uuid.UUID, username, display, bio, location, website string, created time.Time, avatarKey, avatarType string, showNSFW bool, includeTags, excludeTags []string, role string) model.User {
+func userFrom(id uuid.UUID, username, display, bio, location, website string, created time.Time, avatarKey, avatarType string, showNSFW bool, includeTags, excludeTags []string, theme, font, role string) model.User {
 	if includeTags == nil {
 		includeTags = []string{}
 	}
@@ -51,7 +51,13 @@ func userFrom(id uuid.UUID, username, display, bio, location, website string, cr
 	if !r.Valid() {
 		r = model.RoleMember
 	}
-	return model.User{ID: id.String(), Username: username, DisplayName: display, Bio: bio, Location: location, Website: website, CreatedAt: created, AvatarKey: avatarKey, AvatarType: avatarType, ShowNSFW: showNSFW, DefaultIncludeTags: includeTags, DefaultExcludeTags: excludeTags, Role: r}
+	if theme == "" {
+		theme = "kura"
+	}
+	if font == "" {
+		font = "system"
+	}
+	return model.User{ID: id.String(), Username: username, DisplayName: display, Bio: bio, Location: location, Website: website, CreatedAt: created, AvatarKey: avatarKey, AvatarType: avatarType, ShowNSFW: showNSFW, DefaultIncludeTags: includeTags, DefaultExcludeTags: excludeTags, PreferredTheme: theme, PreferredFont: font, Role: r}
 }
 
 func (d *AccountsDAO) CreateUser(ctx context.Context, username, display string) (model.User, error) {
@@ -59,7 +65,7 @@ func (d *AccountsDAO) CreateUser(ctx context.Context, username, display string) 
 	if err != nil {
 		return model.User{}, err
 	}
-	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags, r.Role), nil
+	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags, r.PreferredTheme, r.PreferredFont, r.Role), nil
 }
 func (d *AccountsDAO) CreateUserWithID(ctx context.Context, id, username, display string) (model.User, error) {
 	uid, err := parseUUID(id)
@@ -70,14 +76,14 @@ func (d *AccountsDAO) CreateUserWithID(ctx context.Context, id, username, displa
 	if err != nil {
 		return model.User{}, err
 	}
-	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags, r.Role), nil
+	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags, r.PreferredTheme, r.PreferredFont, r.Role), nil
 }
 func (d *AccountsDAO) GetUserByUsername(ctx context.Context, username string) (model.User, error) {
 	r, err := d.q.GetUserByUsername(ctx, username)
 	if err != nil {
 		return model.User{}, err
 	}
-	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags, r.Role), nil
+	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags, r.PreferredTheme, r.PreferredFont, r.Role), nil
 }
 func (d *AccountsDAO) GetUserByID(ctx context.Context, id string) (model.User, error) {
 	uid, err := parseUUID(id)
@@ -88,7 +94,7 @@ func (d *AccountsDAO) GetUserByID(ctx context.Context, id string) (model.User, e
 	if err != nil {
 		return model.User{}, err
 	}
-	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags, r.Role), nil
+	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags, r.PreferredTheme, r.PreferredFont, r.Role), nil
 }
 func (d *AccountsDAO) UpdateProfile(ctx context.Context, u model.User) (model.User, error) {
 	uid, err := parseUUID(u.ID)
@@ -99,7 +105,7 @@ func (d *AccountsDAO) UpdateProfile(ctx context.Context, u model.User) (model.Us
 	if err != nil {
 		return model.User{}, err
 	}
-	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags, r.Role), nil
+	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags, r.PreferredTheme, r.PreferredFont, r.Role), nil
 }
 func (d *AccountsDAO) UpdateTagPreferences(ctx context.Context, userID string, includeTags, excludeTags []string) error {
 	uid, err := parseUUID(userID)
@@ -113,6 +119,13 @@ func (d *AccountsDAO) UpdateTagPreferences(ctx context.Context, userID string, i
 		excludeTags = []string{}
 	}
 	return d.q.UpdateTagPreferences(ctx, sqlcgen.UpdateTagPreferencesParams{ID: uid, DefaultIncludeTags: includeTags, DefaultExcludeTags: excludeTags})
+}
+func (d *AccountsDAO) UpdateAppearance(ctx context.Context, userID, theme, font string) error {
+	uid, err := parseUUID(userID)
+	if err != nil {
+		return err
+	}
+	return d.q.UpdateAppearance(ctx, sqlcgen.UpdateAppearanceParams{ID: uid, PreferredTheme: theme, PreferredFont: font})
 }
 func (d *AccountsDAO) UpdateShowNSFW(ctx context.Context, userID string, show bool) error {
 	uid, err := parseUUID(userID)
@@ -278,7 +291,7 @@ func (d *AccountsDAO) ListUsers(ctx context.Context) ([]model.User, error) {
 	}
 	out := make([]model.User, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags, r.Role))
+		out = append(out, userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags, r.PreferredTheme, r.PreferredFont, r.Role))
 	}
 	return out, nil
 }
@@ -291,7 +304,7 @@ func (d *AccountsDAO) UpdateUserRole(ctx context.Context, userID string, role mo
 	if err != nil {
 		return model.User{}, err
 	}
-	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags, r.Role), nil
+	return userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags, r.PreferredTheme, r.PreferredFont, r.Role), nil
 }
 func (d *AccountsDAO) CountUsersByRole(ctx context.Context, role model.Role) (int64, error) {
 	return d.q.CountUsersByRole(ctx, string(role))

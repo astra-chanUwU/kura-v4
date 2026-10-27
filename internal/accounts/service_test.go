@@ -250,6 +250,22 @@ func TestSetTagPreferencesNormalizesAndExcludeWins(t *testing.T) {
 		[]string{"gif"}))
 }
 
+func TestSetAppearanceValidatesAndPersists(t *testing.T) {
+	ctx := context.Background()
+	repo := NewMockRepository(t)
+	repo.EXPECT().UpdateAppearance(ctx, "u1", "umineko", "serif").Return(nil)
+	repo.EXPECT().UpdateAppearance(ctx, "u1", "catppuccin", "hack").Return(nil)
+	svc, err := NewService(repo, "http://localhost:5174", nil)
+	require.NoError(t, err)
+	require.NoError(t, svc.SetAppearance(ctx, "u1", "umineko", "serif"))
+	require.NoError(t, svc.SetAppearance(ctx, "u1", "catppuccin", "hack"))
+	for _, bad := range [][2]string{{"neon", "serif"}, {"umineko", "comic"}, {"", ""}} {
+		err := svc.SetAppearance(ctx, "u1", bad[0], bad[1])
+		var vErr *ValidationError
+		require.ErrorAs(t, err, &vErr, "theme=%q font=%q", bad[0], bad[1])
+	}
+}
+
 func TestShowNSFWRequiresAdultConfirmation(t *testing.T) {
 	ctx := context.Background()
 	repo := NewMockRepository(t)

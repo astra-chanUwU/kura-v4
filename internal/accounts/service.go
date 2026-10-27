@@ -58,6 +58,7 @@ type Repository interface {
 	SetAvatar(ctx context.Context, userID, key, contentType string) error
 	UpdateShowNSFW(ctx context.Context, userID string, show bool) error
 	UpdateTagPreferences(ctx context.Context, userID string, includeTags, excludeTags []string) error
+	UpdateAppearance(ctx context.Context, userID, theme, font string) error
 	SetRecoveryKey(ctx context.Context, userID string, keyHash []byte) error
 	GetRecoveryKey(ctx context.Context, userID string) ([]byte, time.Time, error)
 	// RecoverAccount atomically replaces the password and recovery key and
@@ -409,6 +410,31 @@ func (s *Service) SetShowNSFW(ctx context.Context, userID string, show, over18 b
 		return ErrAdultConfirmationRequired
 	}
 	return s.repo.UpdateShowNSFW(ctx, userID, show)
+}
+
+// Appearance ids, mirrored in frontend/src/domain/appearance.ts.
+var Themes = []string{"kura", "safebooru", "rule34", "umineko", "bernkastel", "lambdadelta", "beatrice", "erika", "battler", "virgilia", "catppuccin", "danbooru"}
+var Fonts = []string{"system", "serif", "rounded", "mono", "hack"}
+
+// SetAppearance records the account's default theme and font. Unknown
+// ids are rejected (fail closed) rather than stored.
+func (s *Service) SetAppearance(ctx context.Context, userID, theme, font string) error {
+	if !contains(Themes, theme) {
+		return invalid("Choose one of the available themes.")
+	}
+	if !contains(Fonts, font) {
+		return invalid("Choose one of the available fonts.")
+	}
+	return s.repo.UpdateAppearance(ctx, userID, theme, font)
+}
+
+func contains(list []string, v string) bool {
+	for _, item := range list {
+		if item == v {
+			return true
+		}
+	}
+	return false
 }
 
 // SetTagPreferences records the account's default board tag filters.

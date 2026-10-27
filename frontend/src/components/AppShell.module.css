@@ -79,6 +79,7 @@
 .themeWrap {
   margin-left: auto;
   display: flex;
+  gap: 0.5rem;
   align-items: center;
   flex: none;
 }
@@ -141,7 +142,7 @@
     max-width: 4.5rem;
   }
   .themeWrap {
-    max-width: 9rem;
+    max-width: 13rem;
   }
   .main {
     padding: 1rem 0.75rem 2rem;

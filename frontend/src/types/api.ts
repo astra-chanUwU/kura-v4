@@ -10,6 +10,8 @@ export interface ApiErrorBody {
 }
 import type { Role } from "../domain/roles";
 export type { Role };
+import type { FontId, ThemeId } from "../domain/appearance";
+export type { FontId, ThemeId };
 export interface User {
   id: string;
   role: Role;
@@ -57,6 +59,8 @@ export interface Profile {
   user: User;
   public_lists: ListSummary[];
   contributions: number;
+  theme: ThemeId;
+  font: FontId;
 }
 export interface PasskeyInfo {
   id: string;
@@ -74,6 +78,8 @@ export interface Preferences {
   show_nsfw: boolean;
   default_include_tags: string[];
   default_exclude_tags: string[];
+  theme: ThemeId;
+  font: FontId;
 }
 export interface Me {
   user: User;

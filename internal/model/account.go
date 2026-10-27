@@ -13,7 +13,11 @@ type User struct {
 	AvatarKey   string
 	AvatarType  string
 	ShowNSFW    bool
-	Role        Role
+	// Default appearance: applied on every device and shown on the
+	// public profile. Ids are validated in the accounts service.
+	PreferredTheme string
+	PreferredFont  string
+	Role           Role
 	// Default board tag filters, applied when the board loads.
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string

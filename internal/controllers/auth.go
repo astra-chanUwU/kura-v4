@@ -70,6 +70,7 @@ func (h *Auth) RegisterRoutes(api fiber.Router) {
 	api.Post("/auth/recover", h.recover)
 	api.Patch("/me/preferences", h.updatePreferences)
 	api.Patch("/me/tag-preferences", h.updateTagPreferences)
+	api.Patch("/me/appearance", h.updateAppearance)
 	api.Post("/me/avatar", h.setAvatar)
 	api.Delete("/me/avatar", h.removeAvatar)
 	api.Post("/me/password", h.setPassword)
@@ -311,6 +312,25 @@ func (h *Auth) updateTagPreferences(c fiber.Ctx) error {
 	return h.meResponse(c, updated)
 }
 
+func (h *Auth) updateAppearance(c fiber.Ctx) error {
+	user, err := requireUser(c)
+	if err != nil {
+		return err
+	}
+	var in dto.UpdateAppearance
+	if err := c.Bind().Body(&in); err != nil {
+		return fiber.NewError(400, "Invalid request.")
+	}
+	if err := h.accounts.SetAppearance(c.Context(), user.ID, in.Theme, in.Font); err != nil {
+		return writeError(c, err)
+	}
+	updated, err := h.accounts.GetUser(c.Context(), user.ID)
+	if err != nil {
+		return writeError(c, err)
+	}
+	return h.meResponse(c, updated)
+}
+
 func (h *Auth) avatar(c fiber.Ctx) error {
 	user, file, err := h.accounts.Avatar(c.Context(), c.Params("id"))
 	if err != nil {
@@ -387,5 +407,6 @@ func (h *Auth) publicProfile(c fiber.Ctx) error {
 	if h.board != nil {
 		contributions, _ = h.board.Contributions(c.Context(), user.ID)
 	}
-	return c.JSON(dto.Profile{User: userDTO(user), PublicLists: listsDTO(lists), Contributions: contributions})
+	prefs := preferencesDTO(user)
+	return c.JSON(dto.Profile{User: userDTO(user), PublicLists: listsDTO(lists), Contributions: contributions, Theme: prefs.Theme, Font: prefs.Font})
 }

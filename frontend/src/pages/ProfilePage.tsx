@@ -3,14 +3,22 @@ import { ShareProfileButton } from "../components/ShareProfileButton";
 import { useProfile } from "../hooks/useKura";
 import styles from "./Profile.module.css";
 import { ROLE_LABELS } from "../domain/roles";
+import { FONT_LABELS, THEME_LABELS, normalizeFont, normalizeTheme } from "../domain/appearance";
 
 export function ProfilePage({ username }: { username: string }) {
   const { data, isPending, error } = useProfile(username);
   if (isPending) return <p>Loading…</p>;
   if (error || !data) return <p role="alert">That profile could not be found.</p>;
   const { user, public_lists: lists, contributions } = data;
+  const theme = normalizeTheme(data.theme);
+  const font = normalizeFont(data.font);
   return (
-    <section className={styles.page} aria-labelledby="profile-title">
+    <section
+      className={`${styles.page} ${styles.themed}`}
+      aria-labelledby="profile-title"
+      data-theme={theme}
+      data-font={font}
+    >
       <div className={styles.header}>
         {user.avatar_url ? (
           <img className={styles.avatar} src={user.avatar_url} alt="" />
@@ -24,6 +32,9 @@ export function ProfilePage({ username }: { username: string }) {
           <p className={styles.muted}>
             @{user.username} · {ROLE_LABELS[user.role]}
             {user.location ? ` · ${user.location}` : ""}
+          </p>
+          <p className={styles.appearance}>
+            {THEME_LABELS[theme]} · {FONT_LABELS[font]}
           </p>
           <p className={styles.stats}>
             <strong>{contributions}</strong> contribution{contributions === 1 ? "" : "s"} ·{" "}

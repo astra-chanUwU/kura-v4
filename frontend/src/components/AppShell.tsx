@@ -1,26 +1,41 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { useState } from "react";
+import { useCallback } from "react";
 import { ThemedSelect } from "./ThemedSelect";
-import { useMe } from "../hooks/useKura";
+import { useAccountActions, useMe } from "../hooks/useKura";
+import { useAppearance } from "../hooks/useAppearance";
+import {
+  FONT_LABELS,
+  FONTS,
+  THEME_LABELS,
+  THEME_SWATCHES,
+  THEMES,
+  normalizeFont,
+  normalizeTheme,
+} from "../domain/appearance";
 import { atLeast } from "../domain/roles";
 import styles from "./AppShell.module.css";
 
-const THEMES = [
-  { id: "kura", label: "Kura Dark", swatch: "#b49afa" },
-  { id: "safebooru", label: "Safebooru", swatch: "#0b6bcb" },
-  { id: "rule34", label: "Rule34", swatch: "#8bc34a" },
-  { id: "umineko", label: "Umineko", swatch: "#c9a227" },
-] as const;
-
 export function AppShell() {
-  const { user, loading } = useMe();
-  const [theme, setTheme] = useState(() => localStorage.getItem("kura-theme") ?? "kura");
-  const applyTheme = (id: string) => {
-    setTheme(id);
-    localStorage.setItem("kura-theme", id);
-    if (id === "kura") delete document.documentElement.dataset.theme;
-    else document.documentElement.dataset.theme = id;
-  };
+  const { me, user, loading } = useMe();
+  const account = useAccountActions();
+  const persist = useCallback(
+    (
+      theme: Parameters<typeof account.setAppearance>[0],
+      font: Parameters<typeof account.setAppearance>[1],
+    ) => {
+      // Header picks are quick switches; the account save is
+      // fire-and-forget (the local appearance already applied).
+      void account.setAppearance(theme, font).catch(() => {});
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- account actions are stable wrappers
+    [],
+  );
+  const { theme, font, change } = useAppearance(
+    me?.preferences.theme,
+    me?.preferences.font,
+    !!me,
+    persist,
+  );
   return (
     <div className={styles.shell}>
       <a className={styles.skip} href="#main">
@@ -82,10 +97,25 @@ export function AppShell() {
             ))}
         </nav>
         <div className={styles.themeWrap}>
-          <ThemedSelect label="Theme" value={theme} onChange={applyTheme}>
-            {THEMES.map((t) => (
-              <option key={t.id} value={t.id} data-swatch={t.swatch}>
-                {t.label}
+          <ThemedSelect
+            label="Theme"
+            value={theme}
+            onChange={(id) => change({ theme: normalizeTheme(id) })}
+          >
+            {THEMES.map((id) => (
+              <option key={id} value={id} data-swatch={THEME_SWATCHES[id]}>
+                {THEME_LABELS[id]}
+              </option>
+            ))}
+          </ThemedSelect>
+          <ThemedSelect
+            label="Font"
+            value={font}
+            onChange={(id) => change({ font: normalizeFont(id) })}
+          >
+            {FONTS.map((id) => (
+              <option key={id} value={id}>
+                {FONT_LABELS[id]}
               </option>
             ))}
           </ThemedSelect>

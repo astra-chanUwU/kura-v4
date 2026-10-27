@@ -63,6 +63,8 @@ vi.mock("../hooks/useKura", () => ({
             show_nsfw: false,
             default_include_tags: board.includeTags,
             default_exclude_tags: board.excludeTags,
+            theme: "kura",
+            font: "system",
           },
         }
       : undefined,

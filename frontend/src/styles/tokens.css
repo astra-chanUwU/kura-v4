@@ -1,8 +1,11 @@
 /* Semantic variables are the theme boundary. Themes only redefine
-   these variables (plus an optional font accent); components never
-   hardcode colors. Default theme: Kura Dark. */
+   these variables; fonts only redefine --font-body. Components never
+   hardcode colors. Selectors are element-scoped (not :root-only) so a
+   public profile can render in its owner's theme/font inside a page
+   that otherwise uses the visitor's. Default theme: Kura Dark. */
 :root {
   color-scheme: dark;
+  --font-body: "Atkinson Hyperlegible", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --header-h: 4.25rem;
   --background: #100f15;
   --surface: #191720;
@@ -20,7 +23,7 @@
 }
 
 /* Safebooru: the classic light blue-and-white booru look. */
-:root[data-theme="safebooru"] {
+[data-theme="safebooru"] {
   color-scheme: light;
   --background: #eef4fc;
   --surface: #ffffff;
@@ -38,7 +41,7 @@
 }
 
 /* Rule34: near-black with the signature green. */
-:root[data-theme="rule34"] {
+[data-theme="rule34"] {
   color-scheme: dark;
   --background: #0b0f08;
   --surface: #141a0f;
@@ -56,7 +59,7 @@
 }
 
 /* Umineko — City of Books: black-plum, burgundy and gold, serif voice. */
-:root[data-theme="umineko"] {
+[data-theme="umineko"] {
   color-scheme: dark;
   --background: #120d10;
   --surface: #1e1519;
@@ -72,12 +75,182 @@
   --success: #b5c99a;
   --selection: #4a2f35;
 }
-:root[data-theme="umineko"] body {
-  font-family: Georgia, "Times New Roman", serif;
+
+/* Character themes adapted from VictoriqueMoe's umineko_city_of_books
+   (https://github.com/VictoriqueMoe/umineko_city_of_books), mapped onto
+   Kura's semantic variables. */
+[data-theme="bernkastel"] {
+  color-scheme: dark;
+  --background: #06090f;
+  --surface: #0c1424;
+  --surface-soft: #0f1a30;
+  --text: #e0eaf5;
+  --muted: #9bb5d0;
+  --accent: #4a90d9;
+  --accent-soft: #7eb3f0;
+  --border: #1a2a40;
+  --border-strong: #3d5a80;
+  --danger: #ff6b6b;
+  --warning: #f0c674;
+  --success: #a8d08d;
+  --selection: #1a2a40;
+}
+[data-theme="lambdadelta"] {
+  color-scheme: dark;
+  --background: #120810;
+  --surface: #1a0815;
+  --surface-soft: #240c1f;
+  --text: #f5e0ef;
+  --muted: #d09bb8;
+  --accent: #ff69b4;
+  --accent-soft: #ffb6d9;
+  --border: #4a2038;
+  --border-strong: #6a3a5a;
+  --danger: #ff6b6b;
+  --warning: #f0c674;
+  --success: #a8d08d;
+  --selection: #4a2038;
+}
+[data-theme="beatrice"] {
+  color-scheme: dark;
+  --background: #0f0a08;
+  --surface: #1a1208;
+  --surface-soft: #241a0c;
+  --text: #f5ebe0;
+  --muted: #c9b8a0;
+  --accent: #d4a84b;
+  --accent-soft: #f0d590;
+  --border: #3d2a1a;
+  --border-strong: #6b4c3a;
+  --danger: #ff6b6b;
+  --warning: #f0c674;
+  --success: #a8d08d;
+  --selection: #3d2a1a;
+}
+[data-theme="erika"] {
+  color-scheme: dark;
+  --background: #060a0f;
+  --surface: #0a1824;
+  --surface-soft: #0e2030;
+  --text: #e0f0f5;
+  --muted: #90c0d8;
+  --accent: #00b4d8;
+  --accent-soft: #e27599;
+  --border: #1a2a40;
+  --border-strong: #4a3060;
+  --danger: #ff6b6b;
+  --warning: #f0c674;
+  --success: #a8d08d;
+  --selection: #1a2a40;
+}
+[data-theme="battler"] {
+  color-scheme: dark;
+  --background: #0f0608;
+  --surface: #1f0c14;
+  --surface-soft: #28101a;
+  --text: #f0e0e5;
+  --muted: #c0a0a8;
+  --accent: #e85a70;
+  --accent-soft: #f2b8c6;
+  --border: #2a0f18;
+  --border-strong: #4a1520;
+  --danger: #ff6b6b;
+  --warning: #f0c674;
+  --success: #a8d08d;
+  --selection: #2a0f18;
+}
+/* Virgilia is senpai's one light theme: silver with a deep red accent. */
+[data-theme="virgilia"] {
+  color-scheme: light;
+  --background: #e8eaf0;
+  --surface: #ffffff;
+  --surface-soft: #dde0ea;
+  --text: #1a1a24;
+  --muted: #5a5e6c;
+  --accent: #8b1a2d;
+  --accent-soft: #b83048;
+  --border: #cdd1dc;
+  --border-strong: #9ba0b0;
+  --danger: #c62828;
+  --warning: #9a6200;
+  --success: #2e7d32;
+  --selection: #cdd1dc;
+}
+
+/* Catppuccin Mocha: the official pastel-on-dark palette. */
+[data-theme="catppuccin"] {
+  color-scheme: dark;
+  --background: #1e1e2e;
+  --surface: #313244;
+  --surface-soft: #45475a;
+  --text: #cdd6f4;
+  --muted: #a6adc8;
+  --accent: #cba6f7;
+  --accent-soft: #f5c2e7;
+  --border: #45475a;
+  --border-strong: #585b70;
+  --danger: #f38ba8;
+  --warning: #f9e2af;
+  --success: #a6e3a1;
+  --selection: #585b70;
+}
+
+/* Danbooru: the classic light booru look, blue links on white. */
+[data-theme="danbooru"] {
+  color-scheme: light;
+  --background: #f5f7fa;
+  --surface: #ffffff;
+  --surface-soft: #eef4fb;
+  --text: #222222;
+  --muted: #6c757d;
+  --accent: #0075f8;
+  --accent-soft: #d6336c;
+  --border: #d9e2ec;
+  --border-strong: #a8bdd1;
+  --danger: #c1272d;
+  --warning: #9a6200;
+  --success: #2e7d32;
+  --selection: #bcd8f7;
 }
 
 @media (max-width: 640px) {
   :root {
     --header-h: 3.5rem;
   }
+}
+
+[data-theme="kura"] {
+  color-scheme: dark;
+  --background: #100f15;
+  --surface: #191720;
+  --surface-soft: #211e2b;
+  --text: #f2eff7;
+  --muted: #a19bab;
+  --accent: #b49afa;
+  --accent-soft: #f0a7d2;
+  --border: #2d2937;
+  --border-strong: #484153;
+  --danger: #ff9a9a;
+  --warning: #f0c674;
+  --success: #a8d08d;
+  --selection: #493d62;
+}
+
+/* Fonts are independent of theme: each only swaps --font-body. Every
+   choice is a real self-hosted font (loaded in main.tsx), named by its
+   actual typeface in the picker. */
+[data-font="system"] {
+  --font-body: "Atkinson Hyperlegible", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+[data-font="serif"] {
+  --font-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+}
+[data-font="rounded"] {
+  --font-body: Nunito, ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", sans-serif;
+}
+[data-font="mono"] {
+  --font-body: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+[data-font="hack"] {
+  --font-body: Hack, "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
 }

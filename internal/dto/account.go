@@ -18,6 +18,10 @@ type Profile struct {
 	User          User   `json:"user"`
 	PublicLists   []List `json:"public_lists"`
 	Contributions int64  `json:"contributions"`
+	// The owner's default appearance; the public profile page renders
+	// in it (scoped to that page).
+	Theme string `json:"theme"`
+	Font  string `json:"font"`
 }
 
 type Post struct {
@@ -51,6 +55,14 @@ type Preferences struct {
 	ShowNSFW           bool     `json:"show_nsfw"`
 	DefaultIncludeTags []string `json:"default_include_tags"`
 	DefaultExcludeTags []string `json:"default_exclude_tags"`
+	Theme              string   `json:"theme"`
+	Font               string   `json:"font"`
+}
+
+// UpdateAppearance replaces the account's default theme and font.
+type UpdateAppearance struct {
+	Theme string `json:"theme"`
+	Font  string `json:"font"`
 }
 
 // UpdateTagPreferences replaces the account's default board tag filters.

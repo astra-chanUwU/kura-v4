@@ -3,6 +3,26 @@
   gap: 1.25rem;
   max-width: 64rem;
 }
+/* The public profile renders in its owner's theme/font, scoped to
+   this page; the rest of the site keeps the visitor's appearance. */
+.themed {
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--background);
+  color: var(--text);
+  font-family: var(--font-body);
+}
+.appearance {
+  display: inline-block;
+  margin: 0.35rem 0 0;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
 .header {
   display: flex;
   gap: 1rem;

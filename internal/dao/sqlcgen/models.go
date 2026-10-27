@@ -130,6 +130,8 @@ type User struct {
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
 	Role               string
+	PreferredTheme     string
+	PreferredFont      string
 }
 
 type WebauthnChallenge struct {
