@@ -44,6 +44,28 @@ export function ListPage({ id }: { id: string }) {
   const [local, setLocal] = useState<{ posts: Post[]; baseKey: string } | null>(null);
   const wrapRefs = useRef(new Map<string, HTMLElement>());
 
+  // Drag-and-drop reorder state (owner only). Following the approach
+  // that works smoothly in waifulist's tier-list builder: during a drag
+  // the order NEVER changes — we only record where the drop would land
+  // and paint an insertion indicator. The grid therefore never reflows
+  // mid-drag (that live reflow, plus a FLIP pass per dragover, is what
+  // made the old drag feel choppy). The reorder commits once, on drop.
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const dropIndexRef = useRef<number | null>(null);
+  // Item that must not FLIP after a drop: the dragged picture should
+  // simply appear where it was dropped, not glide from its old slot.
+  const flipSkipRef = useRef<string | null>(null);
+  const setDropTarget = (index: number | null) => {
+    if (dropIndexRef.current === index) return;
+    dropIndexRef.current = index;
+    setDropIndex(index);
+  };
+  const endDrag = () => {
+    setDragId(null);
+    setDropTarget(null);
+  };
+
   // FLIP animation: capture wrapper positions before an order change,
   // then after render translate items back and let them glide home, so
   // reordering animates instead of snapping. Skipped for reduced motion.
@@ -62,9 +84,12 @@ export function ListPage({ id }: { id: string }) {
     if (prev.size === 0) return;
     flipRects.current = new Map();
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const skip = flipSkipRef.current;
+    flipSkipRef.current = null;
     for (const [pid, el] of wrapRefs.current) {
       const before = prev.get(pid);
       if (!before) continue;
+      if (pid === skip) continue;
       if (reduced) continue;
       const now = el.getBoundingClientRect();
       const dx = before.left - now.left;
@@ -100,20 +125,55 @@ export function ListPage({ id }: { id: string }) {
     });
   };
 
-  // One-step move used by the arrow buttons; animates via FLIP and
-  // saves at once. (Drag-and-drop was removed: live-reflowing a grid
-  // mid-drag never animated smoothly without a dedicated sortable lib.)
+  // Apply a new order: FLIP-animate it and save at once. Shared by the
+  // arrow buttons and by drag-and-drop's single commit on drop.
+  const applyOrder = (next: Post[], skipFlipId?: string) => {
+    captureFlip();
+    flipSkipRef.current = skipFlipId ?? null;
+    setLocal({ posts: next, baseKey: serverKey });
+    saveOrder(next);
+  };
+
+  // One-step move used by the arrow buttons (also the keyboard/touch
+  // path, since HTML5 drag needs a mouse).
   const moveItem = (postId: string, target: number) => {
     const base = visible;
     const index = base.findIndex((p) => p.id === postId);
     if (index < 0 || target < 0 || target >= base.length || target === index) return;
-    captureFlip();
     const next = [...base];
     const [moved] = next.splice(index, 1);
     if (!moved) return;
     next.splice(target, 0, moved);
-    setLocal({ posts: next, baseKey: serverKey });
-    saveOrder(next);
+    applyOrder(next);
+  };
+
+  // Where a drop over item `index` would insert: before it on its
+  // first half, after it on its second. Rows stack vertically, the
+  // grid flows left-to-right, so the split axis follows the layout.
+  const insertionAt = (event: React.DragEvent<HTMLElement>, index: number) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const after =
+      view.mode === "rows"
+        ? event.clientY > rect.top + rect.height / 2
+        : event.clientX > rect.left + rect.width / 2;
+    return index + (after ? 1 : 0);
+  };
+
+  // Commit the drag at insertion index `insertion` (an index into the
+  // pre-removal order). No-op when dropped back where it started.
+  const commitDrag = (insertion: number) => {
+    const id = dragId;
+    endDrag();
+    if (!id) return;
+    const from = visible.findIndex((p) => p.id === id);
+    if (from < 0) return;
+    const target = from < insertion ? insertion - 1 : insertion;
+    if (target === from) return;
+    const next = [...visible];
+    const [moved] = next.splice(from, 1);
+    if (!moved) return;
+    next.splice(target, 0, moved);
+    applyOrder(next, id);
   };
 
   return (
@@ -217,10 +277,30 @@ export function ListPage({ id }: { id: string }) {
       )}
       {items.length > 0 && (
         <div className={listStyles.controlsRow}>
+          {isOwner && items.length > 1 ? (
+            <p className={listStyles.dragHint}>Drag a picture to reorder it, or use its arrows.</p>
+          ) : (
+            <span />
+          )}
           <BoardViewControls view={view} onChange={changeView} />
         </div>
       )}
-      <div className={view.mode === "rows" ? listStyles.rowsList : listStyles.listGrid}>
+      <div
+        className={view.mode === "rows" ? listStyles.rowsList : listStyles.listGrid}
+        onDragOver={(event) => {
+          if (dragId) event.preventDefault();
+        }}
+        onDrop={(event) => {
+          if (!dragId) return;
+          event.preventDefault();
+          commitDrag(visible.length);
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setDropTarget(null);
+          }
+        }}
+      >
         {visible.map((post, index) => (
           <div
             key={post.id}
@@ -229,7 +309,70 @@ export function ListPage({ id }: { id: string }) {
               if (el) wrapRefs.current.set(post.id, el);
               else wrapRefs.current.delete(post.id);
             }}
-            className={isOwner ? listStyles.item : undefined}
+            className={
+              isOwner
+                ? [
+                    listStyles.item,
+                    view.mode === "rows" ? listStyles.itemRows : "",
+                    dragId === post.id ? listStyles.dragging : "",
+                    dropIndex === index ? listStyles.dropBefore : "",
+                    index === visible.length - 1 && dropIndex === visible.length
+                      ? listStyles.dropAfter
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")
+                : undefined
+            }
+            draggable={isOwner || undefined}
+            title={isOwner ? "Drag to reorder" : undefined}
+            onDragStart={
+              isOwner
+                ? (event) => {
+                    setDragId(post.id);
+                    setDropTarget(null);
+                    const dt = event.dataTransfer;
+                    if (!dt) return;
+                    dt.effectAllowed = "move";
+                    try {
+                      // Firefox only starts a drag once data is set.
+                      dt.setData("text/plain", post.id);
+                    } catch {
+                      // Data is a drag-start token only; order is state.
+                    }
+                    try {
+                      const el = event.currentTarget;
+                      const rect = el.getBoundingClientRect();
+                      dt.setDragImage(el, event.clientX - rect.left, event.clientY - rect.top);
+                    } catch {
+                      // Fall back to the browser's default drag ghost.
+                    }
+                  }
+                : undefined
+            }
+            onDragEnd={isOwner ? endDrag : undefined}
+            onDragOver={
+              isOwner
+                ? (event) => {
+                    if (!dragId) return;
+                    event.preventDefault();
+                    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+                    // Guarded setter: state only changes when the
+                    // insertion point actually moves, so dragover's
+                    // high fire rate never re-renders the grid.
+                    setDropTarget(insertionAt(event, index));
+                  }
+                : undefined
+            }
+            onDrop={
+              isOwner
+                ? (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    commitDrag(insertionAt(event, index));
+                  }
+                : undefined
+            }
           >
             <div className={listStyles.cardWrap}>
               {view.mode === "rows" ? <PostRow post={post} /> : <PostCard post={post} />}

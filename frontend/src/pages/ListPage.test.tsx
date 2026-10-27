@@ -88,6 +88,87 @@ describe("list reorder controls", () => {
     expect(cards).toEqual(["card-p2", "card-p1", "card-p3"]);
   });
 
+  it("drags a picture to a new spot and saves only on drop", () => {
+    localStorage.removeItem("kura-board-view");
+    hoisted.items = [makePost("p1"), makePost("p2"), makePost("p3")];
+    hoisted.reorderList.mockClear();
+    render(<ListPage id="l1" />);
+    const dataTransfer = {
+      setData: vi.fn(),
+      setDragImage: vi.fn(),
+      effectAllowed: "",
+      dropEffect: "",
+    };
+    const tile = (id: string) => screen.getByTestId(`card-${id}`).closest("[draggable='true']")!;
+    const rect = {
+      left: 0,
+      top: 0,
+      width: 100,
+      height: 100,
+      right: 100,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect;
+    vi.spyOn(tile("p1"), "getBoundingClientRect").mockReturnValue(rect);
+
+    fireEvent.dragStart(tile("p3"), { dataTransfer });
+    // Mid-drag nothing reorders and nothing saves: the grid only marks
+    // where the drop would land. (Live reflow here was the old jank.)
+    fireEvent.dragOver(tile("p1"), { dataTransfer, clientX: 10, clientY: 10 });
+    expect(hoisted.reorderList).not.toHaveBeenCalled();
+    expect(screen.getAllByTestId(/^card-/).map((el) => el.getAttribute("data-testid"))).toEqual([
+      "card-p1",
+      "card-p2",
+      "card-p3",
+    ]);
+    expect(tile("p1").className).toMatch(/dropBefore/);
+
+    fireEvent.drop(tile("p1"), { dataTransfer, clientX: 10, clientY: 10 });
+    expect(hoisted.reorderList).toHaveBeenCalledTimes(1);
+    expect(hoisted.reorderList).toHaveBeenCalledWith("l1", ["p3", "p1", "p2"]);
+    expect(screen.getAllByTestId(/^card-/).map((el) => el.getAttribute("data-testid"))).toEqual([
+      "card-p3",
+      "card-p1",
+      "card-p2",
+    ]);
+  });
+
+  it("saves nothing when a drag ends without a drop or lands back home", () => {
+    localStorage.removeItem("kura-board-view");
+    hoisted.items = [makePost("p1"), makePost("p2"), makePost("p3")];
+    hoisted.reorderList.mockClear();
+    render(<ListPage id="l1" />);
+    const dataTransfer = {
+      setData: vi.fn(),
+      setDragImage: vi.fn(),
+      effectAllowed: "",
+      dropEffect: "",
+    };
+    const tile = (id: string) => screen.getByTestId(`card-${id}`).closest("[draggable='true']")!;
+
+    fireEvent.dragStart(tile("p2"), { dataTransfer });
+    fireEvent.dragEnd(tile("p2"), { dataTransfer });
+    expect(hoisted.reorderList).not.toHaveBeenCalled();
+
+    // Dropped on its own second half = its own slot, still no save.
+    vi.spyOn(tile("p2"), "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 100,
+      height: 100,
+      right: 100,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    fireEvent.dragStart(tile("p2"), { dataTransfer });
+    fireEvent.drop(tile("p2"), { dataTransfer, clientX: 90, clientY: 10 });
+    expect(hoisted.reorderList).not.toHaveBeenCalled();
+  });
+
   it("uses up/down arrows in Rows mode", () => {
     localStorage.setItem("kura-board-view", JSON.stringify({ mode: "rows", wide: false }));
     hoisted.items = [makePost("p1"), makePost("p2"), makePost("p3")];

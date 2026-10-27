@@ -2,9 +2,81 @@
   position: relative;
 }
 
+.item[draggable="true"] {
+  cursor: grab;
+}
+
+.item[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* The dragged picture stays in its slot, dimmed, while the browser's
+   drag ghost follows the pointer. Nothing reflows until drop. */
+.dragging {
+  opacity: 0.35;
+}
+
+/* Insertion indicator: a bar in the gap where the drop will land.
+   Grid items get a vertical bar; rows get a horizontal one. */
+.dropBefore::after,
+.dropAfter::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  background: var(--accent);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.dropBefore::after {
+  left: -0.55rem;
+  top: 0;
+  bottom: 1.4rem;
+  width: 3px;
+}
+
+.dropAfter::after {
+  right: -0.55rem;
+  top: 0;
+  bottom: 1.4rem;
+  width: 3px;
+}
+
+.itemRows.dropBefore::after {
+  left: 0;
+  right: 0;
+  top: -0.45rem;
+  bottom: auto;
+  width: auto;
+  height: 3px;
+}
+
+.itemRows.dropAfter::after {
+  left: 0;
+  right: 0;
+  top: auto;
+  bottom: -0.45rem;
+  width: auto;
+  height: 3px;
+}
+
+/* Nested pictures must not start their own native image drag; the
+   whole tile is the drag source. */
+.item img {
+  -webkit-user-drag: none;
+}
+
 .controlsRow {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dragHint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
 /* Same grid behaviour as the main board. */
