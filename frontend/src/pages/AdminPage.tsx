@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { HistoryList } from "../components/HistoryList";
+import { IconEyeOff, IconHistory } from "../components/icons";
+import { ThemedSelect } from "../components/ThemedSelect";
 import { shortError, useToasts } from "../components/Toasts";
 import {
   assignableRoles,
@@ -10,8 +10,7 @@ import {
   ROLE_LABELS,
   type Role,
 } from "../domain/roles";
-import { useAdminUsers, useMe, useRecentHistory, useStaffActions } from "../hooks/useKura";
-import type { ChangeEntry } from "../types/api";
+import { useAdminUsers, useHiddenPosts, useMe, useStaffActions } from "../hooks/useKura";
 import styles from "./AdminPage.module.css";
 import simple from "./Simple.module.css";
 
@@ -19,12 +18,10 @@ export function AdminPage() {
   const { me, user, loading } = useMe();
   const toasts = useToasts();
   const staff = useStaffActions();
-  const [busyId, setBusyId] = useState("");
-  const [actorFilter, setActorFilter] = useState<string | undefined>(undefined);
   const isStaff = !!user && atLeast(user.role, "moderator");
   const isAdmin = !!user && atLeast(user.role, "admin");
   const users = useAdminUsers(isAdmin);
-  const history = useRecentHistory(actorFilter, isStaff);
+  const hidden = useHiddenPosts(isStaff);
 
   if (loading) return <p>Loading…</p>;
   if (!me || !user) {
@@ -64,23 +61,6 @@ export function AdminPage() {
       .catch((e: unknown) => toasts.push(shortError(e), "error"));
   };
 
-  const rollback = (entry: ChangeEntry) => {
-    setBusyId(entry.id);
-    void staff
-      .rollback(entry)
-      .then(() =>
-        toasts.push("Change rolled back. The rollback itself is in the history.", "success"),
-      )
-      .catch((e: unknown) => toasts.push(shortError(e), "error"))
-      .finally(() => setBusyId(""));
-  };
-
-  const canRollback = (entry: ChangeEntry) => {
-    if (entry.action === "post.created") return false;
-    if (entry.entity_type === "post") return atLeast(user.role, "moderator");
-    return atLeast(user.role, "admin");
-  };
-
   return (
     <section className={simple.page} style={{ maxWidth: "72rem" }} aria-labelledby="admin-title">
       <h1 id="admin-title">Staff</h1>
@@ -88,6 +68,33 @@ export function AdminPage() {
         You are <strong>{ROLE_LABELS[user.role]}</strong> — {ROLE_DESCRIPTIONS[user.role]} Visitor
         means anonymous: SFW reading only, no account.
       </p>
+
+      <div className={simple.card}>
+        <h2>
+          <IconEyeOff /> Hidden &amp; deleted posts
+        </h2>
+        <p className={simple.muted}>
+          {hidden.isPending
+            ? "Loading…"
+            : `${hidden.data?.length ?? 0} post${(hidden.data?.length ?? 0) === 1 ? "" : "s"} off the board right now. Review them, restore the good ones, or roll a removal back from its history.`}
+        </p>
+        <div className={simple.actions}>
+          <Link to="/admin/hidden">Review hidden &amp; deleted</Link>
+        </div>
+      </div>
+
+      <div className={simple.card}>
+        <h2>
+          <IconHistory /> Change history
+        </h2>
+        <p className={simple.muted}>
+          Tag, rating, hide, delete and role changes across the board — with rollback. It has its
+          own page so this one stays about people.
+        </p>
+        <div className={simple.actions}>
+          <Link to="/admin/history">Open change history</Link>
+        </div>
+      </div>
 
       {isAdmin && (
         <div className={simple.card}>
@@ -102,112 +109,42 @@ export function AdminPage() {
               {shortError(users.error)}
             </p>
           )}
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th scope="col">User</th>
-                  <th scope="col">Role</th>
-                  <th scope="col">Joined</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(users.data ?? []).map((u) => {
-                  const options = assignableRoles(user.role, u.role);
-                  return (
-                    <tr key={u.id}>
-                      <td>
-                        <Link to="/u/$username" params={{ username: u.username }}>
-                          @{u.username}
-                        </Link>{" "}
-                        <span className={simple.muted}>{u.display_name}</span>
-                        {u.id === user.id && <span className={simple.muted}> (you)</span>}
-                      </td>
-                      <td>
-                        {options.length > 0 ? (
-                          <select
-                            aria-label={`Role for @${u.username}`}
-                            value={u.role}
-                            onChange={(e) => changeRole(u.id, u.username, e.target.value, u.role)}
-                          >
-                            {[...new Set([u.role, ...options])].map((r) => (
-                              <option key={r} value={r}>
-                                {ROLE_LABELS[r]}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          ROLE_LABELS[u.role]
-                        )}
-                      </td>
-                      <td className={simple.muted}>
-                        {new Date(u.created_at).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <ul className={styles.userList}>
+            {(users.data ?? []).map((u) => {
+              const options = assignableRoles(user.role, u.role);
+              return (
+                <li key={u.id} className={styles.userRow}>
+                  <span className={styles.userMain}>
+                    <Link to="/u/$username" params={{ username: u.username }}>
+                      @{u.username}
+                    </Link>{" "}
+                    <span className={simple.muted}>
+                      {u.display_name}
+                      {u.id === user.id ? " (you)" : ""} · joined{" "}
+                      {new Date(u.created_at).toLocaleDateString()}
+                    </span>
+                  </span>
+                  {options.length > 0 ? (
+                    <ThemedSelect
+                      label={`Role for @${u.username}`}
+                      value={u.role}
+                      onChange={(next) => changeRole(u.id, u.username, next, u.role)}
+                    >
+                      {[...new Set([u.role, ...options])].map((r) => (
+                        <option key={r} value={r}>
+                          {ROLE_LABELS[r]}
+                        </option>
+                      ))}
+                    </ThemedSelect>
+                  ) : (
+                    <span className={styles.roleBadge}>{ROLE_LABELS[u.role]}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
-
-      <div className={simple.card}>
-        <h2>Change history</h2>
-        <p className={simple.muted}>
-          Every tag, rating, hide, delete and role change is recorded with who did it and what it
-          was before. Roll back undoes one change and is itself recorded — use the actor filter to
-          clean up after a rogue staff account, one change at a time.
-        </p>
-        <div
-          style={{
-            display: "flex",
-            gap: "0.5rem",
-            alignItems: "center",
-            flexWrap: "wrap",
-            marginBottom: "0.8rem",
-          }}
-        >
-          <label>
-            Actor{" "}
-            <select
-              aria-label="Filter history by actor"
-              value={actorFilter ?? ""}
-              onChange={(e) => setActorFilter(e.target.value || undefined)}
-            >
-              <option value="">Everyone</option>
-              {[
-                ...new Map(
-                  (history.data ?? [])
-                    .filter((e) => e.actor_id)
-                    .map((e) => [e.actor_id, e.actor_username]),
-                ).entries(),
-              ].map(([id, name]) => (
-                <option key={id} value={id}>
-                  @{name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {actorFilter && (
-            <span className={simple.muted}>
-              Roll back each row to undo this actor&apos;s changes.
-            </span>
-          )}
-        </div>
-        {history.isPending && <p className={simple.muted}>Loading…</p>}
-        {history.error && (
-          <p role="alert" className={simple.error}>
-            {shortError(history.error)}
-          </p>
-        )}
-        <HistoryList
-          entries={history.data ?? []}
-          canRollback={canRollback}
-          onRollback={rollback}
-          busyId={busyId}
-        />
-      </div>
     </section>
   );
 }

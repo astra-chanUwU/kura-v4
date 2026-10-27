@@ -33,6 +33,7 @@ export interface Post {
   artist: string;
   rating: "sfw" | "nsfw";
   hidden: boolean;
+  deleted: boolean;
   width: number;
   height: number;
   source_url: string;

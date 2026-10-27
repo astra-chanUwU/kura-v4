@@ -446,6 +446,68 @@ func (_c *MockRepository_GetUser_Call) RunAndReturn(run func(ctx context.Context
 	return _c
 }
 
+// ListHiddenPosts provides a mock function for the type MockRepository
+func (_mock *MockRepository) ListHiddenPosts(ctx context.Context) ([]model.Post, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListHiddenPosts")
+	}
+
+	var r0 []model.Post
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]model.Post, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []model.Post); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]model.Post)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_ListHiddenPosts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListHiddenPosts'
+type MockRepository_ListHiddenPosts_Call struct {
+	*mock.Call
+}
+
+// ListHiddenPosts is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockRepository_Expecter) ListHiddenPosts(ctx any) *MockRepository_ListHiddenPosts_Call {
+	return &MockRepository_ListHiddenPosts_Call{Call: _e.mock.On("ListHiddenPosts", ctx)}
+}
+
+func (_c *MockRepository_ListHiddenPosts_Call) Run(run func(ctx context.Context)) *MockRepository_ListHiddenPosts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_ListHiddenPosts_Call) Return(posts []model.Post, err error) *MockRepository_ListHiddenPosts_Call {
+	_c.Call.Return(posts, err)
+	return _c
+}
+
+func (_c *MockRepository_ListHiddenPosts_Call) RunAndReturn(run func(ctx context.Context) ([]model.Post, error)) *MockRepository_ListHiddenPosts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListHistoryByActor provides a mock function for the type MockRepository
 func (_mock *MockRepository) ListHistoryByActor(ctx context.Context, actorID string, limit int32) ([]model.ChangeEntry, error) {
 	ret := _mock.Called(ctx, actorID, limit)
@@ -731,16 +793,16 @@ func (_c *MockRepository_ListUsers_Call) RunAndReturn(run func(ctx context.Conte
 }
 
 // SetPostHidden provides a mock function for the type MockRepository
-func (_mock *MockRepository) SetPostHidden(ctx context.Context, postID string, hidden bool, actorID string, entry model.ChangeEntry) error {
-	ret := _mock.Called(ctx, postID, hidden, actorID, entry)
+func (_mock *MockRepository) SetPostHidden(ctx context.Context, postID string, hidden bool, deleted bool, actorID string, entry model.ChangeEntry) error {
+	ret := _mock.Called(ctx, postID, hidden, deleted, actorID, entry)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SetPostHidden")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, string, model.ChangeEntry) error); ok {
-		r0 = returnFunc(ctx, postID, hidden, actorID, entry)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, bool, string, model.ChangeEntry) error); ok {
+		r0 = returnFunc(ctx, postID, hidden, deleted, actorID, entry)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -756,13 +818,14 @@ type MockRepository_SetPostHidden_Call struct {
 //   - ctx context.Context
 //   - postID string
 //   - hidden bool
+//   - deleted bool
 //   - actorID string
 //   - entry model.ChangeEntry
-func (_e *MockRepository_Expecter) SetPostHidden(ctx any, postID any, hidden any, actorID any, entry any) *MockRepository_SetPostHidden_Call {
-	return &MockRepository_SetPostHidden_Call{Call: _e.mock.On("SetPostHidden", ctx, postID, hidden, actorID, entry)}
+func (_e *MockRepository_Expecter) SetPostHidden(ctx any, postID any, hidden any, deleted any, actorID any, entry any) *MockRepository_SetPostHidden_Call {
+	return &MockRepository_SetPostHidden_Call{Call: _e.mock.On("SetPostHidden", ctx, postID, hidden, deleted, actorID, entry)}
 }
 
-func (_c *MockRepository_SetPostHidden_Call) Run(run func(ctx context.Context, postID string, hidden bool, actorID string, entry model.ChangeEntry)) *MockRepository_SetPostHidden_Call {
+func (_c *MockRepository_SetPostHidden_Call) Run(run func(ctx context.Context, postID string, hidden bool, deleted bool, actorID string, entry model.ChangeEntry)) *MockRepository_SetPostHidden_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -776,13 +839,17 @@ func (_c *MockRepository_SetPostHidden_Call) Run(run func(ctx context.Context, p
 		if args[2] != nil {
 			arg2 = args[2].(bool)
 		}
-		var arg3 string
+		var arg3 bool
 		if args[3] != nil {
-			arg3 = args[3].(string)
+			arg3 = args[3].(bool)
 		}
-		var arg4 model.ChangeEntry
+		var arg4 string
 		if args[4] != nil {
-			arg4 = args[4].(model.ChangeEntry)
+			arg4 = args[4].(string)
+		}
+		var arg5 model.ChangeEntry
+		if args[5] != nil {
+			arg5 = args[5].(model.ChangeEntry)
 		}
 		run(
 			arg0,
@@ -790,6 +857,7 @@ func (_c *MockRepository_SetPostHidden_Call) Run(run func(ctx context.Context, p
 			arg2,
 			arg3,
 			arg4,
+			arg5,
 		)
 	})
 	return _c
@@ -800,7 +868,7 @@ func (_c *MockRepository_SetPostHidden_Call) Return(err error) *MockRepository_S
 	return _c
 }
 
-func (_c *MockRepository_SetPostHidden_Call) RunAndReturn(run func(ctx context.Context, postID string, hidden bool, actorID string, entry model.ChangeEntry) error) *MockRepository_SetPostHidden_Call {
+func (_c *MockRepository_SetPostHidden_Call) RunAndReturn(run func(ctx context.Context, postID string, hidden bool, deleted bool, actorID string, entry model.ChangeEntry) error) *MockRepository_SetPostHidden_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -11,5 +11,6 @@ export const queryKeys = {
   profile: (username: string) => ["profile", username] as const,
   adminUsers: () => ["admin-users"] as const,
   postHistory: (id: string) => ["post-history", id] as const,
+  hiddenPosts: () => ["hidden-posts"] as const,
   adminHistory: (actorId?: string) => ["admin-history", actorId ?? ""] as const,
 };

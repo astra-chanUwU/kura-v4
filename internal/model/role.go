@@ -54,10 +54,11 @@ func CanManageRole(actor, target Role, newRole Role) bool {
 
 // PostSnapshot is the rollback-able state of a post entry.
 type PostSnapshot struct {
-	Artist string   `json:"artist"`
-	Tags   []string `json:"tags"`
-	Rating string   `json:"rating"`
-	Hidden bool     `json:"hidden"`
+	Artist  string   `json:"artist"`
+	Tags    []string `json:"tags"`
+	Rating  string   `json:"rating"`
+	Hidden  bool     `json:"hidden"`
+	Deleted bool     `json:"deleted"`
 }
 
 // RoleSnapshot is the rollback-able state of a user entry.

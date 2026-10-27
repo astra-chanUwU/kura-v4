@@ -23,6 +23,7 @@ func (h *Admin) RegisterRoutes(api fiber.Router) {
 	api.Get("/admin/users", h.listUsers)
 	api.Patch("/admin/users/:id/role", h.setRole)
 	api.Get("/admin/history", h.recentHistory)
+	api.Get("/admin/hidden-posts", h.hiddenPosts)
 	api.Get("/posts/:id/history", h.postHistory)
 	api.Post("/posts/:id/hide", h.hide)
 	api.Post("/posts/:id/unhide", h.unhide)
@@ -149,4 +150,16 @@ func (h *Admin) rollback(c fiber.Ctx) error {
 		return writeError(c, err)
 	}
 	return c.JSON(historyDTO(entry))
+}
+
+func (h *Admin) hiddenPosts(c fiber.Ctx) error {
+	user, err := requireUser(c)
+	if err != nil {
+		return err
+	}
+	posts, err := h.mod.ListHiddenPosts(c.Context(), *user)
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.JSON(postsDTO(posts, map[string]bool{}))
 }

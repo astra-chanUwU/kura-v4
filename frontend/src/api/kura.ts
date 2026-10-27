@@ -94,6 +94,7 @@ export const api = {
     getJSON<ChangeEntry[]>(`/posts/${postId}/history`, signal),
   rollback: (historyId: string) =>
     sendJSON<ChangeEntry>(`/admin/history/${historyId}/rollback`, "POST"),
+  hiddenPosts: (signal?: AbortSignal) => getJSON<Post[]>("/admin/hidden-posts", signal),
   hidePost: (postId: string) => sendJSON<Post>(`/posts/${postId}/hide`, "POST"),
   unhidePost: (postId: string) => sendJSON<Post>(`/posts/${postId}/unhide`, "POST"),
   deletePost: (postId: string) => sendJSON<Post>(`/posts/${postId}/delete`, "POST"),

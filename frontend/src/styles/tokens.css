@@ -14,6 +14,8 @@
   --border: #2d2937;
   --border-strong: #484153;
   --danger: #ff9a9a;
+  --warning: #f0c674;
+  --success: #a8d08d;
   --selection: #493d62;
 }
 
@@ -30,6 +32,8 @@
   --border: #bcd2ee;
   --border-strong: #8fb0da;
   --danger: #c1272d;
+  --warning: #9a6200;
+  --success: #2e7d32;
   --selection: #a9ccf5;
 }
 
@@ -46,6 +50,8 @@
   --border: #2c3d22;
   --border-strong: #48622f;
   --danger: #ff9a9a;
+  --warning: #f0c674;
+  --success: #cdeea6;
   --selection: #334d24;
 }
 
@@ -62,6 +68,8 @@
   --border: #3d2a30;
   --border-strong: #61434c;
   --danger: #ff8f8f;
+  --warning: #e5b95f;
+  --success: #b5c99a;
   --selection: #4a2f35;
 }
 :root[data-theme="umineko"] body {

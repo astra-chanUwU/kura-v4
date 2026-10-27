@@ -1,0 +1,94 @@
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.8rem 0 1rem;
+}
+.card {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  min-width: 0;
+}
+.media {
+  position: relative;
+  display: block;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: var(--surface-soft);
+}
+.media img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
+}
+.badgeHidden,
+.badgeDeleted {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: var(--surface);
+}
+.badgeHidden {
+  color: var(--warning);
+  border: 1px solid var(--warning);
+}
+.badgeDeleted {
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+.info {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  min-width: 0;
+}
+.tags {
+  color: var(--muted);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+.actions {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.actions button,
+.viewLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+.restoreBtn {
+  border-color: var(--success) !important;
+  color: var(--success) !important;
+  font-weight: 600;
+}
+.deleteBtn {
+  border-color: var(--danger) !important;
+  color: var(--danger) !important;
+  font-weight: 600;
+}
+.viewLink {
+  color: var(--accent);
+  border-color: var(--accent);
+}

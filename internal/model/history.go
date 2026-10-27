@@ -65,5 +65,5 @@ func SnapshotOf(p Post) PostSnapshot {
 	if tags == nil {
 		tags = []string{}
 	}
-	return PostSnapshot{Artist: p.Artist, Tags: tags, Rating: p.Rating, Hidden: p.Hidden}
+	return PostSnapshot{Artist: p.Artist, Tags: tags, Rating: p.Rating, Hidden: p.Hidden, Deleted: p.Deleted}
 }

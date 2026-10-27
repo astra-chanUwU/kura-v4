@@ -5,6 +5,8 @@ import { HomePage } from "../pages/HomePage";
 import { ListPage } from "../pages/ListPage";
 import { MePage } from "../pages/MePage";
 import { AdminPage } from "../pages/AdminPage";
+import { HiddenPostsPage } from "../pages/HiddenPostsPage";
+import { HistoryPage } from "../pages/HistoryPage";
 import { PostPage } from "../pages/PostPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { RecoverPage } from "../pages/RecoverPage";
@@ -55,6 +57,16 @@ const adminRoute = createRoute({
   path: "/admin",
   component: AdminPage,
 });
+const hiddenRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/hidden",
+  component: HiddenPostsPage,
+});
+const historyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/history",
+  component: HistoryPage,
+});
 const recoverRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/recover",
@@ -92,6 +104,8 @@ export const router = createRouter({
     recoverRoute,
     meRoute,
     adminRoute,
+    hiddenRoute,
+    historyRoute,
     postRoute,
     profileRoute,
     listRoute,

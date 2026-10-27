@@ -7,7 +7,7 @@
 }
 .row {
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0.75rem;
   padding: 0.65rem 0.8rem;
   background: var(--surface);
 }
@@ -44,4 +44,20 @@
 .rollback:disabled {
   opacity: 0.6;
   cursor: wait;
+}
+.postLink {
+  color: var(--accent);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.head a {
+  color: var(--accent);
+}
+.rollback {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
 }

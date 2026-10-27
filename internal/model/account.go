@@ -75,6 +75,7 @@ type Post struct {
 	Height        int
 	Rating        string // sfw | nsfw
 	Hidden        bool   // hidden by a moderator/admin; restorable via history
+	Deleted       bool   // soft-deleted by an admin (hidden, and flagged deleted)
 }
 
 type List struct {

@@ -120,6 +120,7 @@ const untaggedPost: Post = {
   artist: "",
   rating: "sfw",
   hidden: false,
+  deleted: false,
   width: 10,
   height: 10,
   source_url: "",

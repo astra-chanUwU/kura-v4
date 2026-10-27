@@ -168,3 +168,98 @@
   color: var(--danger);
   margin: 0;
 }
+
+.fullLink {
+  display: block;
+  border-radius: 0.75rem;
+}
+.fullLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.staffBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.hideBtn {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+.restoreBtn {
+  border-color: var(--success);
+  color: var(--success);
+}
+.deleteBtn {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.saveRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.saveBtn {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.35rem;
+  background: var(--surface-soft);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+.saveBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  font-weight: 400;
+}
+/* Unsaved changes: highlight the save action until it is pressed. */
+.saveDirty {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--selection);
+  font-weight: 700;
+}
+.discardBtn {
+  padding: 0.45rem 0.7rem;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+.tagStaged {
+  border-color: var(--accent);
+}
+
+/* History lives below the media/details layout in its own full-width
+   card, so long tag diffs never squeeze into the sticky sidebar. */
+.historySection {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+.historyTitle {
+  margin: 0;
+  font-size: 1.05rem;
+}
+@media (min-width: 1024px) {
+  .historySection ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}

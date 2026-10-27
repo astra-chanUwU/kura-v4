@@ -213,7 +213,15 @@ node --env-file=.env scripts/run.mjs go run -tags dev ./cmd/kura promote <userna
 ```
 
 After that, Super Admins and Admins manage roles in the app under **Staff**
-(`/admin`, visible to Moderators and above).
+(`/admin`, visible to Moderators and above). Staff review everything that is
+off the board under **Staff → Hidden & deleted** (`/admin/hidden`), split into
+hidden vs deleted, with one-click Restore.
+
+On a post page, tag/artist/rating edits are staged locally and written by a
+single **Save changes** (one history entry per save, not per tag), the picture
+itself and its **Full size** link open the raw file in a new tab, and staff
+actions are color-coded: Hide in warning amber, Delete in danger red, Restore
+in green.
 
 ## Change history and rollback
 

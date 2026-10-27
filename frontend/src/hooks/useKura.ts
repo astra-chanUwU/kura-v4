@@ -351,6 +351,8 @@ export function usePostActions() {
       api.updatePostMeta(postId, artist, tags, rating).then(() => {
         void client.invalidateQueries({ queryKey: queryKeys.post(postId) });
         void client.invalidateQueries({ queryKey: queryKeys.posts() });
+        void client.invalidateQueries({ queryKey: queryKeys.searchIndex() });
+        void client.invalidateQueries({ queryKey: queryKeys.postHistory(postId) });
       }),
     upload: (file: File, tags = "", rating = "sfw") =>
       api.upload(file, tags, rating).then((post) => {
@@ -417,6 +419,14 @@ export function useAdminUsers(enabled: boolean) {
   });
 }
 
+export function useHiddenPosts(enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.hiddenPosts(),
+    queryFn: ({ signal }) => api.hiddenPosts(signal),
+    enabled,
+  });
+}
+
 export function useRecentHistory(actorId: string | undefined, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.adminHistory(actorId),
@@ -440,6 +450,7 @@ export function useStaffActions() {
     void client.invalidateQueries({ queryKey: queryKeys.posts() });
     void client.invalidateQueries({ queryKey: queryKeys.searchIndex() });
     void client.invalidateQueries({ queryKey: queryKeys.postHistory(postId) });
+    void client.invalidateQueries({ queryKey: queryKeys.hiddenPosts() });
     void client.invalidateQueries({ queryKey: ["admin-history"] });
   };
   return {

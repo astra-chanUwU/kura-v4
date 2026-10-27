@@ -1,10 +1,18 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { HistoryList } from "../components/HistoryList";
+import { IconEye, IconEyeOff, IconTrash } from "../components/icons";
 import { PostActions } from "../components/PostCard";
 import { shortError, useToasts } from "../components/Toasts";
 import { atLeast } from "../domain/roles";
-import { useMe, usePost, usePostActions, usePostHistory, useStaffActions } from "../hooks/useKura";
+import {
+  tagTokens,
+  useMe,
+  usePost,
+  usePostActions,
+  usePostHistory,
+  useStaffActions,
+} from "../hooks/useKura";
 import type { ChangeEntry } from "../types/api";
 import styles from "./PostPage.module.css";
 
@@ -41,16 +49,57 @@ export function PostPage({ id }: { id: string }) {
   const isAdmin = !!user && atLeast(user.role, "admin");
   const [newTag, setNewTag] = useState("");
   const [artistDraft, setArtistDraft] = useState<string | null>(null);
+  const [tagsDraft, setTagsDraft] = useState<string[] | null>(null);
+  const [ratingDraft, setRatingDraft] = useState<string | null>(null);
   const [metaError, setMetaError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Drafts belong to one post; never carry them across pictures.
+  // (Adjusting state while rendering is the React-recommended reset
+  // when a prop changes — no effect needed.)
+  const [draftPostId, setDraftPostId] = useState(id);
+  if (draftPostId !== id) {
+    setDraftPostId(id);
+    setArtistDraft(null);
+    setTagsDraft(null);
+    setRatingDraft(null);
+    setNewTag("");
+    setMetaError("");
+  }
+
   if (isPending) return <p>Loading…</p>;
   if (error || !post) return <p role="alert">That picture could not be found.</p>;
   const isVideo = post.content_type.startsWith("video/");
 
-  const saveMeta = (artist: string, tags: string[], rating: string = post.rating) => {
+  // Staged editing: tag/artist/rating changes sit in drafts and only hit
+  // the server on Save — one save, one history entry, one rollback point.
+  const artist = artistDraft ?? post.artist;
+  const tags = tagsDraft ?? post.tags;
+  const rating = ratingDraft ?? post.rating;
+  const dirty =
+    (artistDraft !== null && artistDraft.trim() !== post.artist) ||
+    (tagsDraft !== null && JSON.stringify(tagsDraft) !== JSON.stringify(post.tags)) ||
+    (ratingDraft !== null && ratingDraft !== post.rating);
+
+  const discardDrafts = () => {
+    setArtistDraft(null);
+    setTagsDraft(null);
+    setRatingDraft(null);
+    setNewTag("");
     setMetaError("");
-    void updatePostMeta(post.id, artist, tags, rating).catch((e: unknown) =>
-      setMetaError(e instanceof Error ? e.message : "Could not save."),
-    );
+  };
+
+  const saveChanges = () => {
+    if (!dirty || saving) return;
+    setMetaError("");
+    setSaving(true);
+    void updatePostMeta(post.id, artist.trim(), tags, rating)
+      .then(() => {
+        discardDrafts();
+        toasts.push("Saved. One history entry covers all of it.", "success");
+      })
+      .catch((e: unknown) => setMetaError(e instanceof Error ? e.message : "Could not save."))
+      .finally(() => setSaving(false));
   };
 
   return (
@@ -72,7 +121,16 @@ export function PostPage({ id }: { id: string }) {
               />
             </>
           ) : (
-            <img className={styles.full} src={post.media_url} alt={post.artist || ""} />
+            <a
+              className={styles.fullLink}
+              href={post.media_url}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open full size in a new tab (picture only, no page)"
+              title="Open full size in a new tab"
+            >
+              <img className={styles.full} src={post.media_url} alt={post.artist || ""} />
+            </a>
           )}
 
           <div className={styles.actionBar}>
@@ -89,13 +147,18 @@ export function PostPage({ id }: { id: string }) {
               </span>
             )}
             <span>{new Date(post.created_at).toLocaleDateString()}</span>
+            <a href={post.media_url} target="_blank" rel="noreferrer">
+              Full size ↗
+            </a>
           </div>
         </div>
 
         <div className={styles.details}>
           {post.hidden && (
             <p role="alert" className={styles.error}>
-              This post is hidden from the board. Staff and the uploader can still open it here.
+              {post.deleted
+                ? "This post is deleted (soft). Staff and the uploader can still open it here, and Restore brings it back."
+                : "This post is hidden from the board. Staff and the uploader can still open it here."}
             </p>
           )}
           {(isModerator || isAdmin) && (
@@ -105,6 +168,7 @@ export function PostPage({ id }: { id: string }) {
                 {post.hidden ? (
                   <button
                     type="button"
+                    className={`${styles.staffBtn} ${styles.restoreBtn}`}
                     onClick={() =>
                       void staff
                         .unhidePost(post.id)
@@ -112,11 +176,12 @@ export function PostPage({ id }: { id: string }) {
                         .catch((e: unknown) => toasts.push(shortError(e), "error"))
                     }
                   >
-                    Unhide
+                    <IconEye /> Restore
                   </button>
                 ) : (
                   <button
                     type="button"
+                    className={`${styles.staffBtn} ${styles.hideBtn}`}
                     onClick={() =>
                       void staff
                         .hidePost(post.id)
@@ -124,30 +189,31 @@ export function PostPage({ id }: { id: string }) {
                         .catch((e: unknown) => toasts.push(shortError(e), "error"))
                     }
                   >
-                    Hide
+                    <IconEyeOff /> Hide
                   </button>
                 )}
-                {isAdmin && !post.hidden && (
+                {isAdmin && !post.deleted && (
                   <button
                     type="button"
+                    className={`${styles.staffBtn} ${styles.deleteBtn}`}
                     onClick={() => {
                       if (
                         window.confirm(
-                          "Delete this post from the board? It can be restored from its history.",
+                          "Delete this post from the board? It can be restored from Hidden & deleted, or its history.",
                         )
                       )
                         void staff
                           .deletePost(post.id)
                           .then(() =>
                             toasts.push(
-                              "Post deleted. Restore it from its history below.",
+                              "Post deleted. Find it under Staff → Hidden & deleted.",
                               "success",
                             ),
                           )
                           .catch((e: unknown) => toasts.push(shortError(e), "error"));
                     }}
                   >
-                    Delete
+                    <IconTrash /> Delete
                   </button>
                 )}
               </span>
@@ -161,14 +227,14 @@ export function PostPage({ id }: { id: string }) {
                   <button
                     key={r}
                     type="button"
-                    aria-pressed={post.rating === r}
-                    onClick={() => saveMeta(post.artist, post.tags, r)}
+                    aria-pressed={rating === r}
+                    onClick={() => setRatingDraft(r)}
                     style={{
                       padding: "0.25rem 0.6rem",
                       borderRadius: "999px",
                       border: "1px solid var(--border-strong)",
-                      background: post.rating === r ? "var(--surface-soft)" : "var(--surface)",
-                      color: post.rating === r ? "var(--text)" : "var(--muted)",
+                      background: rating === r ? "var(--surface-soft)" : "var(--surface)",
+                      color: rating === r ? "var(--text)" : "var(--muted)",
                       cursor: "pointer",
                       textTransform: "uppercase",
                       fontSize: "0.75rem",
@@ -198,16 +264,10 @@ export function PostPage({ id }: { id: string }) {
               {signedIn ? (
                 <input
                   className={styles.artistInput}
-                  value={artistDraft ?? post.artist}
+                  value={artist}
                   placeholder="Unknown artist"
                   aria-label="Artist"
                   onChange={(e) => setArtistDraft(e.target.value)}
-                  onBlur={() => {
-                    if (artistDraft !== null && artistDraft.trim() !== post.artist) {
-                      saveMeta(artistDraft.trim(), post.tags);
-                    }
-                    setArtistDraft(null);
-                  }}
                 />
               ) : (
                 <span>{post.artist || "Unknown"}</span>
@@ -222,20 +282,22 @@ export function PostPage({ id }: { id: string }) {
           <div className={styles.detailRow}>
             <span className={styles.detailLabel}>Tags</span>
             <div className={styles.tagList}>
-              {post.tags.length === 0 && <span className={styles.muted}>No tags yet.</span>}
-              {post.tags.map((tag) => (
-                <span key={tag} className={styles.tag}>
+              {tags.length === 0 && <span className={styles.muted}>No tags yet.</span>}
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className={
+                    tagsDraft !== null && !post.tags.includes(tag)
+                      ? `${styles.tag} ${styles.tagStaged}`
+                      : styles.tag
+                  }
+                >
                   {tag}
                   {signedIn && (
                     <button
                       type="button"
                       aria-label={`Remove tag ${tag}`}
-                      onClick={() =>
-                        saveMeta(
-                          post.artist,
-                          post.tags.filter((t) => t !== tag),
-                        )
-                      }
+                      onClick={() => setTagsDraft(tags.filter((t) => t !== tag))}
                     >
                       ×
                     </button>
@@ -249,9 +311,9 @@ export function PostPage({ id }: { id: string }) {
               className={styles.tagForm}
               onSubmit={(event) => {
                 event.preventDefault();
-                const tag = newTag.trim().toLowerCase();
-                if (tag && !post.tags.includes(tag)) {
-                  saveMeta(post.artist, [...post.tags, tag]);
+                const added = tagTokens(newTag);
+                if (added.length > 0) {
+                  setTagsDraft([...new Set([...tags, ...added])].sort());
                 }
                 setNewTag("");
               }}
@@ -261,41 +323,64 @@ export function PostPage({ id }: { id: string }) {
                 onChange={(e) => setNewTag(e.target.value)}
                 placeholder="Add tags, space separated (anime girl white_hair)…"
                 aria-label="Add a tag"
-                maxLength={40}
               />
-              <button type="submit">Add tag</button>
+              <button type="submit">Add</button>
             </form>
+          )}
+          {signedIn && (
+            <div className={styles.saveRow}>
+              <button
+                type="button"
+                className={dirty ? `${styles.saveBtn} ${styles.saveDirty}` : styles.saveBtn}
+                disabled={!dirty || saving}
+                onClick={saveChanges}
+              >
+                {saving ? "Saving…" : "Save changes"}
+              </button>
+              {dirty && (
+                <button type="button" className={styles.discardBtn} onClick={discardDrafts}>
+                  Discard
+                </button>
+              )}
+              <span className={styles.muted}>
+                {dirty
+                  ? "Unsaved changes — Save writes tags, artist and rating as one history entry."
+                  : "Tag, artist and rating edits are staged here until you Save."}
+              </span>
+            </div>
           )}
           {metaError && (
             <p role="alert" className={styles.error}>
               {metaError}
             </p>
           )}
-          {signedIn && (
-            <div>
-              <h2 style={{ fontSize: "1rem", margin: "1rem 0 0.5rem" }}>History</h2>
-              {history.isPending && <p className={styles.muted}>Loading…</p>}
-              {history.error && <p className={styles.muted}>History could not be loaded.</p>}
-              <HistoryList
-                entries={history.data ?? []}
-                busyId={busyId}
-                canRollback={(entry: ChangeEntry) => isModerator && entry.action !== "post.created"}
-                onRollback={(entry: ChangeEntry) => {
-                  setBusyId(entry.id);
-                  void staff
-                    .rollback(entry)
-                    .then(() => toasts.push("Change rolled back.", "success"))
-                    .catch((e: unknown) => toasts.push(shortError(e), "error"))
-                    .finally(() => setBusyId(""));
-                }}
-              />
-              {!isModerator && (
-                <p className={styles.muted}>Moderators and above can roll a change back.</p>
-              )}
-            </div>
-          )}
         </div>
       </div>
+      {signedIn && (
+        <section className={styles.historySection} aria-labelledby="post-history-title">
+          <h2 id="post-history-title" className={styles.historyTitle}>
+            History
+          </h2>
+          {history.isPending && <p className={styles.muted}>Loading…</p>}
+          {history.error && <p className={styles.muted}>History could not be loaded.</p>}
+          <HistoryList
+            entries={history.data ?? []}
+            busyId={busyId}
+            canRollback={(entry: ChangeEntry) => isModerator && entry.action !== "post.created"}
+            onRollback={(entry: ChangeEntry) => {
+              setBusyId(entry.id);
+              void staff
+                .rollback(entry)
+                .then(() => toasts.push("Change rolled back.", "success"))
+                .catch((e: unknown) => toasts.push(shortError(e), "error"))
+                .finally(() => setBusyId(""));
+            }}
+          />
+          {!isModerator && (
+            <p className={styles.muted}>Moderators and above can roll a change back.</p>
+          )}
+        </section>
+      )}
     </section>
   );
 }

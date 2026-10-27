@@ -87,6 +87,7 @@ type Post struct {
 	Rating       string
 	HiddenAt     sql.NullTime
 	HiddenBy     uuid.NullUUID
+	DeletedAt    sql.NullTime
 }
 
 type PostTag struct {

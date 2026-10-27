@@ -69,7 +69,7 @@ func TestModeratorHidesButCannotDelete(t *testing.T) {
 	post := model.Post{ID: "p1", Artist: "a", Tags: []string{"x"}, Rating: "sfw"}
 	repo := NewMockRepository(t)
 	repo.EXPECT().GetPost(mock.Anything, "p1").Return(post, nil)
-	repo.EXPECT().SetPostHidden(mock.Anything, "p1", true, "u-mod", mock.MatchedBy(func(e model.ChangeEntry) bool {
+	repo.EXPECT().SetPostHidden(mock.Anything, "p1", true, false, "u-mod", mock.MatchedBy(func(e model.ChangeEntry) bool {
 		return e.Action == "post.hidden"
 	})).Return(nil)
 	got, err := NewService(repo).SetPostHidden(context.Background(), moderator, "p1", true, false)
@@ -115,4 +115,43 @@ func TestRollbackRoleReChecksHierarchy(t *testing.T) {
 	repo.EXPECT().GetUser(mock.Anything, "u-mem").Return(model.User{ID: "u-mem", Role: model.RoleAdmin}, nil)
 	_, err := NewService(repo).Rollback(context.Background(), admin, "h2")
 	require.ErrorIs(t, err, ErrForbidden)
+}
+
+func TestListHiddenPostsNeedsModerator(t *testing.T) {
+	repo := NewMockRepository(t)
+	_, err := NewService(repo).ListHiddenPosts(context.Background(), member)
+	require.ErrorIs(t, err, ErrForbidden)
+
+	repo2 := NewMockRepository(t)
+	want := []model.Post{{ID: "p1", Hidden: true, Deleted: true}, {ID: "p2", Hidden: true}}
+	repo2.EXPECT().ListHiddenPosts(mock.Anything).Return(want, nil)
+	got, err := NewService(repo2).ListHiddenPosts(context.Background(), moderator)
+	require.NoError(t, err)
+	require.Equal(t, want, got)
+}
+
+func TestAdminDeleteMarksDeletedAndRollbackRestoresIt(t *testing.T) {
+	post := model.Post{ID: "p1", Artist: "a", Tags: []string{"x"}, Rating: "sfw"}
+	repo := NewMockRepository(t)
+	repo.EXPECT().GetPost(mock.Anything, "p1").Return(post, nil)
+	repo.EXPECT().SetPostHidden(mock.Anything, "p1", true, true, "u-admin", mock.MatchedBy(func(e model.ChangeEntry) bool {
+		after, _ := e.PostAfter()
+		return e.Action == "post.deleted" && after.Hidden && after.Deleted
+	})).Return(nil)
+	got, err := NewService(repo).SetPostHidden(context.Background(), admin, "p1", true, true)
+	require.NoError(t, err)
+	require.True(t, got.Hidden && got.Deleted)
+
+	// Rolling the delete back restores the visible, not-deleted snapshot.
+	entry := model.ChangeEntry{ID: "h-del", EntityType: "post", EntityID: "p1", Action: "post.deleted",
+		Before: model.MarshalPostSnapshot(model.PostSnapshot{Artist: "a", Tags: []string{"x"}, Rating: "sfw", Hidden: false, Deleted: false}),
+		After:  model.MarshalPostSnapshot(model.PostSnapshot{Artist: "a", Tags: []string{"x"}, Rating: "sfw", Hidden: true, Deleted: true})}
+	repo2 := NewMockRepository(t)
+	repo2.EXPECT().GetHistory(mock.Anything, "h-del").Return(entry, nil)
+	repo2.EXPECT().GetPost(mock.Anything, "p1").Return(model.Post{ID: "p1", Artist: "a", Tags: []string{"x"}, Rating: "sfw", Hidden: true, Deleted: true}, nil)
+	repo2.EXPECT().ApplyPostSnapshot(mock.Anything, mock.MatchedBy(func(p model.Post) bool {
+		return !p.Hidden && !p.Deleted
+	}), mock.Anything).Return(nil)
+	_, err = NewService(repo2).Rollback(context.Background(), moderator, "h-del")
+	require.NoError(t, err)
 }

@@ -67,13 +67,13 @@ func (r *Posts) InsertHistory(ctx context.Context, entry model.ChangeEntry) (mod
 }
 
 // SetPostHiddenAudited flips visibility and records it atomically.
-func (r *Posts) SetPostHiddenAudited(ctx context.Context, postID string, hidden bool, actorID string, entry model.ChangeEntry) error {
+func (r *Posts) SetPostHiddenAudited(ctx context.Context, postID string, hidden, deleted bool, actorID string, entry model.ChangeEntry) error {
 	tx, err := r.DB().BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback() //nolint:errcheck
-	if err := r.WithTx(tx).SetPostHidden(ctx, postID, hidden, actorID); err != nil {
+	if err := r.WithTx(tx).SetPostHidden(ctx, postID, hidden, deleted, actorID); err != nil {
 		return err
 	}
 	if _, err := r.audit.WithTx(tx).InsertChangeHistory(ctx, entry); err != nil {
@@ -106,7 +106,7 @@ func (r *Posts) ApplyPostSnapshotAudited(ctx context.Context, p model.Post, entr
 	if entry.ActorID != nil {
 		actorID = *entry.ActorID
 	}
-	if err := d.SetPostHidden(ctx, p.ID, p.Hidden, actorID); err != nil {
+	if err := d.SetPostHidden(ctx, p.ID, p.Hidden, p.Deleted, actorID); err != nil {
 		return err
 	}
 	if _, err := r.audit.WithTx(tx).InsertChangeHistory(ctx, entry); err != nil {

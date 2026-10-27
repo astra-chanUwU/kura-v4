@@ -1,4 +1,6 @@
+import { Link } from "@tanstack/react-router";
 import type { ChangeEntry } from "../types/api";
+import { IconUndo } from "./icons";
 import styles from "./HistoryList.module.css";
 
 export function describeState(state: Record<string, unknown>): string {
@@ -8,7 +10,8 @@ export function describeState(state: Record<string, unknown>): string {
   if (Array.isArray(state.tags))
     parts.push(`tags: ${state.tags.length ? state.tags.join(", ") : "none"}`);
   if (typeof state.rating === "string") parts.push(state.rating.toUpperCase());
-  if (state.hidden === true) parts.push("hidden");
+  if (state.deleted === true) parts.push("deleted");
+  else if (state.hidden === true) parts.push("hidden");
   return parts.join(" · ") || "—";
 }
 
@@ -41,8 +44,25 @@ export function HistoryList({
           <div className={styles.head}>
             <span className={styles.action}>{ACTION_LABELS[entry.action] ?? entry.action}</span>
             <span className={styles.meta}>
-              @{entry.actor_username || "system"} · {new Date(entry.created_at).toLocaleString()}
+              {entry.actor_username ? (
+                <Link to="/u/$username" params={{ username: entry.actor_username }}>
+                  @{entry.actor_username}
+                </Link>
+              ) : (
+                "system"
+              )}{" "}
+              · {new Date(entry.created_at).toLocaleString()}
             </span>
+            {entry.entity_type === "post" && (
+              <Link
+                to="/posts/$id"
+                params={{ id: entry.entity_id }}
+                className={styles.postLink}
+                aria-label="Open the post this change belongs to"
+              >
+                View post ↗
+              </Link>
+            )}
             {canRollback?.(entry) && onRollback && (
               <button
                 type="button"
@@ -50,7 +70,7 @@ export function HistoryList({
                 disabled={busyId === entry.id}
                 onClick={() => onRollback(entry)}
               >
-                {busyId === entry.id ? "Rolling back…" : "Roll back"}
+                <IconUndo /> {busyId === entry.id ? "Rolling back…" : "Roll back"}
               </button>
             )}
           </div>

@@ -34,6 +34,7 @@ type Post struct {
 	Height        int      `json:"height"`
 	Rating        string   `json:"rating"`
 	Hidden        bool     `json:"hidden"`
+	Deleted       bool     `json:"deleted"`
 	SourceURL     string   `json:"source_url"`
 	Tags          []string `json:"tags"`
 }

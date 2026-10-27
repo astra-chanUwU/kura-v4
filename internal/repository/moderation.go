@@ -56,8 +56,11 @@ func (r *Moderation) ApplyUserRole(ctx context.Context, userID string, role mode
 func (r *Moderation) ApplyPostSnapshot(ctx context.Context, p model.Post, entry model.ChangeEntry) error {
 	return r.posts.ApplyPostSnapshotAudited(ctx, p, entry)
 }
-func (r *Moderation) SetPostHidden(ctx context.Context, postID string, hidden bool, actorID string, entry model.ChangeEntry) error {
-	return r.posts.SetPostHiddenAudited(ctx, postID, hidden, actorID, entry)
+func (r *Moderation) SetPostHidden(ctx context.Context, postID string, hidden, deleted bool, actorID string, entry model.ChangeEntry) error {
+	return r.posts.SetPostHiddenAudited(ctx, postID, hidden, deleted, actorID, entry)
+}
+func (r *Moderation) ListHiddenPosts(ctx context.Context) ([]model.Post, error) {
+	return r.posts.ListHiddenPosts(ctx)
 }
 func (r *Moderation) GetHistory(ctx context.Context, id string) (model.ChangeEntry, error) {
 	return r.audit.GetChangeHistory(ctx, id)

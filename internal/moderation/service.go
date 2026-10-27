@@ -25,7 +25,8 @@ type Repository interface {
 	CountSuperAdmins(ctx context.Context) (int64, error)
 	ApplyUserRole(ctx context.Context, userID string, role model.Role, entry model.ChangeEntry) (model.User, error)
 	ApplyPostSnapshot(ctx context.Context, p model.Post, entry model.ChangeEntry) error
-	SetPostHidden(ctx context.Context, postID string, hidden bool, actorID string, entry model.ChangeEntry) error
+	SetPostHidden(ctx context.Context, postID string, hidden, deleted bool, actorID string, entry model.ChangeEntry) error
+	ListHiddenPosts(ctx context.Context) ([]model.Post, error)
 	GetHistory(ctx context.Context, id string) (model.ChangeEntry, error)
 	ListHistoryForEntity(ctx context.Context, entityType, entityID string, limit int32) ([]model.ChangeEntry, error)
 	ListRecentHistory(ctx context.Context, limit int32) ([]model.ChangeEntry, error)
@@ -114,11 +115,12 @@ func (s *Service) SetPostHidden(ctx context.Context, actor model.User, postID st
 	if err != nil {
 		return model.Post{}, err
 	}
-	if post.Hidden == hidden {
+	if post.Hidden == hidden && post.Deleted == (hidden && deleted) {
 		return post, nil
 	}
 	before := model.SnapshotOf(post)
 	post.Hidden = hidden
+	post.Deleted = hidden && deleted
 	action := "post.unhidden"
 	if hidden && deleted {
 		action = "post.deleted"
@@ -127,7 +129,7 @@ func (s *Service) SetPostHidden(ctx context.Context, actor model.User, postID st
 	}
 	entry := model.ChangeEntry{EntityType: "post", EntityID: post.ID, ActorID: &actor.ID, ActorUsername: actor.Username,
 		Action: action, Before: model.MarshalPostSnapshot(before), After: model.MarshalPostSnapshot(model.SnapshotOf(post))}
-	if err := s.repo.SetPostHidden(ctx, post.ID, hidden, actor.ID, entry); err != nil {
+	if err := s.repo.SetPostHidden(ctx, post.ID, hidden, deleted, actor.ID, entry); err != nil {
 		return model.Post{}, err
 	}
 	return post, nil
@@ -213,7 +215,7 @@ func (s *Service) rollbackPost(ctx context.Context, actor model.User, entry mode
 		return model.ChangeEntry{}, err
 	}
 	current := model.SnapshotOf(post)
-	post.Artist, post.Tags, post.Rating, post.Hidden = before.Artist, before.Tags, before.Rating, before.Hidden
+	post.Artist, post.Tags, post.Rating, post.Hidden, post.Deleted = before.Artist, before.Tags, before.Rating, before.Hidden, before.Deleted
 	if post.Rating != "sfw" && post.Rating != "nsfw" {
 		post.Rating = "sfw"
 	}
@@ -259,4 +261,17 @@ func (s *Service) rollbackUser(ctx context.Context, actor model.User, entry mode
 		return model.ChangeEntry{}, err
 	}
 	return rb, nil
+}
+
+// ListHiddenPosts is the staff review queue: every post currently off
+// the board, newest removal first (moderator+).
+func (s *Service) ListHiddenPosts(ctx context.Context, actor model.User) ([]model.Post, error) {
+	if !actor.Role.AtLeast(model.RoleModerator) {
+		return nil, ErrForbidden
+	}
+	posts, err := s.repo.ListHiddenPosts(ctx)
+	if posts == nil {
+		posts = []model.Post{}
+	}
+	return posts, err
 }
