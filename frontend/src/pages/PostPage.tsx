@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HistoryList } from "../components/HistoryList";
 import { IconEye, IconEyeOff, IconTrash } from "../components/icons";
 import { PostActions } from "../components/PostCard";
@@ -53,6 +54,7 @@ export function PostPage({ id }: { id: string }) {
   const [ratingDraft, setRatingDraft] = useState<string | null>(null);
   const [metaError, setMetaError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Drafts belong to one post; never carry them across pictures.
   // (Adjusting state while rendering is the React-recommended reset
@@ -196,22 +198,7 @@ export function PostPage({ id }: { id: string }) {
                   <button
                     type="button"
                     className={`${styles.staffBtn} ${styles.deleteBtn}`}
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          "Delete this post from the board? It can be restored from Hidden & deleted, or its history.",
-                        )
-                      )
-                        void staff
-                          .deletePost(post.id)
-                          .then(() =>
-                            toasts.push(
-                              "Post deleted. Find it under Staff → Hidden & deleted.",
-                              "success",
-                            ),
-                          )
-                          .catch((e: unknown) => toasts.push(shortError(e), "error"));
-                    }}
+                    onClick={() => setConfirmDelete(true)}
                   >
                     <IconTrash /> Delete
                   </button>
@@ -381,6 +368,23 @@ export function PostPage({ id }: { id: string }) {
           )}
         </section>
       )}
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete this post?"
+        message="Delete this post from the board? It can be restored from Hidden & deleted, or its history."
+        confirmLabel="Delete"
+        destructive
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          void staff
+            .deletePost(post.id)
+            .then(() =>
+              toasts.push("Post deleted. Find it under Staff → Hidden & deleted.", "success"),
+            )
+            .catch((e: unknown) => toasts.push(shortError(e), "error"));
+        }}
+      />
     </section>
   );
 }

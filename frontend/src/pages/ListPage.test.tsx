@@ -1,10 +1,11 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ListDetail, Post } from "../types/api";
 import { ListPage } from "./ListPage";
 
 const hoisted = vi.hoisted(() => ({
   reorderList: vi.fn((_id: string, _ids: string[]) => Promise.resolve()),
+  deleteList: vi.fn((_id: string) => Promise.resolve()),
   items: [] as Post[],
 }));
 
@@ -65,7 +66,7 @@ vi.mock("../hooks/useKura", () => ({
     reorderList: hoisted.reorderList,
     removeFromList: vi.fn(() => Promise.resolve()),
     updateList: vi.fn(() => Promise.resolve()),
-    deleteList: vi.fn(() => Promise.resolve()),
+    deleteList: hoisted.deleteList,
     refresh: vi.fn(),
   }),
 }));
@@ -185,6 +186,25 @@ describe("list reorder controls", () => {
     fireEvent.click(down[0]!);
     expect(hoisted.reorderList).toHaveBeenCalledWith("l1", ["p2", "p1", "p3"]);
     localStorage.removeItem("kura-board-view");
+  });
+
+  it("deletes the list only after confirming in the themed dialog", async () => {
+    hoisted.items = [makePost("p1")];
+    hoisted.deleteList.mockClear();
+    render(<ListPage id="l1" />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete list" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete this list?" });
+    expect(within(dialog).getByText(/pictures stay on the board/)).toBeInTheDocument();
+    expect(hoisted.deleteList).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(hoisted.deleteList).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Delete list" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Delete list" }),
+    );
+    await waitFor(() => expect(hoisted.deleteList).toHaveBeenCalledWith("l1"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("highlights Save list only while edits are unsaved", () => {

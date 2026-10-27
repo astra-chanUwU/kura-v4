@@ -1,4 +1,6 @@
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { IconEyeOff, IconHistory } from "../components/icons";
 import { ThemedSelect } from "../components/ThemedSelect";
 import { shortError, useToasts } from "../components/Toasts";
@@ -22,6 +24,11 @@ export function AdminPage() {
   const isAdmin = !!user && atLeast(user.role, "admin");
   const users = useAdminUsers(isAdmin);
   const hidden = useHiddenPosts(isStaff);
+  const [pendingRole, setPendingRole] = useState<{
+    targetId: string;
+    targetName: string;
+    next: Role;
+  } | null>(null);
 
   if (loading) return <p>Loading…</p>;
   if (!me || !user) {
@@ -47,18 +54,20 @@ export function AdminPage() {
     );
   }
 
-  const changeRole = (targetId: string, targetName: string, next: string, current: Role) => {
-    if (!isRole(next) || next === current) return;
-    if (
-      (next === "admin" || next === "super_admin") &&
-      !window.confirm(`Make @${targetName} a ${ROLE_LABELS[next]}? They will gain staff powers.`)
-    ) {
-      return;
-    }
+  const applyRole = (targetId: string, targetName: string, next: Role) => {
     void staff
       .setUserRole(targetId, next)
       .then(() => toasts.push(`@${targetName} is now ${ROLE_LABELS[next]}.`, "success"))
       .catch((e: unknown) => toasts.push(shortError(e), "error"));
+  };
+
+  const changeRole = (targetId: string, targetName: string, next: string, current: Role) => {
+    if (!isRole(next) || next === current) return;
+    if (next === "admin" || next === "super_admin") {
+      setPendingRole({ targetId, targetName, next });
+      return;
+    }
+    applyRole(targetId, targetName, next);
   };
 
   return (
@@ -145,6 +154,20 @@ export function AdminPage() {
           </ul>
         </div>
       )}
+      <ConfirmDialog
+        open={pendingRole !== null}
+        title={
+          pendingRole ? `Make @${pendingRole.targetName} a ${ROLE_LABELS[pendingRole.next]}?` : ""
+        }
+        message="They will gain staff powers."
+        confirmLabel={pendingRole ? `Make ${ROLE_LABELS[pendingRole.next]}` : "Confirm"}
+        onCancel={() => setPendingRole(null)}
+        onConfirm={() => {
+          const pending = pendingRole;
+          setPendingRole(null);
+          if (pending) applyRole(pending.targetId, pending.targetName, pending.next);
+        }}
+      />
     </section>
   );
 }

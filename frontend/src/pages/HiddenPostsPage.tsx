@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { IconEye, IconTrash } from "../components/icons";
 import { ThemedSelect } from "../components/ThemedSelect";
 import { shortError, useToasts } from "../components/Toasts";
@@ -15,6 +16,7 @@ export function HiddenPostsPage() {
   const toasts = useToasts();
   const staff = useStaffActions();
   const [filter, setFilter] = useState<Filter>("all");
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const isStaff = !!user && atLeast(user.role, "moderator");
   const isAdmin = !!user && atLeast(user.role, "admin");
   const hidden = useHiddenPosts(isStaff);
@@ -115,14 +117,7 @@ export function HiddenPostsPage() {
                 <button
                   type="button"
                   className={styles.deleteBtn}
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        "Delete this post? It stays restorable from here and its history.",
-                      )
-                    )
-                      run(staff.deletePost(post.id), "Post deleted. Restore it from here anytime.");
-                  }}
+                  onClick={() => setPendingDeleteId(post.id)}
                 >
                   <IconTrash /> Delete
                 </button>
@@ -134,6 +129,19 @@ export function HiddenPostsPage() {
           </article>
         ))}
       </div>
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Delete this post?"
+        message="Delete this post? It stays restorable from here and its history."
+        confirmLabel="Delete"
+        destructive
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={() => {
+          const id = pendingDeleteId;
+          setPendingDeleteId(null);
+          if (id) run(staff.deletePost(id), "Post deleted. Restore it from here anytime.");
+        }}
+      />
     </section>
   );
 }

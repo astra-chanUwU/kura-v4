@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ThemedSelect } from "../components/ThemedSelect";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { Post } from "../types/api";
@@ -18,6 +19,7 @@ export function ListPage({ id }: { id: string }) {
   const actions = useListActions(id);
   const toasts = useToasts();
   const [copied, setCopied] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [editError, setEditError] = useState("");
   const [editDirty, setEditDirty] = useState(false);
   const editFormRef = useRef<HTMLFormElement>(null);
@@ -252,16 +254,7 @@ export function ListPage({ id }: { id: string }) {
           <button type="submit" className={editDirty ? styles.saveDirty : undefined}>
             Save list
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm("Delete this list? The pictures stay on the board.")) {
-                void actions.deleteList(id).then(() => {
-                  window.location.assign("/me");
-                });
-              }
-            }}
-          >
+          <button type="button" onClick={() => setConfirmDelete(true)}>
             Delete list
           </button>
         </form>
@@ -421,6 +414,20 @@ export function ListPage({ id }: { id: string }) {
           </div>
         ))}
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete this list?"
+        message="Delete this list? The pictures stay on the board."
+        confirmLabel="Delete list"
+        destructive
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          void actions.deleteList(id).then(() => {
+            window.location.assign("/me");
+          });
+        }}
+      />
     </section>
   );
 }
