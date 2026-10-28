@@ -1,4 +1,4 @@
-import { Link, useNavigate, useRouter, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { BoardViewControls } from "../components/BoardViewControls";
 import { PostCard } from "../components/PostCard";
@@ -18,11 +18,6 @@ import { useBoardView } from "../hooks/useBoardView";
 import { useSite } from "../hooks/useSite";
 import { useViewportTags } from "../hooks/useViewportTags";
 import styles from "./HomePage.module.css";
-
-// Clear shows the whole board for this visit, including Back from a
-// picture. Leaving the board (anywhere but a post) drops the flag, so
-// the next open starts from the saved defaults again.
-const NO_DEFAULTS = "kura-board-no-defaults";
 
 export function HomePage() {
   const { signedIn, me, loading: accountLoading } = useMe();
@@ -88,16 +83,21 @@ export function HomePage() {
     };
   }, [signedIn]);
 
-  // The applied filter lives in the URL (?tags=a,b&exclude=c&q=x), so
-  // Back/Forward restore the search you were exploring. Draft tags are
-  // staged locally and only enter the URL when Filter is pressed.
+  // The applied filter lives in the URL (?tags=a,b&exclude=c&q=x).
+  // Tag chips write it immediately. Back/Forward restore that entry.
+  // Saved defaults seed only a bare homepage (no filter, not a Clear).
   const urlSearch = useSearch({ strict: false }) as {
     tags?: string;
     exclude?: string;
     q?: string;
   };
   const navigate = useNavigate();
-  const router = useRouter();
+  // Set on an empty board the user asked for (Clear, or the last chip
+  // removed). A bare homepage visit has no such state, so defaults apply.
+  // Back/Forward restore this with the history entry. Nothing else does.
+  const boardCleared = useRouterState({
+    select: (s) => s.location.state.boardCleared === true,
+  });
   const parseUrlTags = (value?: string): string[] =>
     value
       ? [
@@ -111,10 +111,22 @@ export function HomePage() {
       : [];
   const urlKey = `${urlSearch.tags ?? ""}|${urlSearch.exclude ?? ""}|${urlSearch.q ?? ""}`;
   const hasUrlFilter = !!(urlSearch.tags || urlSearch.exclude || urlSearch.q);
-  const writeUrl = (include: string[], exclude: string[], q: string, replace = false) => {
+  // A chip edit or Clear sets this before navigate() resolves. The
+  // history flag can land a render later; this stops that render from
+  // treating the empty URL as a fresh homepage and putting defaults back.
+  const skipSeed = useRef(false);
+  const pendingWrite = useRef<string | null>(null);
+  const writeUrl = (
+    include: string[],
+    exclude: string[],
+    q: string,
+    opts?: { replace?: boolean; cleared?: boolean },
+  ) => {
+    pendingWrite.current = `${include.join(",")}|${exclude.join(",")}|${q}`;
     void navigate({
       to: "/",
-      ...(replace ? { replace: true } : {}),
+      replace: opts?.replace ?? true,
+      state: { boardCleared: opts?.cleared === true },
       search: {
         tags: include.length > 0 ? include.join(",") : undefined,
         exclude: exclude.length > 0 ? exclude.join(",") : undefined,
@@ -124,8 +136,8 @@ export function HomePage() {
   };
 
   const [searchText, setSearchText] = useState(() => urlSearch.q ?? "");
-  // Draft tags: chips the user is staging. They do not filter anything
-  // until Filter is pressed — then they become the applied tags below.
+  // Chips and the applied filter are the same set. The text query is
+  // the only thing that waits for Filter / Enter.
   const [selectedTags, setSelectedTags] = useState<string[]>(() => parseUrlTags(urlSearch.tags));
   const [excludedTags, setExcludedTags] = useState<string[]>(() => parseUrlTags(urlSearch.exclude));
   const [appliedTags, setAppliedTags] = useState<string[]>(() => parseUrlTags(urlSearch.tags));
@@ -134,17 +146,8 @@ export function HomePage() {
   );
   const [appliedQuery, setAppliedQuery] = useState(() => urlSearch.q ?? "");
   const [searchFocused, setSearchFocused] = useState(false);
-  const [defaultsSuppressed, setDefaultsSuppressed] = useState(
-    () => sessionStorage.getItem(NO_DEFAULTS) === "1",
-  );
-  const suppressDefaults = (on: boolean) => {
-    if (on) sessionStorage.setItem(NO_DEFAULTS, "1");
-    else sessionStorage.removeItem(NO_DEFAULTS);
-    setDefaultsSuppressed(on);
-  };
 
-  // URL changed under us (Back/Forward, a link): adopt it wholesale —
-  // draft resets to the applied filter. A real filter ends a Clear.
+  // URL changed under us (Back/Forward, a link): adopt it wholesale.
   const lastUrlKey = useRef(urlKey);
   useEffect(() => {
     if (lastUrlKey.current === urlKey) return;
@@ -157,22 +160,20 @@ export function HomePage() {
     setAppliedExcludedTags(exclude);
     setAppliedQuery(urlSearch.q ?? "");
     setSearchText(urlSearch.q ?? "");
-    if (include.length > 0 || exclude.length > 0 || (urlSearch.q ?? "") !== "") {
-      sessionStorage.removeItem(NO_DEFAULTS);
-      setDefaultsSuppressed((prev) => (prev ? false : prev));
-    }
+    // Logo, a typed URL, Back/Forward. Our own write already decided
+    // whether defaults are allowed.
+    if (pendingWrite.current !== urlKey) skipSeed.current = false;
+    pendingWrite.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlKey]);
 
-  // A plain board open starts from the saved filters and mirrors them
-  // into the URL, so refresh and Previous/Next stay on that set. An
-  // address that already carries a filter wins. Clear shows everything
-  // for this visit, including Back from a picture.
+  // Saved tags seed a bare homepage only. A URL that already has a
+  // filter, and an empty board the user just asked for, are left alone.
   const defaultInclude = me?.preferences.default_include_tags ?? [];
   const defaultExclude = me?.preferences.default_exclude_tags ?? [];
   const defaultsKey = `${me?.user.id ?? ""}|${defaultInclude.join(",")}|${defaultExclude.join(",")}`;
   useEffect(() => {
-    if (!me || hasUrlFilter || defaultsSuppressed) return;
+    if (!me || hasUrlFilter || boardCleared || skipSeed.current) return;
     if (defaultInclude.length === 0 && defaultExclude.length === 0) return;
     setSelectedTags(defaultInclude);
     setExcludedTags(defaultExclude);
@@ -180,56 +181,41 @@ export function HomePage() {
     setAppliedExcludedTags(defaultExclude);
     setAppliedQuery("");
     setSearchText("");
-    writeUrl(defaultInclude, defaultExclude, "", true);
+    writeUrl(defaultInclude, defaultExclude, "", { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultsKey, hasUrlFilter, defaultsSuppressed]);
-  // Leaving the board for anything but a picture ends Clear. The flag
-  // stays through a post so Back returns to the cleared board. This is
-  // a subscription rather than an unmount cleanup: dev Strict Mode runs
-  // that cleanup on mount and would wipe the flag while still on "/".
-  useEffect(() => {
-    return router.subscribe("onBeforeNavigate", (event) => {
-      const path = event.toLocation.pathname;
-      if (path === "/" || path.startsWith("/posts")) return;
-      sessionStorage.removeItem(NO_DEFAULTS);
-    });
-  }, [router]);
-  const applyDefaults = () => {
-    if (!me) return;
-    suppressDefaults(false);
-    const include = me.preferences.default_include_tags ?? [];
-    const exclude = me.preferences.default_exclude_tags ?? [];
+  }, [defaultsKey, hasUrlFilter, boardCleared]);
+  // Tags commit straight into the URL (replace, so Back from a picture
+  // returns here instead of walking every chip). The text query still
+  // waits for Filter / Enter.
+  const commitFilter = (include: string[], exclude: string[], q: string) => {
+    skipSeed.current = true;
+    const query = q.trim();
+    const cleared = include.length === 0 && exclude.length === 0 && query === "";
     setSelectedTags(include);
     setExcludedTags(exclude);
     setAppliedTags(include);
     setAppliedExcludedTags(exclude);
-    setAppliedQuery("");
-    setSearchText("");
-    writeUrl(include, exclude, "");
+    setAppliedQuery(query);
+    writeUrl(include, exclude, query, { replace: true, cleared });
     goToBoardTop();
   };
-  // Deliberate search: one press applies the whole staged filter — and
-  // writes it to the URL, so Back returns here after viewing a picture.
-  // An empty Filter is Clear: don't let the saved defaults snap back.
+  const applyDefaults = () => {
+    if (!me) return;
+    setSearchText("");
+    commitFilter(
+      me.preferences.default_include_tags ?? [],
+      me.preferences.default_exclude_tags ?? [],
+      "",
+    );
+  };
   const applyFilters = () => {
     const q = searchText.trim();
-    suppressDefaults(selectedTags.length === 0 && excludedTags.length === 0 && q === "");
-    setAppliedTags(selectedTags);
-    setAppliedExcludedTags(excludedTags);
-    setAppliedQuery(q);
-    writeUrl(selectedTags, excludedTags, q);
-    goToBoardTop();
+    setSearchText(q);
+    commitFilter(selectedTags, excludedTags, q);
   };
   const clearFilters = () => {
-    suppressDefaults(true);
     setSearchText("");
-    setSelectedTags([]);
-    setExcludedTags([]);
-    setAppliedTags([]);
-    setAppliedExcludedTags([]);
-    setAppliedQuery("");
-    writeUrl([], [], "");
-    goToBoardTop();
+    commitFilter([], [], "");
   };
   const pendingCount =
     selectedTags.filter((t) => !appliedTags.includes(t)).length +
@@ -249,7 +235,7 @@ export function HomePage() {
   // are still on their way into the chips.
   const defaultsPending =
     !hasUrlFilter &&
-    !defaultsSuppressed &&
+    !boardCleared &&
     (accountLoading ||
       (defaultInclude.length + defaultExclude.length > 0 &&
         (!sameTagSet(appliedTags, defaultInclude) ||
@@ -277,36 +263,46 @@ export function HomePage() {
 
   const addTag = (tag: string) => {
     const normalized = normalizeTagToken(tag);
-    if (normalized) {
-      setExcludedTags((prev) => prev.filter((t) => t !== normalized));
-      setSelectedTags((prev) => (prev.includes(normalized) ? prev : [...prev, normalized]));
-    }
     setSearchText("");
     setHighlight(0);
+    if (!normalized) return;
+    const include = selectedTags.includes(normalized)
+      ? selectedTags
+      : [...selectedTags, normalized];
+    commitFilter(
+      include,
+      excludedTags.filter((t) => t !== normalized),
+      appliedQuery,
+    );
   };
   const addExcludedTag = (tag: string) => {
     const normalized = normalizeTagToken(tag);
-    if (normalized) {
-      setSelectedTags((prev) => prev.filter((t) => t !== normalized));
-      setExcludedTags((prev) => (prev.includes(normalized) ? prev : [...prev, normalized]));
-    }
     setSearchText("");
     setHighlight(0);
+    if (!normalized) return;
+    const exclude = excludedTags.includes(normalized)
+      ? excludedTags
+      : [...excludedTags, normalized];
+    commitFilter(
+      selectedTags.filter((t) => t !== normalized),
+      exclude,
+      appliedQuery,
+    );
   };
   // Booru-style entry: "anime girl white_hair -gif" — plain tokens are
   // required tags, "-tag" tokens are excluded tags, one chip each.
   const addTagsFromText = (text: string) => {
     const { include, exclude } = splitTagInput(text);
-    if (include.length > 0) {
-      setExcludedTags((prev) => prev.filter((t) => !include.includes(t)));
-      setSelectedTags((prev) => [...new Set([...prev, ...include])]);
-    }
-    if (exclude.length > 0) {
-      setSelectedTags((prev) => prev.filter((t) => !exclude.includes(t)));
-      setExcludedTags((prev) => [...new Set([...prev, ...exclude])]);
-    }
     setSearchText("");
     setHighlight(0);
+    if (include.length === 0 && exclude.length === 0) return;
+    const nextExclude = [
+      ...new Set([...excludedTags.filter((t) => !include.includes(t)), ...exclude]),
+    ];
+    const nextInclude = [
+      ...new Set([...selectedTags.filter((t) => !nextExclude.includes(t)), ...include]),
+    ];
+    commitFilter(nextInclude, nextExclude, appliedQuery);
   };
   const shownPosts = search.active ? search.results : posts;
   // Opening a picture carries the applied filter (defaults included),
@@ -378,7 +374,13 @@ export function HomePage() {
                   <button
                     type="button"
                     aria-label={`Remove tag ${tag}`}
-                    onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
+                    onClick={() =>
+                      commitFilter(
+                        selectedTags.filter((t) => t !== tag),
+                        excludedTags,
+                        appliedQuery,
+                      )
+                    }
                   >
                     ×
                   </button>
@@ -393,7 +395,13 @@ export function HomePage() {
                   <button
                     type="button"
                     aria-label={`Remove excluded tag ${tag}`}
-                    onClick={() => setExcludedTags((prev) => prev.filter((t) => t !== tag))}
+                    onClick={() =>
+                      commitFilter(
+                        selectedTags,
+                        excludedTags.filter((t) => t !== tag),
+                        appliedQuery,
+                      )
+                    }
                   >
                     ×
                   </button>
@@ -442,8 +450,11 @@ export function HomePage() {
                   searchText === "" &&
                   (selectedTags.length > 0 || excludedTags.length > 0)
                 ) {
-                  if (selectedTags.length > 0) setSelectedTags((prev) => prev.slice(0, -1));
-                  else setExcludedTags((prev) => prev.slice(0, -1));
+                  if (selectedTags.length > 0) {
+                    commitFilter(selectedTags.slice(0, -1), excludedTags, appliedQuery);
+                  } else {
+                    commitFilter(selectedTags, excludedTags.slice(0, -1), appliedQuery);
+                  }
                 } else if (e.key === "Escape") {
                   setSearchFocused(false);
                 }

@@ -115,6 +115,11 @@ export const router = createRouter({
   scrollRestoration: true,
 });
 declare module "@tanstack/react-router" {
+  interface HistoryState {
+    // An empty board the user asked for. A bare "/" without this is a
+    // fresh homepage and takes the saved default tags.
+    boardCleared?: boolean;
+  }
   interface Register {
     router: typeof router;
   }

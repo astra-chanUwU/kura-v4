@@ -42,7 +42,7 @@ export function AppShell() {
         Skip to content
       </a>
       <header className={styles.header}>
-        <Link className={styles.brand} to="/" aria-label="Kura home">
+        <Link className={styles.brand} to="/" search={{}} aria-label="Kura home">
           Kura
         </Link>
         <nav aria-label="Main navigation" className={styles.nav}>

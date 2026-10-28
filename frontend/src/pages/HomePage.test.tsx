@@ -10,6 +10,7 @@ const board = vi.hoisted(() => ({
   includeTags: [] as string[],
   excludeTags: [] as string[],
   urlSearch: {} as { tags?: string; exclude?: string; q?: string },
+  historyState: {} as { boardCleared?: boolean },
   navigate: vi.fn(),
 }));
 
@@ -19,7 +20,11 @@ vi.mock("@tanstack/react-router", async () => {
   return {
     useSearch: () => board.urlSearch,
     useNavigate: () => board.navigate,
-    useRouter: () => ({ subscribe: () => () => {} }),
+    useRouterState: ({
+      select,
+    }: {
+      select: (s: { location: { state: { boardCleared?: boolean } } }) => unknown;
+    }) => select({ location: { state: board.historyState } }),
     Link: ({
       to,
       params,
@@ -138,8 +143,8 @@ describe("image board states", () => {
     board.includeTags = [];
     board.excludeTags = [];
     board.urlSearch = {};
+    board.historyState = {};
     board.navigate.mockClear();
-    sessionStorage.clear();
   });
   it("offers recovery when the API is unavailable", () => {
     const retry = vi.fn();
@@ -243,10 +248,11 @@ describe("image board states", () => {
     expect(board.navigate).toHaveBeenCalledWith({
       to: "/",
       replace: true,
+      state: { boardCleared: false },
       search: { tags: "anime", exclude: "landscape", q: undefined },
     });
   });
-  it("puts the saved defaults back when a filtered visit returns to a plain board", () => {
+  it("seeds the saved defaults when the address becomes a bare homepage", () => {
     board.posts = [
       { ...untaggedPost, id: "p1", tags: ["anime", "girl"] },
       { ...untaggedPost, id: "p2", tags: ["anime", "landscape"] },
@@ -291,6 +297,30 @@ describe("image board states", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear" }));
     expect(screen.queryByRole("button", { name: "Remove tag anime" })).not.toBeInTheDocument();
     expect(screen.queryByText(/result/)).not.toBeInTheDocument();
+    expect(board.navigate).toHaveBeenCalledWith({
+      to: "/",
+      replace: true,
+      state: { boardCleared: true },
+      search: { tags: undefined, exclude: undefined, q: undefined },
+    });
+  });
+  it("leaves a cleared board empty when that history entry comes back", () => {
+    board.posts = [
+      { ...untaggedPost, id: "p1", tags: ["anime", "girl"] },
+      { ...untaggedPost, id: "p2", tags: ["anime", "landscape"] },
+    ];
+    board.signedIn = true;
+    board.includeTags = ["anime"];
+    board.historyState = { boardCleared: true };
+    mockUseSite.mockReturnValue({
+      site: { name: "My archive", description: "" },
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+    });
+    render(<HomePage />);
+    expect(screen.queryByRole("button", { name: "Remove tag anime" })).not.toBeInTheDocument();
+    expect(board.navigate).not.toHaveBeenCalled();
   });
   it("excludes a tag typed with a leading dash", () => {
     board.posts = [
@@ -309,12 +339,15 @@ describe("image board states", () => {
     fireEvent.change(input, { target: { value: "-gif" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(screen.getByRole("button", { name: "Remove excluded tag gif" })).toBeInTheDocument();
-    // Staged only: nothing filters until Filter is pressed.
-    expect(screen.queryByText(/result/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Filter/ }));
     expect(screen.getByText(/1 result/)).toBeInTheDocument();
+    expect(board.navigate).toHaveBeenCalledWith({
+      to: "/",
+      replace: true,
+      state: { boardCleared: false },
+      search: { tags: undefined, exclude: "gif", q: undefined },
+    });
   });
-  it("stages several tags and filters once on Filter", () => {
+  it("applies tags as they are added and writes them into the URL", () => {
     board.posts = [
       { ...untaggedPost, id: "p1", tags: ["yuri", "cute", "white_hair"] },
       { ...untaggedPost, id: "p2", tags: ["yuri", "cute"] },
@@ -331,15 +364,12 @@ describe("image board states", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add tag cute" }));
     expect(screen.getByRole("button", { name: "Remove tag yuri" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove tag cute" })).toBeInTheDocument();
-    const filterButton = screen.getByRole("button", { name: /Filter/ });
-    expect(filterButton).toHaveTextContent(/^Filter$/);
-    expect(filterButton).toHaveAccessibleName("Filter (2 unapplied changes)");
-    expect(screen.queryByText(/results with all selected tags/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Filter/ }));
     expect(screen.getByText(/2 results with all selected tags/)).toBeInTheDocument();
-    // The applied filter is written to the URL for Back/Forward.
-    expect(board.navigate).toHaveBeenCalledWith({
+    expect(screen.getByRole("button", { name: "Filter" })).toBeInTheDocument();
+    expect(board.navigate).toHaveBeenLastCalledWith({
       to: "/",
+      replace: true,
+      state: { boardCleared: false },
       search: { tags: "yuri,cute", exclude: undefined, q: undefined },
     });
   });
@@ -378,7 +408,6 @@ describe("image board states", () => {
     expect(screen.getByRole("button", { name: "Include tag girl" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Exclude tag girl" }));
     expect(screen.getByRole("button", { name: "Remove excluded tag girl" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Filter/ }));
     expect(screen.getByText(/1 result/)).toBeInTheDocument();
   });
   it("shows detected tags instead of the no-tags default", () => {

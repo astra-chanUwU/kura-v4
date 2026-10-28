@@ -432,9 +432,9 @@ export function MePage() {
           <div className={`${styles.card} ${styles.tagCard}`}>
             <h2>Default board tags</h2>
             <p className={styles.muted}>
-              The board opens with this filter. A post has to carry every required tag, and an
-              excluded tag hides it. Change it on the board for that visit — Clear shows everything
-              until you come back. Type <code>-tag</code> to exclude.
+              A fresh homepage opens on this filter. Tags you set on the board are written into the
+              address bar, so Back from a picture returns to them. The Kura logo starts from this
+              filter again. Type <code>-tag</code> to exclude.
             </p>
             <div className={styles.tagFields}>
               {(
