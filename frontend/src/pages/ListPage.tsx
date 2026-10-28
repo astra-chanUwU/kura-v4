@@ -4,6 +4,7 @@ import { ThemedSelect } from "../components/ThemedSelect";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { Post } from "../types/api";
 import { BoardViewControls } from "../components/BoardViewControls";
+import { IconSave, IconTrash, IconUndo } from "../components/icons";
 import { PostCard } from "../components/PostCard";
 import { PostRow } from "../components/PostRow";
 import { useBoardView } from "../hooks/useBoardView";
@@ -22,6 +23,7 @@ export function ListPage({ id }: { id: string }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editError, setEditError] = useState("");
   const [editDirty, setEditDirty] = useState(false);
+  const [editRevision, setEditRevision] = useState(0);
   const editFormRef = useRef<HTMLFormElement>(null);
 
   // Unsaved-changes check for the edit form (title/description inputs are
@@ -215,6 +217,7 @@ export function ListPage({ id }: { id: string }) {
 
       {isOwner && (
         <form
+          key={editRevision}
           ref={editFormRef}
           className={styles.inlineForm}
           onChange={() => checkEditDirty()}
@@ -251,12 +254,33 @@ export function ListPage({ id }: { id: string }) {
             <option value="private">Private — only me</option>
             <option value="public">Public — anyone with the link</option>
           </ThemedSelect>
-          <button type="submit" className={editDirty ? styles.saveDirty : undefined}>
-            Save list
-          </button>
-          <button type="button" onClick={() => setConfirmDelete(true)}>
-            Delete list
-          </button>
+          <span className={styles.formActions}>
+            <button
+              type="submit"
+              className={editDirty ? `${styles.withIcon} ${styles.saveDirty}` : styles.withIcon}
+            >
+              <IconSave /> Save
+            </button>
+            <button
+              type="button"
+              className={styles.withIcon}
+              disabled={!editDirty}
+              title="Put the title, description, and visibility back"
+              onClick={() => {
+                setEditRevision((revision) => revision + 1);
+                setEditDirty(false);
+              }}
+            >
+              <IconUndo /> Undo
+            </button>
+            <button
+              type="button"
+              className={`${styles.withIcon} ${styles.dangerAction}`}
+              onClick={() => setConfirmDelete(true)}
+            >
+              <IconTrash /> Delete
+            </button>
+          </span>
         </form>
       )}
       {editError && (
@@ -373,6 +397,24 @@ export function ListPage({ id }: { id: string }) {
                 {index + 1}
               </span>
               {isOwner && (
+                <button
+                  type="button"
+                  className={listStyles.remove}
+                  aria-label={`Remove pick ${index + 1}`}
+                  title="Remove from this list"
+                  draggable={false}
+                  onMouseDown={(event) => event.stopPropagation()}
+                  onClick={() =>
+                    void actions
+                      .removeFromList(id, post.id)
+                      .then(() => toasts.push("Removed from this list", "success"))
+                      .catch((e: unknown) => toasts.push(shortError(e), "error"))
+                  }
+                >
+                  ×
+                </button>
+              )}
+              {isOwner && (
                 <div className={listStyles.moveControls}>
                   <button
                     type="button"
@@ -395,22 +437,6 @@ export function ListPage({ id }: { id: string }) {
                 </div>
               )}
             </div>
-            {isOwner && (
-              <div className={listStyles.removeRow}>
-                <button
-                  type="button"
-                  className={listStyles.remove}
-                  onClick={() =>
-                    void actions
-                      .removeFromList(id, post.id)
-                      .then(() => toasts.push("Removed from this list", "success"))
-                      .catch((e: unknown) => toasts.push(shortError(e), "error"))
-                  }
-                >
-                  Remove
-                </button>
-              </div>
-            )}
           </div>
         ))}
       </div>

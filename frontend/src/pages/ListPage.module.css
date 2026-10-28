@@ -31,14 +31,14 @@
 .dropBefore::after {
   left: -0.55rem;
   top: 0;
-  bottom: 1.4rem;
+  bottom: 0;
   width: 3px;
 }
 
 .dropAfter::after {
   right: -0.55rem;
   top: 0;
-  bottom: 1.4rem;
+  bottom: 0;
   width: 3px;
 }
 
@@ -175,35 +175,35 @@
   outline-offset: 1px;
 }
 
-.removeRow {
-  display: flex;
-  justify-content: flex-end;
-  min-height: 1.25rem;
-}
-
+/* Remove sits on the picture's top-left, opposite the pick number.
+   Danger color is the same signal Clear uses on the board. */
 .remove {
-  background: none;
-  border: none;
-  padding: 0.15rem 0.25rem;
-  color: var(--muted);
-  font-size: 0.8rem;
+  position: absolute;
+  top: 0.4rem;
+  left: 0.4rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border: 1px solid var(--danger);
+  border-radius: 0.35rem;
+  background: var(--surface);
+  color: var(--danger);
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1;
   cursor: pointer;
-  opacity: 0;
-}
-
-.item:hover .remove,
-.item:focus-within .remove,
-.remove:focus-visible {
-  opacity: 1;
+  touch-action: manipulation;
 }
 
 .remove:hover {
-  color: var(--text);
-  text-decoration: underline;
+  background: color-mix(in srgb, var(--danger) 18%, var(--surface));
 }
 
-@media (hover: none) {
-  .remove {
-    opacity: 1;
-  }
+.remove:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 1px;
 }

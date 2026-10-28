@@ -85,6 +85,16 @@ export function IconCheck() {
   );
 }
 
+export function IconSave() {
+  return (
+    <Base>
+      <path d="M5 4.5h10.2L19 8.3V19.5H5v-15Z" />
+      <path d="M8 4.5V8h6.5" />
+      <path d="M8 19.5v-5h8v5" />
+    </Base>
+  );
+}
+
 export function IconUpload() {
   return (
     <Base>

@@ -68,6 +68,24 @@
   box-shadow: 0 0 0 2px var(--selection);
   font-weight: 700;
 }
+/* Inside a row of fields the accent border alone disappears. Color the
+   label too, and ring it with the accent so the pending save is obvious. */
+.inlineForm button.saveDirty {
+  color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.inlineForm button.withIcon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.inlineForm button.dangerAction {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.inlineForm button.dangerAction:hover {
+  background: color-mix(in srgb, var(--danger) 16%, var(--surface-soft));
+}
 .tabs {
   display: flex;
   gap: 0.5rem;
@@ -113,6 +131,18 @@
   gap: 0.5rem;
   flex-wrap: wrap;
   align-items: center;
+}
+.formActions {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.inlineForm button.withIcon:disabled {
+  border-color: var(--border);
+  color: var(--muted);
+  opacity: 0.55;
+  cursor: default;
 }
 .full {
   width: 100%;

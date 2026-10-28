@@ -78,6 +78,7 @@ describe("list reorder controls", () => {
     render(<ListPage id="l1" />);
     expect(screen.queryByRole("button", { name: "Drag to reorder" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Pick number 1")).toHaveTextContent("1");
+    expect(screen.getByRole("button", { name: "Remove pick 1" })).toHaveTextContent("×");
     expect(screen.getByLabelText("Pick number 3")).toHaveTextContent("3");
     expect(screen.getByRole("group", { name: "View mode" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Page width" })).toBeInTheDocument();
@@ -192,14 +193,14 @@ describe("list reorder controls", () => {
     hoisted.items = [makePost("p1")];
     hoisted.deleteList.mockClear();
     render(<ListPage id="l1" />);
-    fireEvent.click(screen.getByRole("button", { name: "Delete list" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     const dialog = screen.getByRole("dialog", { name: "Delete this list?" });
     expect(within(dialog).getByText(/pictures stay on the board/)).toBeInTheDocument();
     expect(hoisted.deleteList).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(hoisted.deleteList).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Delete list" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     fireEvent.click(
       within(screen.getByRole("dialog")).getByRole("button", { name: "Delete list" }),
     );
@@ -207,15 +208,30 @@ describe("list reorder controls", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("highlights Save list only while edits are unsaved", () => {
+  it("highlights Save only while edits are unsaved", () => {
     localStorage.removeItem("kura-board-view");
     hoisted.items = [makePost("p1")];
     render(<ListPage id="l1" />);
-    const save = screen.getByRole("button", { name: "Save list" });
+    const save = screen.getByRole("button", { name: "Save" });
     expect(save.className).not.toMatch(/saveDirty/);
     fireEvent.change(screen.getByLabelText("List title"), { target: { value: "New title" } });
     expect(save.className).toMatch(/saveDirty/);
     fireEvent.change(screen.getByLabelText("List title"), { target: { value: "Faves" } });
     expect(save.className).not.toMatch(/saveDirty/);
+    expect(screen.getByRole("button", { name: "Undo" })).toBeDisabled();
+  });
+  it("undo restores the saved title and description", () => {
+    localStorage.removeItem("kura-board-view");
+    hoisted.items = [makePost("p1")];
+    render(<ListPage id="l1" />);
+    expect(screen.getByRole("button", { name: "Undo" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("List title"), { target: { value: "New title" } });
+    fireEvent.change(screen.getByLabelText("List description"), { target: { value: "notes" } });
+    expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(screen.getByLabelText("List title")).toHaveValue("Faves");
+    expect(screen.getByLabelText("List description")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Save" }).className).not.toMatch(/saveDirty/);
+    expect(screen.getByRole("button", { name: "Undo" })).toBeDisabled();
   });
 });
