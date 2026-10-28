@@ -8,5 +8,6 @@
 - Run make check for changes spanning the scaffold. Database integration tests use disposable testcontainers, never an existing library database.
 - Run make generate after changing queries/schema or mocked interfaces. Never edit generated SQL bindings or mocks by hand.
 - Preserve originals, credentials, .env, runtime databases and media. Do not commit them. No automatic original deletion or transformation.
-- Session cookies and PostgreSQL-backed sessions are the agreed authentication design; account flows have not been built yet. Public read access must never imply anonymous write access.
+- Session cookies and PostgreSQL-backed sessions are the agreed authentication design. Public read access must never imply anonymous write access.
+- `kura agent` is the JSON surface for a signed-in account. `kura agent schema` lists every command and does not need a database. Members contribute; moderators and admins moderate with the same checks as the website. `kura promote` stays operator-only. The session token stays in `.local/agent-session` and is never printed. The password comes from `KURA_AGENT_PASSWORD`.
 - New work branches use codex/. Do not introduce extra infrastructure without a concrete feature need.

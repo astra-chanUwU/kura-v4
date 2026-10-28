@@ -161,10 +161,12 @@ type SetRole struct {
 
 // ChangeEntry is one history row. Before/After decode per entity:
 // post -> PostSnapshot fields; user -> {"role": "..."}.
+// ThumbnailURL is set for post entries and empty for user entries.
 type ChangeEntry struct {
 	ID            string         `json:"id"`
 	EntityType    string         `json:"entity_type"`
 	EntityID      string         `json:"entity_id"`
+	ThumbnailURL  string         `json:"thumbnail_url"`
 	ActorID       string         `json:"actor_id"`
 	ActorUsername string         `json:"actor_username"`
 	Action        string         `json:"action"`

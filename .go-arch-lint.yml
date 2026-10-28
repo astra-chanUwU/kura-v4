@@ -18,12 +18,14 @@ components:
   db: { in: internal/db }
   storage: { in: internal/storage }
   kernel: { in: [internal/model, internal/dto, internal/config, internal/webui] }
+  agentcli: { in: internal/agentcli }
 commonComponents:
   - kernel
 deps:
   main: { mayDependOn: [app, db] }
   app: { anyProjectDeps: true }
   controllers: { mayDependOn: [services] }
+  agentcli: { mayDependOn: [services] }
   services: { mayDependOn: [repository, storage] }
   repository: { mayDependOn: [dao, db] }
   dao: { mayDependOn: [dao, db] }

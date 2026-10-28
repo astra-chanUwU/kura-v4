@@ -14,10 +14,14 @@ import (
 )
 
 func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logWriter := os.Stdout
+	if len(os.Args) >= 2 && os.Args[1] == "agent" {
+		logWriter = os.Stderr
+	}
+	log := slog.New(slog.NewJSONHandler(logWriter, nil))
 	slog.SetDefault(log)
-	if len(os.Args) < 2 || (os.Args[1] != "serve" && os.Args[1] != "migrate" && os.Args[1] != "seed" && os.Args[1] != "demo" && os.Args[1] != "audit" && os.Args[1] != "promote") {
-		log.Error("usage: kura serve | migrate | seed <dir> [dir...] | demo <dir> [dir...] | audit | promote <username> <role>")
+	if len(os.Args) < 2 || (os.Args[1] != "serve" && os.Args[1] != "migrate" && os.Args[1] != "seed" && os.Args[1] != "demo" && os.Args[1] != "audit" && os.Args[1] != "promote" && os.Args[1] != "agent") {
+		log.Error("usage: kura serve | migrate | seed <dir> [dir...] | demo <dir> [dir...] | audit | promote <username> <role> | agent <command>")
 		os.Exit(2)
 	}
 	if os.Args[1] == "promote" && len(os.Args) != 4 {
@@ -32,6 +36,12 @@ func main() {
 		log.Error("usage: kura demo <dir> [dir...]")
 		os.Exit(2)
 	}
+	if os.Args[1] == "agent" {
+		agentArgs := os.Args[2:]
+		if len(agentArgs) == 0 || agentArgs[0] == "schema" || agentArgs[0] == "help" {
+			os.Exit(app.Agent(context.Background(), config.Config{}, agentArgs, os.Stdout))
+		}
+	}
 	cfg, err := config.Load()
 	if err != nil {
 		log.Error("configuration", "error", err)
@@ -39,6 +49,9 @@ func main() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if os.Args[1] == "agent" {
+		os.Exit(app.Agent(ctx, cfg, os.Args[2:], os.Stdout))
+	}
 	if os.Args[1] == "migrate" {
 		migrateCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 		defer cancel()

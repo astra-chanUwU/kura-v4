@@ -56,6 +56,46 @@ stage changes.
 The `dev` build tag lets Go tests run without a frontend build. A production
 build intentionally requires the real frontend output; `make build` supplies it.
 
+## Agent CLI
+
+`kura agent` is a JSON command surface for a signed-in account. It calls the
+same services as the website, so a member can contribute and a moderator or
+admin can moderate only what that role can already do in the app. It does not
+grant shell-level access. `kura promote` remains the operator bootstrap and
+is not an agent command.
+
+Every command writes one JSON object to stdout and nothing else:
+
+```json
+{"ok":true,"command":"whoami","data":{}}
+{"ok":false,"command":"posts.hide","error":{"code":"forbidden","message":"You don't have permission to do that."}}
+```
+
+Exit 0 means `ok` is true. Exit 1 is an operation error (`unauthenticated`,
+`forbidden`, `not_found`, `validation`, `duplicate_post`, `canceled`,
+`internal`). Exit 2 is `usage`. Unexpected failures print the detail on stderr
+and a generic message on stdout.
+
+`kura agent schema` lists every command and needs no database. Other commands
+use `DATABASE_URL` and the media directory, the same configuration as
+`serve`. Sign in once; the session token is stored in `.local/agent-session`
+(mode 0600, gitignored) and is never printed.
+
+```sh
+node --env-file=.env scripts/run.mjs go run -tags dev ./cmd/kura agent schema
+KURA_AGENT_PASSWORD='your-password' node --env-file=.env scripts/run.mjs go run -tags dev ./cmd/kura agent login --username ada
+node --env-file=.env scripts/run.mjs go run -tags dev ./cmd/kura agent whoami
+node --env-file=.env scripts/run.mjs go run -tags dev ./cmd/kura agent posts upload ./picture.jpg --tags "artist,original" --rating sfw
+node --env-file=.env scripts/run.mjs go run -tags dev ./cmd/kura agent capabilities
+```
+
+`--password` is accepted and overrides `KURA_AGENT_PASSWORD`. Prefer the
+environment variable so the secret is not part of the process arguments.
+Public reads (site, board list, a single public post, schema) work without a
+session. Uploads, edits, favorites, lists, and every staff action require a
+signed-in account of the matching role. `kura agent schema` is the command
+list.
+
 ## What is implemented
 
 - React image-board shell, CSS Modules and semantic theme variables, with four
@@ -75,6 +115,11 @@ build intentionally requires the real frontend output; `make build` supplies it.
   contribution counts, and a `seed` command that imports sample folders.
 - Roles and change history (below): staff tiers with an append-only audit
   log and one-click rollback for post and role changes.
+- An agent CLI (`kura agent`) that speaks one JSON object per command and signs
+  in as a real account. Members can upload, tag, favorite, and manage lists.
+  Moderators and admins can hide, restore, review history, and roll back, with
+  the same role checks as the website. `kura promote` stays the operator-only
+  bootstrap.
 - A real `GET /api/v1/site` route reading site settings through every backend
   layer; frontend loading, connection-error and retry states.
 - Separate `/health/live` and `/health/ready` endpoints and consistent API errors
@@ -106,7 +151,8 @@ The UI is designed for phone, tablet and desktop widths:
 ## Code map
 
 ```text
-cmd/kura/                 serve, migrate, seed, demo, audit and promote commands
+cmd/kura/                 serve, migrate, seed, demo, audit, promote and agent commands
+internal/agentcli/        JSON command surface for signed-in agents
 internal/app/             dependency construction and lifecycle
 internal/controllers/     HTTP parsing and responses
 internal/accounts/        accounts, passkeys, sessions and recovery keys
