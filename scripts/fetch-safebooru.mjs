@@ -16,12 +16,14 @@ const MAX_TAGS = 30;
 function parseArgs(argv) {
   let count = 600;
   let dir = ".local/seed/safebooru-anime";
+  let tags = "";
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--count" && argv[i + 1]) count = Number(argv[++i]);
     else if (argv[i] === "--dir" && argv[i + 1]) dir = argv[++i];
+    else if (argv[i] === "--tags" && argv[i + 1]) tags = argv[++i];
   }
   if (!Number.isFinite(count) || count < 0) throw new Error("Invalid --count");
-  return { count, dir };
+  return { count, dir, tags };
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -65,8 +67,26 @@ function idFromName(name) {
   return m ? m[1] : null;
 }
 
+// Tags from --tags that the API actually returned. They are written
+// first so the 30-tag sidecar cap cannot drop the search itself.
+let pinnedTags = [];
+
 function trimTags(raw) {
-  return raw.trim().split(/\s+/).filter(Boolean).slice(0, MAX_TAGS).join(" ");
+  const tags = raw.trim().split(/\s+/).filter(Boolean);
+  const keep = [];
+  const seen = new Set();
+  for (const tag of pinnedTags) {
+    if (!tags.includes(tag) || seen.has(tag)) continue;
+    keep.push(tag);
+    seen.add(tag);
+  }
+  for (const tag of tags) {
+    if (seen.has(tag)) continue;
+    if (keep.length >= MAX_TAGS) break;
+    keep.push(tag);
+    seen.add(tag);
+  }
+  return keep.join(" ");
 }
 
 async function listImageFiles(dir) {
@@ -101,8 +121,10 @@ async function fetchPost(id) {
   return post;
 }
 
-async function fetchPage(pid) {
-  const res = await fetchRetry(`${API}&limit=100&pid=${pid}`);
+async function fetchPage(pid, tags) {
+  let url = `${API}&limit=100&pid=${pid}`;
+  if (tags) url += `&tags=${encodeURIComponent(tags)}`;
+  const res = await fetchRetry(url);
   if (!res.ok) throw new Error(`page ${pid}: HTTP ${res.status}`);
   const data = await res.json();
   return Array.isArray(data) ? data : [];
@@ -135,7 +157,8 @@ async function downloadImage(url, dest) {
   }
 }
 
-const { count: target, dir } = parseArgs(process.argv.slice(2));
+const { count: target, dir, tags } = parseArgs(process.argv.slice(2));
+pinnedTags = tags.split(/\s+/).filter((tag) => tag && !tag.startsWith("-"));
 await mkdir(dir, { recursive: true });
 
 let downloaded = 0;
@@ -180,7 +203,7 @@ if (total < target) {
   for (let pid = 0; total < target; pid++) {
     let page;
     try {
-      page = await fetchPage(pid);
+      page = await fetchPage(pid, tags);
     } catch (err) {
       failures++;
       console.error(err.message);
