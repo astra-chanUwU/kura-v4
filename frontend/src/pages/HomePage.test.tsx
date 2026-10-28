@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { writeBoardMemory } from "../domain/boardMemory";
 import { useSite } from "../hooks/useSite";
 import type { Post } from "../types/api";
 import { HomePage } from "./HomePage";
@@ -146,6 +147,7 @@ describe("image board states", () => {
     board.urlSearch = {};
     board.historyState = {};
     board.navigate.mockClear();
+    sessionStorage.clear();
   });
   it("offers recovery when the API is unavailable", () => {
     const retry = vi.fn();
@@ -253,7 +255,7 @@ describe("image board states", () => {
       search: { tags: "anime", exclude: "landscape", q: undefined },
     });
   });
-  it("seeds the saved defaults when the address becomes a bare homepage", () => {
+  it("restores the last filter when the address becomes a bare homepage", () => {
     board.posts = [
       { ...untaggedPost, id: "p1", tags: ["anime", "girl"] },
       { ...untaggedPost, id: "p2", tags: ["anime", "landscape"] },
@@ -274,11 +276,86 @@ describe("image board states", () => {
     expect(board.navigate).not.toHaveBeenCalled();
     board.urlSearch = {};
     rerender(<HomePage />);
+    expect(screen.getByRole("button", { name: "Remove tag girl" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove tag anime" })).not.toBeInTheDocument();
+    expect(board.navigate).toHaveBeenCalledWith({
+      to: "/",
+      replace: true,
+      state: { boardCleared: false },
+      search: { tags: "girl", exclude: undefined, q: undefined },
+    });
+  });
+  it("restores a remembered clear instead of the saved defaults", () => {
+    board.posts = [
+      { ...untaggedPost, id: "p1", tags: ["anime", "girl"] },
+      { ...untaggedPost, id: "p2", tags: ["anime", "landscape"] },
+    ];
+    board.signedIn = true;
+    board.includeTags = ["anime"];
+    board.historyState = { boardCleared: true };
+    mockUseSite.mockReturnValue({
+      site: { name: "My archive", description: "" },
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+    });
+    const { rerender } = render(<HomePage />);
+    expect(screen.queryByRole("button", { name: "Remove tag anime" })).not.toBeInTheDocument();
+    expect(board.navigate).not.toHaveBeenCalled();
+    board.historyState = {};
+    rerender(<HomePage />);
+    expect(screen.queryByRole("button", { name: "Remove tag anime" })).not.toBeInTheDocument();
+    expect(board.navigate).toHaveBeenCalledWith({
+      to: "/",
+      replace: true,
+      state: { boardCleared: true },
+      search: { tags: undefined, exclude: undefined, q: undefined },
+    });
+  });
+  it("ignores another account's remembered board and seeds defaults", () => {
+    board.posts = [{ ...untaggedPost, id: "p1", tags: ["anime", "girl"] }];
+    board.signedIn = true;
+    board.includeTags = ["anime"];
+    writeBoardMemory({
+      userId: "someone-else",
+      tags: ["girl"],
+      exclude: [],
+      q: "",
+      cleared: false,
+    });
+    mockUseSite.mockReturnValue({
+      site: { name: "My archive", description: "" },
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+    });
+    render(<HomePage />);
     expect(screen.getByRole("button", { name: "Remove tag anime" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Remove excluded tag landscape" }),
-    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove tag girl" })).not.toBeInTheDocument();
+  });
+  it("brings staged tags back after leaving the board", () => {
+    board.posts = [
+      { ...untaggedPost, id: "p1", tags: ["anime", "girl"] },
+      { ...untaggedPost, id: "p2", tags: ["anime", "landscape"] },
+    ];
+    board.signedIn = true;
+    board.includeTags = ["anime"];
+    mockUseSite.mockReturnValue({
+      site: { name: "My archive", description: "" },
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+    });
+    const first = render(<HomePage />);
+    fireEvent.click(screen.getByRole("button", { name: "Add tag girl" }));
+    expect(board.navigate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ search: expect.objectContaining({ tags: "anime,girl" }) }),
+    );
+    first.unmount();
+    board.navigate.mockClear();
+    render(<HomePage />);
+    expect(screen.getByRole("button", { name: "Remove tag anime" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove tag girl" })).toBeInTheDocument();
   });
   it("keeps a cleared board from snapping back to the saved defaults", () => {
     board.posts = [

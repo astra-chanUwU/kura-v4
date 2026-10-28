@@ -116,8 +116,9 @@ export const router = createRouter({
 });
 declare module "@tanstack/react-router" {
   interface HistoryState {
-    // An empty board the user asked for. A bare "/" without this is a
-    // fresh homepage and takes the saved default tags.
+    // An empty board the user asked for (Clear). A bare "/" without this
+    // restores this tab's remembered board, or the saved defaults when
+    // this tab has not opened the board yet.
     boardCleared?: boolean;
   }
   interface Register {

@@ -18,6 +18,7 @@ import {
   type BoardFilter,
   type Neighbors,
 } from "../domain/boardFilter";
+import { clearBoardMemory } from "../domain/boardMemory";
 import { api, DuplicatePostError } from "../api/kura";
 
 /** The existing post when an upload was a duplicate, else undefined. */
@@ -335,6 +336,8 @@ export function useAuthActions() {
       api.logout().then(() => {
         // Clear the user synchronously — invalidating alone leaves the
         // old data visible until (and unless) the refetch lands.
+        // Drop the tab's board too, so the next account does not inherit it.
+        clearBoardMemory();
         client.setQueryData(queryKeys.me(), null);
         purgeUserCaches();
         invalidate();

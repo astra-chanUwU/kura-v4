@@ -6,6 +6,7 @@ import { PostRow } from "../components/PostRow";
 import { UploadDialog } from "../components/UploadDialog";
 import uploadStyles from "../components/UploadDialog.module.css";
 import { sameTagSet, searchFromFilter, splitTagInput } from "../domain/boardFilter";
+import { boardMemoryFor, writeBoardMemory } from "../domain/boardMemory";
 import {
   normalizeTagToken,
   tagTokens,
@@ -85,7 +86,9 @@ export function HomePage() {
 
   // The applied filter lives in the URL (?tags=a,b&exclude=c&q=x).
   // Tag chips write it immediately. Back/Forward restore that entry.
-  // Saved defaults seed only a bare homepage (no filter, not a Clear).
+  // This tab also remembers the last board. A bare "/" (the logo) puts
+  // that board back. Saved defaults seed a bare homepage only when
+  // nothing is remembered yet.
   const urlSearch = useSearch({ strict: false }) as {
     tags?: string;
     exclude?: string;
@@ -93,8 +96,9 @@ export function HomePage() {
   };
   const navigate = useNavigate();
   // Set on an empty board the user asked for (Clear, or the last chip
-  // removed). A bare homepage visit has no such state, so defaults apply.
-  // Back/Forward restore this with the history entry. Nothing else does.
+  // removed). Back/Forward restore this with the history entry. The
+  // remembered board stores the same choice, so the logo honors a Clear.
+  // Defaults apply only when this tab has no remembered board.
   const boardCleared = useRouterState({
     select: (s) => s.location.state.boardCleared === true,
   });
@@ -116,17 +120,20 @@ export function HomePage() {
   // treating the empty URL as a fresh homepage and putting defaults back.
   const skipSeed = useRef(false);
   const pendingWrite = useRef<string | null>(null);
+  const viewerId = me?.user.id ?? "";
   const writeUrl = (
     include: string[],
     exclude: string[],
     q: string,
     opts?: { replace?: boolean; cleared?: boolean },
   ) => {
+    const cleared = opts?.cleared === true;
+    writeBoardMemory({ userId: viewerId, tags: include, exclude, q, cleared });
     pendingWrite.current = `${include.join(",")}|${exclude.join(",")}|${q}`;
     void navigate({
       to: "/",
       replace: opts?.replace ?? true,
-      state: { boardCleared: opts?.cleared === true },
+      state: { boardCleared: cleared },
       search: {
         tags: include.length > 0 ? include.join(",") : undefined,
         exclude: exclude.length > 0 ? exclude.join(",") : undefined,
@@ -146,6 +153,42 @@ export function HomePage() {
   );
   const [appliedQuery, setAppliedQuery] = useState(() => urlSearch.q ?? "");
   const [searchFocused, setSearchFocused] = useState(false);
+  // Latest chips, including ones staged from the strip and not yet in
+  // the URL. Leaving the board saves them so the logo can bring them back.
+  const chipRef = useRef({ tags: selectedTags, exclude: excludedTags, q: appliedQuery });
+  chipRef.current = { tags: selectedTags, exclude: excludedTags, q: appliedQuery };
+  const urlFilterRef = useRef({
+    tags: parseUrlTags(urlSearch.tags),
+    exclude: parseUrlTags(urlSearch.exclude),
+    q: urlSearch.q ?? "",
+  });
+  urlFilterRef.current = {
+    tags: parseUrlTags(urlSearch.tags),
+    exclude: parseUrlTags(urlSearch.exclude),
+    q: urlSearch.q ?? "",
+  };
+  const viewerIdRef = useRef(viewerId);
+  viewerIdRef.current = viewerId;
+  useEffect(() => {
+    return () => {
+      const chips = chipRef.current;
+      const url = urlFilterRef.current;
+      if (
+        sameTagSet(chips.tags, url.tags) &&
+        sameTagSet(chips.exclude, url.exclude) &&
+        chips.q === url.q
+      ) {
+        return;
+      }
+      writeBoardMemory({
+        userId: viewerIdRef.current,
+        tags: chips.tags,
+        exclude: chips.exclude,
+        q: chips.q,
+        cleared: false,
+      });
+    };
+  }, []);
 
   // URL changed under us (Back/Forward, a link): adopt it wholesale.
   const lastUrlKey = useRef(urlKey);
@@ -167,23 +210,47 @@ export function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlKey]);
 
-  // Saved tags seed a bare homepage only. A URL that already has a
-  // filter, and an empty board the user just asked for, are left alone.
+  // A filter already in the address (refresh, Back) is the board to
+  // restore the next time the logo opens a bare "/".
+  useEffect(() => {
+    if (accountLoading || (!hasUrlFilter && !boardCleared)) return;
+    writeBoardMemory({
+      userId: viewerId,
+      tags: parseUrlTags(urlSearch.tags),
+      exclude: parseUrlTags(urlSearch.exclude),
+      q: urlSearch.q ?? "",
+      cleared: boardCleared && !hasUrlFilter,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlKey, boardCleared, accountLoading, viewerId]);
+
+  // A bare homepage restores this tab's board. Saved tags seed one only
+  // when nothing is remembered yet. A URL that already has a filter, and
+  // an empty board the user just asked for, are left alone.
   const defaultInclude = me?.preferences.default_include_tags ?? [];
   const defaultExclude = me?.preferences.default_exclude_tags ?? [];
   const defaultsKey = `${me?.user.id ?? ""}|${defaultInclude.join(",")}|${defaultExclude.join(",")}`;
+  const remembered =
+    !hasUrlFilter && !boardCleared && !accountLoading ? boardMemoryFor(viewerId) : null;
   useEffect(() => {
-    if (!me || hasUrlFilter || boardCleared || skipSeed.current) return;
-    if (defaultInclude.length === 0 && defaultExclude.length === 0) return;
-    setSelectedTags(defaultInclude);
-    setExcludedTags(defaultExclude);
-    setAppliedTags(defaultInclude);
-    setAppliedExcludedTags(defaultExclude);
-    setAppliedQuery("");
-    setSearchText("");
-    writeUrl(defaultInclude, defaultExclude, "", { replace: true });
+    if (hasUrlFilter || boardCleared || skipSeed.current || accountLoading) return;
+    const memory = boardMemoryFor(viewerId);
+    const include = memory ? memory.tags : defaultInclude;
+    const exclude = memory ? memory.exclude : defaultExclude;
+    const query = memory ? memory.q : "";
+    const cleared = memory?.cleared === true;
+    if (!memory) {
+      if (!me || (include.length === 0 && exclude.length === 0)) return;
+    }
+    setSelectedTags(include);
+    setExcludedTags(exclude);
+    setAppliedTags(include);
+    setAppliedExcludedTags(exclude);
+    setAppliedQuery(query);
+    setSearchText(query);
+    writeUrl(include, exclude, query, { replace: true, cleared });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultsKey, hasUrlFilter, boardCleared]);
+  }, [defaultsKey, hasUrlFilter, boardCleared, accountLoading, viewerId]);
   // Search-box edits commit straight into the URL (replace, so Back
   // from a picture returns here). Scroll only when the result list is
   // deliberately replaced: Filter, Clear, My defaults.
@@ -232,16 +299,18 @@ export function HomePage() {
   const differsFromDefaults =
     hasDefaults &&
     (!sameTagSet(selectedTags, defaultInclude) || !sameTagSet(excludedTags, defaultExclude));
-  // Don't paint the unfiltered board for a frame while saved defaults
-  // are still on their way into the chips.
-  const defaultsPending =
-    !hasUrlFilter &&
-    !boardCleared &&
-    (accountLoading ||
-      (defaultInclude.length + defaultExclude.length > 0 &&
-        (!sameTagSet(appliedTags, defaultInclude) ||
-          !sameTagSet(appliedExcludedTags, defaultExclude) ||
-          appliedQuery !== "")));
+  // Don't paint the unfiltered board for a frame while a remembered
+  // board, or the saved defaults, are still on their way into the chips.
+  const restorePending = remembered
+    ? !remembered.cleared &&
+      (!sameTagSet(appliedTags, remembered.tags) ||
+        !sameTagSet(appliedExcludedTags, remembered.exclude) ||
+        appliedQuery !== remembered.q)
+    : (defaultInclude.length > 0 || defaultExclude.length > 0) &&
+      (!sameTagSet(appliedTags, defaultInclude) ||
+        !sameTagSet(appliedExcludedTags, defaultExclude) ||
+        appliedQuery !== "");
+  const defaultsPending = !hasUrlFilter && !boardCleared && (accountLoading || restorePending);
   const [highlight, setHighlight] = useState(0);
   // Keystrokes update the input instantly, but filtering (and anything
   // network-adjacent) only sees the debounced value, 200ms behind.
@@ -699,7 +768,12 @@ export function HomePage() {
           <div className={styles.rows}>
             {shownPosts.map((post) => (
               <div key={post.id} ref={(el) => observePost(el, post.id)} data-post-id={post.id}>
-                <PostRow post={post} onTagClick={addTag} search={postSearch} onOpen={commitStaged} />
+                <PostRow
+                  post={post}
+                  onTagClick={addTag}
+                  search={postSearch}
+                  onOpen={commitStaged}
+                />
               </div>
             ))}
           </div>

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/client";
 import { api } from "../api/kura";
+import { readBoardMemory, writeBoardMemory } from "../domain/boardMemory";
 import type { Me, Post } from "../types/api";
 import { useAuthActions, useMe, useToggleFavorite } from "./useKura";
 
@@ -67,11 +68,13 @@ describe("auth cache", () => {
     client.setQueryData(["me"], meFixture);
     client.setQueryData(["favorites"], [post]);
     const { result } = renderHook(() => useAuthActions(), { wrapper: wrapperFor(client) });
+    writeBoardMemory({ userId: "u1", tags: ["anime"], exclude: [], q: "", cleared: false });
     await act(async () => {
       await result.current.logout();
     });
     expect(client.getQueryData(["me"]) ?? null).toBeNull();
     expect(client.getQueryData(["favorites"])).toBeUndefined();
+    expect(readBoardMemory()).toBeNull();
   });
 });
 
