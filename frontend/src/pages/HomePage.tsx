@@ -530,12 +530,12 @@ export function HomePage() {
               appliedExcludedTags.length > 0 ||
               searchText.trim() !== "" ||
               appliedQuery !== "") && (
-              <button type="button" onClick={clearFilters}>
+              <button type="button" className={styles.clearButton} onClick={clearFilters}>
                 Clear
               </button>
             )}
             {differsFromDefaults && (
-              <button type="button" onClick={applyDefaults}>
+              <button type="button" className={styles.defaultsButton} onClick={applyDefaults}>
                 My defaults
               </button>
             )}
