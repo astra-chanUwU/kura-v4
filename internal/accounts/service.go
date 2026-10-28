@@ -59,6 +59,7 @@ type Repository interface {
 	UpdateShowNSFW(ctx context.Context, userID string, show bool) error
 	UpdateTagPreferences(ctx context.Context, userID string, includeTags, excludeTags []string) error
 	UpdateAppearance(ctx context.Context, userID, theme, font string) error
+	UpdateTagSuggestionRows(ctx context.Context, userID string, rows int) error
 	SetRecoveryKey(ctx context.Context, userID string, keyHash []byte) error
 	GetRecoveryKey(ctx context.Context, userID string) ([]byte, time.Time, error)
 	// RecoverAccount atomically replaces the password and recovery key and
@@ -463,6 +464,15 @@ func (s *Service) SetAppearance(ctx context.Context, userID, theme, font string)
 		return invalid("Choose one of the available fonts.")
 	}
 	return s.repo.UpdateAppearance(ctx, userID, theme, font)
+}
+
+// SetTagSuggestionRows records how many rows of on-screen tag
+// suggestions the board shows. 0 hides the strip.
+func (s *Service) SetTagSuggestionRows(ctx context.Context, userID string, rows int) error {
+	if rows < 0 || rows > 10 {
+		return invalid("Tag suggestions use 0 to 10 rows.")
+	}
+	return s.repo.UpdateTagSuggestionRows(ctx, userID, rows)
 }
 
 func contains(list []string, v string) bool {

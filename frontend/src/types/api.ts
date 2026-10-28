@@ -80,6 +80,8 @@ export interface Preferences {
   default_exclude_tags: string[];
   theme: ThemeId;
   font: FontId;
+  /** Rows of on-screen tag suggestions. 0 hides the strip. */
+  tag_suggestion_rows: number;
 }
 export interface Me {
   user: User;

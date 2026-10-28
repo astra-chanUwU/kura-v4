@@ -69,6 +69,7 @@ vi.mock("../hooks/useKura", () => ({
             show_nsfw: false,
             default_include_tags: board.includeTags,
             default_exclude_tags: board.excludeTags,
+            tag_suggestion_rows: 1,
             theme: "kura",
             font: "system",
           },
@@ -347,7 +348,7 @@ describe("image board states", () => {
       search: { tags: undefined, exclude: "gif", q: undefined },
     });
   });
-  it("applies tags as they are added and writes them into the URL", () => {
+  it("stages strip tags until Filter writes them into the URL", () => {
     board.posts = [
       { ...untaggedPost, id: "p1", tags: ["yuri", "cute", "white_hair"] },
       { ...untaggedPost, id: "p2", tags: ["yuri", "cute"] },
@@ -364,8 +365,11 @@ describe("image board states", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add tag cute" }));
     expect(screen.getByRole("button", { name: "Remove tag yuri" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove tag cute" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add tag white_hair" })).toBeInTheDocument();
+    expect(screen.queryByText(/results with all selected tags/)).not.toBeInTheDocument();
+    expect(board.navigate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Filter/ }));
     expect(screen.getByText(/2 results with all selected tags/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Filter" })).toBeInTheDocument();
     expect(board.navigate).toHaveBeenLastCalledWith({
       to: "/",
       replace: true,
@@ -408,6 +412,10 @@ describe("image board states", () => {
     expect(screen.getByRole("button", { name: "Include tag girl" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Exclude tag girl" }));
     expect(screen.getByRole("button", { name: "Remove excluded tag girl" })).toBeInTheDocument();
+    // Staged from the strip: the pictures stay put until Filter.
+    expect(screen.queryByText(/1 result/)).not.toBeInTheDocument();
+    expect(board.navigate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Filter/ }));
     expect(screen.getByText(/1 result/)).toBeInTheDocument();
   });
   it("shows detected tags instead of the no-tags default", () => {

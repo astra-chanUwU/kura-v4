@@ -17,7 +17,10 @@ type User struct {
 	// public profile. Ids are validated in the accounts service.
 	PreferredTheme string
 	PreferredFont  string
-	Role           Role
+	// How many rows of on-screen tag suggestions the board shows.
+	// 0 hides the strip. Default 1 matches the single scrolling row.
+	TagSuggestionRows int
+	Role              Role
 	// Default board tag filters, applied when the board loads.
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string

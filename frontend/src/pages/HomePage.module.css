@@ -339,6 +339,14 @@
 .viewportTags::-webkit-scrollbar {
   display: none;
 }
+.viewportTagsWrap {
+  flex-wrap: wrap;
+  align-content: flex-start;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  max-height: calc(var(--suggestion-rows) * 2.6rem);
+}
 .viewportChip {
   flex-shrink: 0;
   display: inline-flex;

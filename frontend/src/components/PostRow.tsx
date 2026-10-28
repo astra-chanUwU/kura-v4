@@ -28,10 +28,12 @@ export function PostRow({
   post,
   onTagClick,
   search,
+  onOpen,
 }: {
   post: Post;
   onTagClick?: (tag: string) => void;
   search?: BoardSearch;
+  onOpen?: () => void;
 }) {
   const prefetch = usePrefetchPost(post);
   const type = TYPE_LABEL[post.content_type] ?? post.content_type;
@@ -44,6 +46,7 @@ export function PostRow({
         search={search}
         className={styles.media}
         aria-label="Open post"
+        onMouseDown={onOpen}
         {...prefetch}
       >
         <img src={post.thumbnail_url} alt="" loading="lazy" />

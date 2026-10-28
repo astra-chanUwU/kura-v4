@@ -401,6 +401,7 @@ export function useAccountActions() {
     setTagPreferences: (includeTags: string[], excludeTags: string[]) =>
       api.setTagPreferences(includeTags, excludeTags).then(refresh),
     setAppearance: (theme: string, font: string) => api.setAppearance(theme, font).then(refresh),
+    setTagSuggestionRows: (rows: number) => api.setTagSuggestionRows(rows).then(refresh),
     setAvatar: (file: File) => api.setAvatar(file).then(refresh),
     removeAvatar: () => api.removeAvatar().then(refresh),
     setPassword: (password: string) => api.setPassword(password).then(refresh),

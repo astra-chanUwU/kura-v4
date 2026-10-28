@@ -83,6 +83,8 @@ export const api = {
     sendJSON<Me>("/me/tag-preferences", "PATCH", { include_tags, exclude_tags }),
   setAppearance: (theme: string, font: string) =>
     sendJSON<Me>("/me/appearance", "PATCH", { theme, font }),
+  setTagSuggestionRows: (rows: number) =>
+    sendJSON<Me>("/me/tag-suggestion-rows", "PATCH", { rows }),
   setPassword: (password: string) => sendJSON<Me>("/me/password", "POST", { password }),
   adminUsers: (signal?: AbortSignal) => getJSON<User[]>("/admin/users", signal),
   setUserRole: (userId: string, role: Role) =>

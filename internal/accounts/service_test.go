@@ -266,6 +266,22 @@ func TestSetAppearanceValidatesAndPersists(t *testing.T) {
 	}
 }
 
+func TestSetTagSuggestionRowsValidates(t *testing.T) {
+	ctx := context.Background()
+	repo := NewMockRepository(t)
+	repo.EXPECT().UpdateTagSuggestionRows(ctx, "u1", 0).Return(nil)
+	repo.EXPECT().UpdateTagSuggestionRows(ctx, "u1", 10).Return(nil)
+	svc, err := NewService(repo, "http://localhost:5174", nil)
+	require.NoError(t, err)
+	require.NoError(t, svc.SetTagSuggestionRows(ctx, "u1", 0))
+	require.NoError(t, svc.SetTagSuggestionRows(ctx, "u1", 10))
+	for _, rows := range []int{-1, 11} {
+		err := svc.SetTagSuggestionRows(ctx, "u1", rows)
+		var vErr *ValidationError
+		require.ErrorAs(t, err, &vErr)
+	}
+}
+
 func TestShowNSFWRequiresAdultConfirmation(t *testing.T) {
 	ctx := context.Background()
 	repo := NewMockRepository(t)

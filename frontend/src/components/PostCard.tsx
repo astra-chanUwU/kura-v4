@@ -185,7 +185,15 @@ export function PostActions({ post }: { post: Post }) {
  * No title or owner text on the board — those live on the post page.
  * `search` is the board filter the post page steps through.
  */
-export function PostCard({ post, search }: { post: Post; search?: BoardSearch }) {
+export function PostCard({
+  post,
+  search,
+  onOpen,
+}: {
+  post: Post;
+  search?: BoardSearch;
+  onOpen?: () => void;
+}) {
   const prefetch = usePrefetchPost(post);
   return (
     <article className={styles.card}>
@@ -195,6 +203,7 @@ export function PostCard({ post, search }: { post: Post; search?: BoardSearch })
         search={search}
         className={styles.media}
         aria-label="Open post"
+        onMouseDown={onOpen}
         {...prefetch}
       >
         <img src={post.thumbnail_url} alt="" loading="lazy" />

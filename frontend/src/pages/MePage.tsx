@@ -436,6 +436,30 @@ export function MePage() {
               address bar, so Back from a picture returns to them. The Kura logo starts from this
               filter again. Type <code>-tag</code> to exclude.
             </p>
+            <label className={styles.choice}>
+              Tag suggestion rows
+              <ThemedSelect
+                label="Tag suggestion rows"
+                value={String(preferences.tag_suggestion_rows ?? 1)}
+                onChange={(value) => {
+                  const rows = Number(value);
+                  run(
+                    account.setTagSuggestionRows(rows),
+                    rows === 0 ? "Tag suggestions hidden." : "Tag suggestions saved.",
+                  );
+                }}
+              >
+                <option value="0">Off</option>
+                {Array.from({ length: 10 }, (_, i) => (
+                  <option key={i + 1} value={String(i + 1)}>
+                    {i + 1}
+                  </option>
+                ))}
+              </ThemedSelect>
+            </label>
+            <p className={styles.muted}>
+              How many rows of tags from the pictures on screen. Off hides that strip.
+            </p>
             <div className={styles.tagFields}>
               {(
                 [

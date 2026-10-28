@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { BoardViewControls } from "../components/BoardViewControls";
 import { PostCard } from "../components/PostCard";
 import { PostRow } from "../components/PostRow";
@@ -184,10 +184,10 @@ export function HomePage() {
     writeUrl(defaultInclude, defaultExclude, "", { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultsKey, hasUrlFilter, boardCleared]);
-  // Tags commit straight into the URL (replace, so Back from a picture
-  // returns here instead of walking every chip). The text query still
-  // waits for Filter / Enter.
-  const commitFilter = (include: string[], exclude: string[], q: string) => {
+  // Search-box edits commit straight into the URL (replace, so Back
+  // from a picture returns here). Scroll only when the result list is
+  // deliberately replaced: Filter, Clear, My defaults.
+  const commitFilter = (include: string[], exclude: string[], q: string, scroll = false) => {
     skipSeed.current = true;
     const query = q.trim();
     const cleared = include.length === 0 && exclude.length === 0 && query === "";
@@ -197,7 +197,7 @@ export function HomePage() {
     setAppliedExcludedTags(exclude);
     setAppliedQuery(query);
     writeUrl(include, exclude, query, { replace: true, cleared });
-    goToBoardTop();
+    if (scroll) goToBoardTop();
   };
   const applyDefaults = () => {
     if (!me) return;
@@ -206,16 +206,17 @@ export function HomePage() {
       me.preferences.default_include_tags ?? [],
       me.preferences.default_exclude_tags ?? [],
       "",
+      true,
     );
   };
   const applyFilters = () => {
     const q = searchText.trim();
     setSearchText(q);
-    commitFilter(selectedTags, excludedTags, q);
+    commitFilter(selectedTags, excludedTags, q, true);
   };
   const clearFilters = () => {
     setSearchText("");
-    commitFilter([], [], "");
+    commitFilter([], [], "", true);
   };
   const pendingCount =
     selectedTags.filter((t) => !appliedTags.includes(t)).length +
@@ -261,6 +262,21 @@ export function HomePage() {
   // start of the board instead of leaving the user mid-scroll.
   const goToBoardTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
+  // The on-screen tag strip only stages a chip. Applying here would
+  // swap the pictures and jump to the top, so the next tag in that
+  // strip is gone. Filter commits them.
+  const stageInclude = (tag: string) => {
+    const normalized = normalizeTagToken(tag);
+    if (!normalized) return;
+    setExcludedTags((prev) => prev.filter((t) => t !== normalized));
+    setSelectedTags((prev) => (prev.includes(normalized) ? prev : [...prev, normalized]));
+  };
+  const stageExclude = (tag: string) => {
+    const normalized = normalizeTagToken(tag);
+    if (!normalized) return;
+    setSelectedTags((prev) => prev.filter((t) => t !== normalized));
+    setExcludedTags((prev) => (prev.includes(normalized) ? prev : [...prev, normalized]));
+  };
   const addTag = (tag: string) => {
     const normalized = normalizeTagToken(tag);
     setSearchText("");
@@ -305,21 +321,29 @@ export function HomePage() {
     commitFilter(nextInclude, nextExclude, appliedQuery);
   };
   const shownPosts = search.active ? search.results : posts;
-  // Opening a picture carries the applied filter (defaults included),
-  // so the post page's Previous/Next stay inside this result set.
+  // The picture link carries the chips, including ones staged from the
+  // strip and not yet applied. Opening one writes that filter into the
+  // board history entry first, so Back restores it. No scroll.
   const postSearch = searchFromFilter({
-    tags: appliedTags,
-    exclude: appliedExcludedTags,
+    tags: selectedTags,
+    exclude: excludedTags,
     q: appliedQuery,
   });
+  const commitStaged = () => {
+    if (sameTagSet(selectedTags, appliedTags) && sameTagSet(excludedTags, appliedExcludedTags)) {
+      return;
+    }
+    commitFilter(selectedTags, excludedTags, appliedQuery);
+  };
 
-  // Dynamic viewport-based recommendations: observe which cards are on screen
-  // and surface their most frequent tags (like Safebooru but for infinite scroll).
-  // Limited to 12, excludes already-selected tags, re-computes as you scroll.
+  // One row is the current horizontal strip (12 tags). More rows wrap.
+  // 0 hides the strip. Signed-out visitors get the one-row default.
+  const suggestionRows = me?.preferences.tag_suggestion_rows ?? 1;
+  const suggestionLimit = suggestionRows <= 1 ? 12 : suggestionRows * 16;
   const { recommended: viewportTags, observe: observePost } = useViewportTags(
     shownPosts,
     [...selectedTags, ...excludedTags, ...appliedTags, ...appliedExcludedTags],
-    12,
+    suggestionLimit,
   );
 
   const failed = error ?? siteError;
@@ -574,8 +598,16 @@ export function HomePage() {
           the sticky board head, so it stays visible while scrolling. When
           the current view has no tags it keeps its place with a default
           prompt instead of vanishing. */}
-        {!loading && !failed && !defaultsPending && shownPosts.length > 0 && (
-          <div className={styles.viewportTags} aria-label="Tags in current view">
+        {suggestionRows > 0 && !loading && !failed && !defaultsPending && shownPosts.length > 0 && (
+          <div
+            className={`${styles.viewportTags} ${suggestionRows > 1 ? styles.viewportTagsWrap : ""}`}
+            style={
+              suggestionRows > 1
+                ? ({ "--suggestion-rows": suggestionRows } as CSSProperties)
+                : undefined
+            }
+            aria-label="Tags in current view"
+          >
             {viewportTags.length > 0 ? (
               viewportTags.map((t) => (
                 <span key={t.tag} className={styles.viewportTag}>
@@ -584,7 +616,7 @@ export function HomePage() {
                     className={`${styles.viewportTagSide} ${styles.viewportExclude}`}
                     aria-label={`Exclude tag ${t.tag}`}
                     title={`Exclude ${t.tag}`}
-                    onClick={() => addExcludedTag(t.tag)}
+                    onClick={() => stageExclude(t.tag)}
                   >
                     −
                   </button>
@@ -592,7 +624,7 @@ export function HomePage() {
                     type="button"
                     className={styles.viewportTagMain}
                     aria-label={`Add tag ${t.tag}`}
-                    onClick={() => addTag(t.tag)}
+                    onClick={() => stageInclude(t.tag)}
                   >
                     {t.tag} <span className={styles.viewportChipCount}>· {t.count}</span>
                   </button>
@@ -601,7 +633,7 @@ export function HomePage() {
                     className={`${styles.viewportTagSide} ${styles.viewportInclude}`}
                     aria-label={`Include tag ${t.tag}`}
                     title={`Include ${t.tag}`}
-                    onClick={() => addTag(t.tag)}
+                    onClick={() => stageInclude(t.tag)}
                   >
                     +
                   </button>
@@ -667,7 +699,7 @@ export function HomePage() {
           <div className={styles.rows}>
             {shownPosts.map((post) => (
               <div key={post.id} ref={(el) => observePost(el, post.id)} data-post-id={post.id}>
-                <PostRow post={post} onTagClick={addTag} search={postSearch} />
+                <PostRow post={post} onTagClick={addTag} search={postSearch} onOpen={commitStaged} />
               </div>
             ))}
           </div>
@@ -675,7 +707,7 @@ export function HomePage() {
           <div className={styles.grid}>
             {shownPosts.map((post) => (
               <div key={post.id} ref={(el) => observePost(el, post.id)} data-post-id={post.id}>
-                <PostCard post={post} search={postSearch} />
+                <PostCard post={post} search={postSearch} onOpen={commitStaged} />
               </div>
             ))}
           </div>

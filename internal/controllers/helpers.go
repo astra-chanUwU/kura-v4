@@ -136,7 +136,11 @@ func preferencesDTO(u model.User) dto.Preferences {
 	if font == "" {
 		font = "system"
 	}
-	return dto.Preferences{ShowNSFW: u.ShowNSFW, DefaultIncludeTags: include, DefaultExcludeTags: exclude, Theme: theme, Font: font}
+	rows := u.TagSuggestionRows
+	if rows < 0 || rows > 10 {
+		rows = 1
+	}
+	return dto.Preferences{ShowNSFW: u.ShowNSFW, DefaultIncludeTags: include, DefaultExcludeTags: exclude, Theme: theme, Font: font, TagSuggestionRows: rows}
 }
 
 func securityDTO(sec model.AccountSecurity) dto.Security {

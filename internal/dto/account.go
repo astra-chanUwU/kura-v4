@@ -57,6 +57,13 @@ type Preferences struct {
 	DefaultExcludeTags []string `json:"default_exclude_tags"`
 	Theme              string   `json:"theme"`
 	Font               string   `json:"font"`
+	TagSuggestionRows  int      `json:"tag_suggestion_rows"`
+}
+
+// UpdateTagSuggestionRows sets how many rows of board tag suggestions
+// to show. 0 hides them.
+type UpdateTagSuggestionRows struct {
+	Rows int `json:"rows"`
 }
 
 // UpdateAppearance replaces the account's default theme and font.
