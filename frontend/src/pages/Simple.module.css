@@ -245,6 +245,10 @@
 }
 .tagCard {
   grid-column: 1 / -1;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: var(--background);
 }
 .tagFields {
   display: grid;
