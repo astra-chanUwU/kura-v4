@@ -43,7 +43,11 @@ func historyDTO(e model.ChangeEntry) dto.ChangeEntry {
 	if e.ActorID != nil {
 		actorID = *e.ActorID
 	}
-	return dto.ChangeEntry{ID: e.ID, EntityType: e.EntityType, EntityID: e.EntityID, ActorID: actorID, ActorUsername: e.ActorUsername,
+	thumbnailURL := ""
+	if e.EntityType == "post" {
+		thumbnailURL = "/media/posts/" + e.EntityID + "/thumb"
+	}
+	return dto.ChangeEntry{ID: e.ID, EntityType: e.EntityType, EntityID: e.EntityID, ThumbnailURL: thumbnailURL, ActorID: actorID, ActorUsername: e.ActorUsername,
 		Action: e.Action, Before: decode(e.Before), After: decode(e.After), RollbackOf: e.RollbackOf,
 		CreatedAt: e.CreatedAt.Format("2006-01-02T15:04:05Z07:00")}
 }

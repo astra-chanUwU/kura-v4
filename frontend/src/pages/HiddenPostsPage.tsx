@@ -6,13 +6,14 @@ import { ThemedSelect } from "../components/ThemedSelect";
 import { shortError, useToasts } from "../components/Toasts";
 import { atLeast } from "../domain/roles";
 import { useHiddenPosts, useMe, useStaffActions } from "../hooks/useKura";
+import { StaffSection } from "./StaffLayout";
 import styles from "./HiddenPostsPage.module.css";
 import simple from "./Simple.module.css";
 
 type Filter = "all" | "hidden" | "deleted";
 
 export function HiddenPostsPage() {
-  const { me, user, loading } = useMe();
+  const { user } = useMe();
   const toasts = useToasts();
   const staff = useStaffActions();
   const [filter, setFilter] = useState<Filter>("all");
@@ -21,28 +22,7 @@ export function HiddenPostsPage() {
   const isAdmin = !!user && atLeast(user.role, "admin");
   const hidden = useHiddenPosts(isStaff);
 
-  if (loading) return <p>Loading…</p>;
-  if (!me || !user) {
-    return (
-      <section className={simple.page}>
-        <h1>Hidden &amp; deleted</h1>
-        <p className={simple.muted}>Sign in with a staff account to review removed posts.</p>
-        <div className={simple.actions}>
-          <Link to="/login">Sign in</Link>
-        </div>
-      </section>
-    );
-  }
-  if (!isStaff) {
-    return (
-      <section className={simple.page}>
-        <h1>Hidden &amp; deleted</h1>
-        <p className={simple.muted}>
-          Moderators and above can review posts that are off the board.
-        </p>
-      </section>
-    );
-  }
+  if (!user) return null;
 
   const all = hidden.data ?? [];
   const shown = all.filter((p) =>
@@ -57,14 +37,17 @@ export function HiddenPostsPage() {
       .catch((e: unknown) => toasts.push(shortError(e), "error"));
 
   return (
-    <section className={simple.page} style={{ maxWidth: "80rem" }} aria-labelledby="hidden-title">
-      <h1 id="hidden-title">Hidden &amp; deleted</h1>
-      <p className={simple.muted}>
-        Everything currently off the board, newest removal first. Hidden posts can be restored by
-        any moderator; deleted posts are the stronger admin removal. Nothing here is gone for good —
-        restore puts it back, and every step stays in the post&apos;s history. Back to{" "}
-        <Link to="/admin">Staff</Link>.
-      </p>
+    <StaffSection
+      id="hidden-title"
+      title="Hidden & deleted"
+      intro={
+        <>
+          Everything currently off the board, newest removal first. Hidden posts can be restored by
+          any moderator; deleted posts are the stronger admin removal. Nothing here is gone for good
+          — restore puts it back, and every step stays in the post&apos;s history.
+        </>
+      }
+    >
       <div className={styles.filterRow}>
         <ThemedSelect label="Show" value={filter} onChange={(next) => setFilter(next as Filter)}>
           <option value="all">All removed ({all.length})</option>
@@ -142,6 +125,6 @@ export function HiddenPostsPage() {
           if (id) run(staff.deletePost(id), "Post deleted. Restore it from here anytime.");
         }}
       />
-    </section>
+    </StaffSection>
   );
 }

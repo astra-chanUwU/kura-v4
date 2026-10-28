@@ -1,17 +1,16 @@
-import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { HistoryList } from "../components/HistoryList";
-import { IconHistory } from "../components/icons";
 import { ThemedSelect } from "../components/ThemedSelect";
 import { shortError, useToasts } from "../components/Toasts";
-import { atLeast, ROLE_LABELS } from "../domain/roles";
+import { atLeast } from "../domain/roles";
 import { useMe, useRecentHistory, useStaffActions } from "../hooks/useKura";
 import type { ChangeEntry } from "../types/api";
+import { StaffSection } from "./StaffLayout";
 import styles from "./AdminPage.module.css";
 import simple from "./Simple.module.css";
 
 export function HistoryPage() {
-  const { me, user, loading } = useMe();
+  const { user } = useMe();
   const toasts = useToasts();
   const staff = useStaffActions();
   const [busyId, setBusyId] = useState("");
@@ -19,29 +18,7 @@ export function HistoryPage() {
   const isStaff = !!user && atLeast(user.role, "moderator");
   const history = useRecentHistory(actorFilter, isStaff);
 
-  if (loading) return <p>Loading…</p>;
-  if (!me || !user) {
-    return (
-      <section className={simple.page}>
-        <h1>Change history</h1>
-        <p className={simple.muted}>Sign in with a staff account to see the change history.</p>
-        <div className={simple.actions}>
-          <Link to="/login">Sign in</Link>
-        </div>
-      </section>
-    );
-  }
-  if (!isStaff) {
-    return (
-      <section className={simple.page}>
-        <h1>Change history</h1>
-        <p className={simple.muted}>
-          Your account is a {ROLE_LABELS[user.role]}. Moderators and above can see the staff change
-          history.
-        </p>
-      </section>
-    );
-  }
+  if (!user) return null;
 
   const rollback = (entry: ChangeEntry) => {
     setBusyId(entry.id);
@@ -67,17 +44,17 @@ export function HistoryPage() {
   ];
 
   return (
-    <section className={simple.page} style={{ maxWidth: "72rem" }} aria-labelledby="history-title">
-      <h1 id="history-title">
-        <IconHistory /> Change history
-      </h1>
-      <p className={simple.muted}>
-        Every tag, rating, hide, delete and role change across the board, newest first — who did it
-        and what it was before. Roll back undoes one change and is itself recorded, so a rogue staff
-        account can be cleaned up one change at a time. Each post change links to its post. People
-        and roles live on the <Link to="/admin">Staff</Link> page.
-      </p>
-
+    <StaffSection
+      id="history-title"
+      title="Change history"
+      intro={
+        <>
+          Every tag, rating, hide, delete and role change across the board, newest first — who did
+          it and what it was before. Roll back undoes one change and is itself recorded, so a rogue
+          staff account can be cleaned up one change at a time. Each post change links to its post.
+        </>
+      }
+    >
       <div className={styles.filterRow}>
         <span className={simple.muted}>Actor</span>
         <ThemedSelect
@@ -105,12 +82,15 @@ export function HistoryPage() {
           {shortError(history.error)}
         </p>
       )}
-      <HistoryList
-        entries={history.data ?? []}
-        canRollback={canRollback}
-        onRollback={rollback}
-        busyId={busyId}
-      />
-    </section>
+      {history.data && (
+        <HistoryList
+          entries={history.data}
+          canRollback={canRollback}
+          onRollback={rollback}
+          busyId={busyId}
+          showThumbnails
+        />
+      )}
+    </StaffSection>
   );
 }

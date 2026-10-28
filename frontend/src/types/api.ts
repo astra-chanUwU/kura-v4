@@ -98,6 +98,8 @@ export interface ChangeEntry {
   id: string;
   entity_type: "post" | "user";
   entity_id: string;
+  /** Set for post entries; empty for user entries. */
+  thumbnail_url: string;
   actor_id: string;
   actor_username: string;
   action: string;

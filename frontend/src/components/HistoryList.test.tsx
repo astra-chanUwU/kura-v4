@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { ChangeEntry } from "../types/api";
@@ -12,6 +12,7 @@ const entry: ChangeEntry = {
   id: "h1",
   entity_type: "post",
   entity_id: "p1",
+  thumbnail_url: "/media/posts/p1/thumb",
   actor_id: "u1",
   actor_username: "ana",
   action: "post.meta_updated",
@@ -49,5 +50,39 @@ describe("HistoryList diff highlighting", () => {
       "unchanged",
     );
     expect(screen.queryByText(/ana.*→.*bob/)).not.toBeInTheDocument();
+  });
+});
+
+describe("HistoryList post links", () => {
+  it("opens the post in a new tab and only shows the picture when asked", () => {
+    const { container, rerender } = render(<HistoryList entries={[entry]} />);
+    expect(screen.getByLabelText(/in a new tab/)).toHaveAttribute("target", "_blank");
+    expect(container.querySelector("img")).toBeNull();
+
+    rerender(<HistoryList entries={[entry]} showThumbnails />);
+    expect(container.querySelector("img")).toHaveAttribute("src", "/media/posts/p1/thumb");
+  });
+
+  it("labels a withheld NSFW thumbnail instead of showing a broken image", () => {
+    const nsfw: ChangeEntry = { ...entry, after: { ...entry.after, rating: "nsfw" } };
+    const { container } = render(<HistoryList entries={[nsfw]} showThumbnails />);
+    fireEvent.error(container.querySelector("img")!);
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByText("NSFW")).toBeInTheDocument();
+  });
+
+  it("shows no picture for user role changes", () => {
+    const roleChange: ChangeEntry = {
+      ...entry,
+      id: "h2",
+      entity_type: "user",
+      entity_id: "u2",
+      thumbnail_url: "",
+      action: "user.role_changed",
+      before: { role: "member" },
+      after: { role: "moderator" },
+    };
+    const { container } = render(<HistoryList entries={[roleChange]} showThumbnails />);
+    expect(container.querySelector("img")).toBeNull();
   });
 });

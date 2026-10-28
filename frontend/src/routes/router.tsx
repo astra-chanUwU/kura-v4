@@ -11,6 +11,7 @@ import { HistoryPage } from "../pages/HistoryPage";
 import { PostPage } from "../pages/PostPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { RecoverPage } from "../pages/RecoverPage";
+import { StaffLayout } from "../pages/StaffLayout";
 
 const rootRoute = createRootRoute({
   component: AppShell,
@@ -46,19 +47,24 @@ const registerRoute = createRoute({
   component: () => <AuthPage mode="register" />,
 });
 const meRoute = createRoute({ getParentRoute: () => rootRoute, path: "/me", component: MePage });
-const adminRoute = createRoute({
+const staffRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admin",
+  component: StaffLayout,
+});
+const staffPeopleRoute = createRoute({
+  getParentRoute: () => staffRoute,
+  path: "/",
   component: AdminPage,
 });
 const hiddenRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/admin/hidden",
+  getParentRoute: () => staffRoute,
+  path: "hidden",
   component: HiddenPostsPage,
 });
 const historyRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/admin/history",
+  getParentRoute: () => staffRoute,
+  path: "history",
   component: HistoryPage,
 });
 const recoverRoute = createRoute({
@@ -101,9 +107,7 @@ export const router = createRouter({
     registerRoute,
     recoverRoute,
     meRoute,
-    adminRoute,
-    hiddenRoute,
-    historyRoute,
+    staffRoute.addChildren([staffPeopleRoute, hiddenRoute, historyRoute]),
     postRoute,
     profileRoute,
     listRoute,

@@ -54,16 +54,6 @@ export function AppShell() {
                     Staff
                   </Link>
                 )}
-                {atLeast(user.role, "moderator") && (
-                  <Link to="/admin/history" activeProps={{ className: styles.active }}>
-                    History
-                  </Link>
-                )}
-                {atLeast(user.role, "moderator") && (
-                  <Link to="/admin/hidden" activeProps={{ className: styles.active }}>
-                    Hidden
-                  </Link>
-                )}
                 <Link
                   to="/me"
                   activeProps={{ className: styles.active }}
