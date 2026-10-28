@@ -1,11 +1,11 @@
-import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { BoardViewControls } from "../components/BoardViewControls";
 import { PostCard } from "../components/PostCard";
 import { PostRow } from "../components/PostRow";
 import { UploadDialog } from "../components/UploadDialog";
 import uploadStyles from "../components/UploadDialog.module.css";
-import { searchFromFilter } from "../domain/boardFilter";
+import { sameTagSet, searchFromFilter, splitTagInput } from "../domain/boardFilter";
 import {
   normalizeTagToken,
   tagTokens,
@@ -19,8 +19,13 @@ import { useSite } from "../hooks/useSite";
 import { useViewportTags } from "../hooks/useViewportTags";
 import styles from "./HomePage.module.css";
 
+// Clear shows the whole board for this visit, including Back from a
+// picture. Leaving the board (anywhere but a post) drops the flag, so
+// the next open starts from the saved defaults again.
+const NO_DEFAULTS = "kura-board-no-defaults";
+
 export function HomePage() {
-  const { signedIn, me } = useMe();
+  const { signedIn, me, loading: accountLoading } = useMe();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [droppedFiles, setDroppedFiles] = useState<File[]>([]);
   const [uploadNotice, setUploadNotice] = useState("");
@@ -92,6 +97,7 @@ export function HomePage() {
     q?: string;
   };
   const navigate = useNavigate();
+  const router = useRouter();
   const parseUrlTags = (value?: string): string[] =>
     value
       ? [
@@ -105,9 +111,10 @@ export function HomePage() {
       : [];
   const urlKey = `${urlSearch.tags ?? ""}|${urlSearch.exclude ?? ""}|${urlSearch.q ?? ""}`;
   const hasUrlFilter = !!(urlSearch.tags || urlSearch.exclude || urlSearch.q);
-  const writeUrl = (include: string[], exclude: string[], q: string) => {
+  const writeUrl = (include: string[], exclude: string[], q: string, replace = false) => {
     void navigate({
       to: "/",
+      ...(replace ? { replace: true } : {}),
       search: {
         tags: include.length > 0 ? include.join(",") : undefined,
         exclude: exclude.length > 0 ? exclude.join(",") : undefined,
@@ -127,9 +134,17 @@ export function HomePage() {
   );
   const [appliedQuery, setAppliedQuery] = useState(() => urlSearch.q ?? "");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [defaultsSuppressed, setDefaultsSuppressed] = useState(
+    () => sessionStorage.getItem(NO_DEFAULTS) === "1",
+  );
+  const suppressDefaults = (on: boolean) => {
+    if (on) sessionStorage.setItem(NO_DEFAULTS, "1");
+    else sessionStorage.removeItem(NO_DEFAULTS);
+    setDefaultsSuppressed(on);
+  };
 
   // URL changed under us (Back/Forward, a link): adopt it wholesale —
-  // draft resets to the applied filter.
+  // draft resets to the applied filter. A real filter ends a Clear.
   const lastUrlKey = useRef(urlKey);
   useEffect(() => {
     if (lastUrlKey.current === urlKey) return;
@@ -142,29 +157,46 @@ export function HomePage() {
     setAppliedExcludedTags(exclude);
     setAppliedQuery(urlSearch.q ?? "");
     setSearchText(urlSearch.q ?? "");
+    if (include.length > 0 || exclude.length > 0 || (urlSearch.q ?? "") !== "") {
+      sessionStorage.removeItem(NO_DEFAULTS);
+      setDefaultsSuppressed((prev) => (prev ? false : prev));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlKey]);
 
-  // Pre-load the signed-in user's saved default tags once per account —
-  // but only on a plain "/" visit. A URL filter wins, now and for the
-  // rest of this mount (Clear must not resurrect the defaults).
-  const defaultsAppliedFor = useRef<string | null>(null);
+  // A plain board open starts from the saved filters and mirrors them
+  // into the URL, so refresh and Previous/Next stay on that set. An
+  // address that already carries a filter wins. Clear shows everything
+  // for this visit, including Back from a picture.
+  const defaultInclude = me?.preferences.default_include_tags ?? [];
+  const defaultExclude = me?.preferences.default_exclude_tags ?? [];
+  const defaultsKey = `${me?.user.id ?? ""}|${defaultInclude.join(",")}|${defaultExclude.join(",")}`;
   useEffect(() => {
-    if (!me || defaultsAppliedFor.current === me.user.id) return;
-    defaultsAppliedFor.current = me.user.id;
-    if (hasUrlFilter) return;
-    // Clear was pressed this tab session: don't resurrect defaults on
-    // a Back-remount. A new tab (fresh sessionStorage) gets defaults.
-    if (sessionStorage.getItem("kura-board-no-defaults") === "1") return;
-    setSelectedTags(me.preferences.default_include_tags ?? []);
-    setExcludedTags(me.preferences.default_exclude_tags ?? []);
-    setAppliedTags(me.preferences.default_include_tags ?? []);
-    setAppliedExcludedTags(me.preferences.default_exclude_tags ?? []);
+    if (!me || hasUrlFilter || defaultsSuppressed) return;
+    if (defaultInclude.length === 0 && defaultExclude.length === 0) return;
+    setSelectedTags(defaultInclude);
+    setExcludedTags(defaultExclude);
+    setAppliedTags(defaultInclude);
+    setAppliedExcludedTags(defaultExclude);
+    setAppliedQuery("");
+    setSearchText("");
+    writeUrl(defaultInclude, defaultExclude, "", true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me, hasUrlFilter]);
+  }, [defaultsKey, hasUrlFilter, defaultsSuppressed]);
+  // Leaving the board for anything but a picture ends Clear. The flag
+  // stays through a post so Back returns to the cleared board. This is
+  // a subscription rather than an unmount cleanup: dev Strict Mode runs
+  // that cleanup on mount and would wipe the flag while still on "/".
+  useEffect(() => {
+    return router.subscribe("onBeforeNavigate", (event) => {
+      const path = event.toLocation.pathname;
+      if (path === "/" || path.startsWith("/posts")) return;
+      sessionStorage.removeItem(NO_DEFAULTS);
+    });
+  }, [router]);
   const applyDefaults = () => {
     if (!me) return;
-    sessionStorage.removeItem("kura-board-no-defaults");
+    suppressDefaults(false);
     const include = me.preferences.default_include_tags ?? [];
     const exclude = me.preferences.default_exclude_tags ?? [];
     setSelectedTags(include);
@@ -178,16 +210,18 @@ export function HomePage() {
   };
   // Deliberate search: one press applies the whole staged filter — and
   // writes it to the URL, so Back returns here after viewing a picture.
+  // An empty Filter is Clear: don't let the saved defaults snap back.
   const applyFilters = () => {
-    sessionStorage.removeItem("kura-board-no-defaults");
+    const q = searchText.trim();
+    suppressDefaults(selectedTags.length === 0 && excludedTags.length === 0 && q === "");
     setAppliedTags(selectedTags);
     setAppliedExcludedTags(excludedTags);
-    setAppliedQuery(searchText.trim());
-    writeUrl(selectedTags, excludedTags, searchText.trim());
+    setAppliedQuery(q);
+    writeUrl(selectedTags, excludedTags, q);
     goToBoardTop();
   };
   const clearFilters = () => {
-    sessionStorage.setItem("kura-board-no-defaults", "1");
+    suppressDefaults(true);
     setSearchText("");
     setSelectedTags([]);
     setExcludedTags([]);
@@ -210,8 +244,17 @@ export function HomePage() {
       (me.preferences.default_exclude_tags ?? []).length > 0);
   const differsFromDefaults =
     hasDefaults &&
-    (JSON.stringify(selectedTags) !== JSON.stringify(me?.preferences.default_include_tags ?? []) ||
-      JSON.stringify(excludedTags) !== JSON.stringify(me?.preferences.default_exclude_tags ?? []));
+    (!sameTagSet(selectedTags, defaultInclude) || !sameTagSet(excludedTags, defaultExclude));
+  // Don't paint the unfiltered board for a frame while saved defaults
+  // are still on their way into the chips.
+  const defaultsPending =
+    !hasUrlFilter &&
+    !defaultsSuppressed &&
+    (accountLoading ||
+      (defaultInclude.length + defaultExclude.length > 0 &&
+        (!sameTagSet(appliedTags, defaultInclude) ||
+          !sameTagSet(appliedExcludedTags, defaultExclude) ||
+          appliedQuery !== "")));
   const [highlight, setHighlight] = useState(0);
   // Keystrokes update the input instantly, but filtering (and anything
   // network-adjacent) only sees the debounced value, 200ms behind.
@@ -253,14 +296,7 @@ export function HomePage() {
   // Booru-style entry: "anime girl white_hair -gif" — plain tokens are
   // required tags, "-tag" tokens are excluded tags, one chip each.
   const addTagsFromText = (text: string) => {
-    const include: string[] = [];
-    const exclude: string[] = [];
-    for (const raw of text.split(/[\s,]+/)) {
-      if (!raw) continue;
-      const isExclude = raw.startsWith("-") && raw.length > 1;
-      const normalized = normalizeTagToken(isExclude ? raw.slice(1) : raw);
-      if (normalized) (isExclude ? exclude : include).push(normalized);
-    }
+    const { include, exclude } = splitTagInput(text);
     if (include.length > 0) {
       setExcludedTags((prev) => prev.filter((t) => !include.includes(t)));
       setSelectedTags((prev) => [...new Set([...prev, ...include])]);
@@ -527,7 +563,7 @@ export function HomePage() {
           the sticky board head, so it stays visible while scrolling. When
           the current view has no tags it keeps its place with a default
           prompt instead of vanishing. */}
-        {!loading && !failed && shownPosts.length > 0 && (
+        {!loading && !failed && !defaultsPending && shownPosts.length > 0 && (
           <div className={styles.viewportTags} aria-label="Tags in current view">
             {viewportTags.length > 0 ? (
               viewportTags.map((t) => (
@@ -585,8 +621,8 @@ export function HomePage() {
         )}
       </div>
 
-      {(loading || siteLoading) && <p className={styles.message}>Loading…</p>}
-      {failed && !loading && (
+      {(loading || siteLoading || defaultsPending) && <p className={styles.message}>Loading…</p>}
+      {failed && !loading && !defaultsPending && (
         <div role="alert" className={styles.message}>
           <span>Couldn’t connect to Kura.</span>
           <button
@@ -599,12 +635,12 @@ export function HomePage() {
           </button>
         </div>
       )}
-      {!loading && !failed && !search.active && posts.length === 0 && (
+      {!loading && !failed && !defaultsPending && !search.active && posts.length === 0 && (
         <div className={styles.empty}>
           <p>No images yet</p>
         </div>
       )}
-      {search.active && !search.searching && search.results.length === 0 && (
+      {search.active && !defaultsPending && !search.searching && search.results.length === 0 && (
         <div className={styles.empty}>
           <p>
             {searchText.trim()
@@ -615,6 +651,7 @@ export function HomePage() {
         </div>
       )}
       {shownPosts.length > 0 &&
+        !defaultsPending &&
         (view.mode === "rows" ? (
           <div className={styles.rows}>
             {shownPosts.map((post) => (

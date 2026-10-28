@@ -27,9 +27,16 @@
 }
 .form label {
   display: grid;
-  gap: 0.3rem;
+  grid-template-columns: 1fr auto;
+  gap: 0.3rem 0.75rem;
+  align-items: baseline;
   font-size: 0.85rem;
   color: var(--muted);
+}
+.form label input,
+.form label textarea,
+.form label select {
+  grid-column: 1 / -1;
 }
 .form input,
 .form textarea,
@@ -180,7 +187,7 @@
 }
 
 .count {
-  float: right;
+  justify-self: end;
   color: var(--muted);
   font-size: 0.75rem;
   font-weight: 400;
@@ -212,6 +219,91 @@
 }
 .securityGrid .inlineForm button {
   flex: none;
+}
+.choice {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.choice > div {
+  width: 100%;
+}
+.choice > div > button {
+  width: 100%;
+}
+.preview {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  background: var(--background);
+  color: var(--text);
+  font-family: var(--font-body);
+}
+.preview span {
+  color: var(--muted);
+}
+.tagCard {
+  grid-column: 1 / -1;
+}
+.tagFields {
+  display: grid;
+  gap: 1rem;
+}
+.tagField {
+  display: grid;
+  gap: 0.45rem;
+  align-content: start;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  background: var(--background);
+}
+.tagLabel {
+  font-weight: 650;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.tagRow {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+.tagChip,
+.tagExclude {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 0.8rem;
+}
+.tagChip button,
+.tagExclude button {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.9rem;
+}
+.tagExclude {
+  border-color: var(--danger);
+  background: var(--surface);
+  color: var(--danger);
+  text-decoration: line-through;
+}
+.tagExclude button {
+  color: var(--danger);
+  text-decoration: none;
+}
+@media (min-width: 720px) {
+  .tagFields {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 @media (min-width: 1024px) and (orientation: landscape) {
   .profileGrid {

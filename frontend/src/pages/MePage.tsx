@@ -14,9 +14,7 @@ import { RecoveryKeyPanel } from "../components/RecoveryKeyPanel";
 import { ShareProfileButton } from "../components/ShareProfileButton";
 import { shortError, useToasts } from "../components/Toasts";
 import {
-  normalizeTagToken,
   passkeysSupported,
-  tagTokens,
   useAccountActions,
   useAuthActions,
   useFavorites,
@@ -26,6 +24,7 @@ import {
   useMyLists,
   useMyPosts,
 } from "../hooks/useKura";
+import { mergeTagEdit, sameTagSet, splitTagInput } from "../domain/boardFilter";
 import { ROLE_LABELS } from "../domain/roles";
 import {
   FONT_LABELS,
@@ -113,8 +112,18 @@ export function MePage() {
   const savedIncludeTags = preferences.default_include_tags ?? [];
   const savedExcludeTags = preferences.default_exclude_tags ?? [];
   const tagsDirty =
-    (includeDraft !== null && JSON.stringify(includeDraft) !== JSON.stringify(savedIncludeTags)) ||
-    (excludeDraft !== null && JSON.stringify(excludeDraft) !== JSON.stringify(savedExcludeTags));
+    (includeDraft !== null && !sameTagSet(includeDraft, savedIncludeTags)) ||
+    (excludeDraft !== null && !sameTagSet(excludeDraft, savedExcludeTags));
+  const stageTags = (kind: "include" | "exclude", raw: string) => {
+    const next = mergeTagEdit(
+      kind,
+      raw,
+      includeDraft ?? savedIncludeTags,
+      excludeDraft ?? savedExcludeTags,
+    );
+    setIncludeDraft(next.include);
+    setExcludeDraft(next.exclude);
+  };
 
   const run = (action: Promise<unknown>, ok: string) => {
     setError("");
@@ -360,7 +369,7 @@ export function MePage() {
               Your default theme and font on every device. Anyone who opens your public profile sees
               that page in this theme and font, too.
             </p>
-            <label style={{ display: "grid", gap: "0.3rem", fontSize: "0.85rem" }}>
+            <label className={styles.choice}>
               Theme
               <ThemedSelect
                 label="Default theme"
@@ -374,7 +383,7 @@ export function MePage() {
                 ))}
               </ThemedSelect>
             </label>
-            <label style={{ display: "grid", gap: "0.3rem", fontSize: "0.85rem" }}>
+            <label className={styles.choice}>
               Font
               <ThemedSelect
                 label="Default font"
@@ -389,19 +398,12 @@ export function MePage() {
               </ThemedSelect>
             </label>
             <div
+              className={styles.preview}
               data-theme={normalizeTheme(themeDraft ?? savedTheme)}
               data-font={normalizeFont(fontDraft ?? savedFont)}
-              style={{
-                padding: "0.75rem 0.9rem",
-                border: "1px solid var(--border)",
-                borderRadius: "0.6rem",
-                background: "var(--background)",
-                color: "var(--text)",
-                fontFamily: "var(--font-body)",
-              }}
             >
               <strong>Aa</strong> — The quick brown fox.{" "}
-              <span style={{ color: "var(--muted)" }}>
+              <span>
                 {THEME_LABELS[normalizeTheme(themeDraft ?? savedTheme)]} ·{" "}
                 {FONT_LABELS[normalizeFont(fontDraft ?? savedFont)]}
               </span>
@@ -427,115 +429,94 @@ export function MePage() {
             </div>
           </div>
 
-          <div className={styles.card}>
+          <div className={`${styles.card} ${styles.tagCard}`}>
             <h2>Default board tags</h2>
             <p className={styles.muted}>
-              Applied every time you open the board. Always show posts with your tags; never show
-              posts with your excluded tags. On the board you can still change them for the session,
-              or type <code>-tag</code> to exclude.
+              The board opens with this filter. A post has to carry every required tag, and an
+              excluded tag hides it. Change it on the board for that visit — Clear shows everything
+              until you come back. Type <code>-tag</code> to exclude.
             </p>
-            {(
-              [
-                {
-                  label: "Always show",
-                  placeholder: "Add a tag…",
-                  tags: includeDraft ?? preferences.default_include_tags ?? [],
-                  input: includeInput,
-                  setInput: setIncludeInput,
-                  add: (raw: string) => {
-                    const tokens = tagTokens(raw);
-                    if (tokens.length === 0) return;
-                    const current = includeDraft ?? preferences.default_include_tags ?? [];
-                    setIncludeDraft([...new Set([...current, ...tokens])]);
-                    const excluded = excludeDraft ?? preferences.default_exclude_tags ?? [];
-                    setExcludeDraft(excluded.filter((t) => !tokens.includes(t)));
-                    setIncludeInput("");
+            <div className={styles.tagFields}>
+              {(
+                [
+                  {
+                    kind: "include" as const,
+                    label: "Require",
+                    hint: "Posts must have all of these.",
+                    placeholder: "Add a tag…",
+                    tags: includeDraft ?? savedIncludeTags,
+                    input: includeInput,
+                    setInput: setIncludeInput,
                   },
-                  remove: (tag: string) => {
-                    const current = includeDraft ?? preferences.default_include_tags ?? [];
-                    setIncludeDraft(current.filter((t) => t !== tag));
+                  {
+                    kind: "exclude" as const,
+                    label: "Exclude",
+                    hint: "Hide posts with any of these.",
+                    placeholder: "Add a tag, or -tag…",
+                    tags: excludeDraft ?? savedExcludeTags,
+                    input: excludeInput,
+                    setInput: setExcludeInput,
                   },
-                },
-                {
-                  label: "Never show",
-                  placeholder: "Add an excluded tag…",
-                  tags: excludeDraft ?? preferences.default_exclude_tags ?? [],
-                  input: excludeInput,
-                  setInput: setExcludeInput,
-                  add: (raw: string) => {
-                    const tokens = tagTokens(raw.replace(/^-+/, ""));
-                    if (tokens.length === 0) return;
-                    const current = excludeDraft ?? preferences.default_exclude_tags ?? [];
-                    setExcludeDraft([...new Set([...current, ...tokens])]);
-                    const included = includeDraft ?? preferences.default_include_tags ?? [];
-                    setIncludeDraft(included.filter((t) => !tokens.includes(t)));
-                    setExcludeInput("");
-                  },
-                  remove: (tag: string) => {
-                    const current = excludeDraft ?? preferences.default_exclude_tags ?? [];
-                    setExcludeDraft(current.filter((t) => t !== tag));
-                  },
-                },
-              ] as const
-            ).map((field) => (
-              <div key={field.label} style={{ marginTop: "0.9rem" }}>
-                <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{field.label}</span>
-                <div
-                  style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", margin: "0.45rem 0" }}
-                >
-                  {field.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      style={{
-                        display: "inline-flex",
-                        gap: "0.3rem",
-                        alignItems: "center",
-                        padding: "0.2rem 0.55rem",
-                        border: "1px solid var(--border-strong)",
-                        borderRadius: "999px",
-                        background: "var(--surface-soft)",
-                        fontSize: "0.8rem",
+                ] as const
+              ).map((field) => {
+                const parsed = splitTagInput(field.input);
+                const canAdd = parsed.include.length + parsed.exclude.length > 0;
+                return (
+                  <div key={field.kind} className={styles.tagField}>
+                    <span className={styles.tagLabel}>{field.label}</span>
+                    <span className={styles.muted}>{field.hint}</span>
+                    {field.tags.length > 0 && (
+                      <div className={styles.tagRow}>
+                        {field.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className={
+                              field.kind === "exclude" ? styles.tagExclude : styles.tagChip
+                            }
+                          >
+                            {field.kind === "exclude" ? `−${tag}` : tag}
+                            <button
+                              type="button"
+                              aria-label={`Remove ${field.kind === "exclude" ? "excluded " : ""}${tag}`}
+                              onClick={() => {
+                                const drop = (tags: string[]) => tags.filter((t) => t !== tag);
+                                if (field.kind === "include") {
+                                  setIncludeDraft(drop(includeDraft ?? savedIncludeTags));
+                                } else {
+                                  setExcludeDraft(drop(excludeDraft ?? savedExcludeTags));
+                                }
+                              }}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <form
+                      className={styles.inlineForm}
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!canAdd) return;
+                        stageTags(field.kind, field.input);
+                        field.setInput("");
                       }}
                     >
-                      {field.label === "Never show" ? `−${tag}` : tag}
-                      <button
-                        type="button"
-                        aria-label={`Remove ${tag}`}
-                        onClick={() => field.remove(tag)}
-                        style={{
-                          border: "none",
-                          background: "none",
-                          color: "var(--muted)",
-                          cursor: "pointer",
-                          padding: 0,
-                        }}
-                      >
-                        ×
+                      <input
+                        value={field.input}
+                        onChange={(e) => field.setInput(e.target.value)}
+                        placeholder={field.placeholder}
+                        aria-label={`${field.label} tag`}
+                      />
+                      <button type="submit" disabled={!canAdd}>
+                        Add
                       </button>
-                    </span>
-                  ))}
-                  {field.tags.length === 0 && <span className={styles.muted}>None</span>}
-                </div>
-                <form
-                  className={styles.inlineForm}
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    field.add(field.input);
-                  }}
-                >
-                  <input
-                    value={field.input}
-                    onChange={(e) => field.setInput(e.target.value)}
-                    placeholder={field.placeholder}
-                    aria-label={`${field.label} tag`}
-                  />
-                  <button type="submit" disabled={!normalizeTagToken(field.input)}>
-                    Add
-                  </button>
-                </form>
-              </div>
-            ))}
-            <div className={styles.actions} style={{ marginTop: "1rem" }}>
+                    </form>
+                  </div>
+                );
+              })}
+            </div>
+            <div className={styles.actions}>
               <button
                 type="button"
                 className={tagsDirty ? styles.saveDirty : undefined}

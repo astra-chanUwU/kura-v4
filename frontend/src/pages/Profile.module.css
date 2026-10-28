@@ -3,12 +3,16 @@
   gap: 1.25rem;
   max-width: 64rem;
 }
-/* The public profile renders in its owner's theme/font, scoped to
-   this page; the rest of the site keeps the visitor's appearance. */
+/* The public profile renders in its owner's theme/font. It fills the
+   content column instead of sitting as a card, so a light theme is the
+   page rather than a pale panel on the visitor's background. */
 .themed {
-  padding: 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: 1rem;
+  box-sizing: border-box;
+  max-width: none;
+  margin: calc(-1 * var(--main-pad-top, 2rem)) calc(-1 * var(--main-pad-x, 1rem))
+    calc(-1 * var(--main-pad-bottom, 2rem));
+  padding: var(--main-pad-top, 2rem) var(--main-pad-x, 1rem) 2.5rem;
+  min-height: calc(100dvh - var(--header-h));
   background: var(--background);
   color: var(--text);
   font-family: var(--font-body);

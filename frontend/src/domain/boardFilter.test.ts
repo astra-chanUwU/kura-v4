@@ -3,8 +3,10 @@ import type { Post } from "../types/api";
 import {
   filterFromSearch,
   filterPosts,
+  mergeTagEdit,
   neighborsOf,
   searchFromFilter,
+  splitTagInput,
   validateBoardSearch,
 } from "./boardFilter";
 
@@ -58,6 +60,29 @@ describe("board filter URL round trip", () => {
       tags: "yuri,cute",
       exclude: undefined,
       q: undefined,
+    });
+  });
+});
+
+describe("splitTagInput", () => {
+  it("treats a leading dash as an exclusion and drops a tag from both lists", () => {
+    expect(splitTagInput("Yuri, white_hair -gif -GIF")).toEqual({
+      include: ["yuri", "white_hair"],
+      exclude: ["gif"],
+    });
+    expect(splitTagInput("gif -gif")).toEqual({ include: [], exclude: ["gif"] });
+  });
+});
+
+describe("mergeTagEdit", () => {
+  it("moves a tag into the list being edited", () => {
+    expect(mergeTagEdit("exclude", "-landscape anime", ["anime", "girl"], ["meme"])).toEqual({
+      include: ["girl"],
+      exclude: ["meme", "anime", "landscape"],
+    });
+    expect(mergeTagEdit("include", "smile -text", ["girl"], ["smile", "comic"])).toEqual({
+      include: ["girl", "smile"],
+      exclude: ["comic", "text"],
     });
   });
 });

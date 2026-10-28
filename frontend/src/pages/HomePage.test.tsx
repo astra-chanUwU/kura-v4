@@ -19,6 +19,7 @@ vi.mock("@tanstack/react-router", async () => {
   return {
     useSearch: () => board.urlSearch,
     useNavigate: () => board.navigate,
+    useRouter: () => ({ subscribe: () => () => {} }),
     Link: ({
       to,
       params,
@@ -239,6 +240,57 @@ describe("image board states", () => {
       screen.getByRole("button", { name: "Remove excluded tag landscape" }),
     ).toBeInTheDocument();
     expect(screen.getByText(/1 result/)).toBeInTheDocument();
+    expect(board.navigate).toHaveBeenCalledWith({
+      to: "/",
+      replace: true,
+      search: { tags: "anime", exclude: "landscape", q: undefined },
+    });
+  });
+  it("puts the saved defaults back when a filtered visit returns to a plain board", () => {
+    board.posts = [
+      { ...untaggedPost, id: "p1", tags: ["anime", "girl"] },
+      { ...untaggedPost, id: "p2", tags: ["anime", "landscape"] },
+      { ...untaggedPost, id: "p3", tags: ["girl"] },
+    ];
+    board.signedIn = true;
+    board.includeTags = ["anime"];
+    board.excludeTags = ["landscape"];
+    board.urlSearch = { tags: "girl" };
+    mockUseSite.mockReturnValue({
+      site: { name: "My archive", description: "" },
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+    });
+    const { rerender } = render(<HomePage />);
+    expect(screen.getByRole("button", { name: "Remove tag girl" })).toBeInTheDocument();
+    expect(board.navigate).not.toHaveBeenCalled();
+    board.urlSearch = {};
+    rerender(<HomePage />);
+    expect(screen.getByRole("button", { name: "Remove tag anime" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remove excluded tag landscape" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove tag girl" })).not.toBeInTheDocument();
+  });
+  it("keeps a cleared board from snapping back to the saved defaults", () => {
+    board.posts = [
+      { ...untaggedPost, id: "p1", tags: ["anime", "girl"] },
+      { ...untaggedPost, id: "p2", tags: ["anime", "landscape"] },
+    ];
+    board.signedIn = true;
+    board.includeTags = ["anime"];
+    mockUseSite.mockReturnValue({
+      site: { name: "My archive", description: "" },
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+    });
+    render(<HomePage />);
+    expect(screen.getByRole("button", { name: "Remove tag anime" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(screen.queryByRole("button", { name: "Remove tag anime" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/result/)).not.toBeInTheDocument();
   });
   it("excludes a tag typed with a leading dash", () => {
     board.posts = [
@@ -309,6 +361,7 @@ describe("image board states", () => {
     render(<HomePage />);
     expect(screen.getByRole("button", { name: "Remove tag anime" })).toBeInTheDocument();
     expect(screen.getByText(/1 result/)).toBeInTheDocument();
+    expect(board.navigate).not.toHaveBeenCalled();
   });
   it("excludes a tag from the viewport strip's minus button", () => {
     board.posts = [

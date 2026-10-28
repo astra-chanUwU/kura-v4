@@ -14,6 +14,7 @@ import {
   filterPosts,
   neighborsOf,
   normalizeTagToken,
+  splitTagInput,
   type BoardFilter,
   type Neighbors,
 } from "../domain/boardFilter";
@@ -95,14 +96,8 @@ export function useDebouncedValue<T>(value: T, delay = 200): T {
 export { normalizeTagToken };
 
 export function tagTokens(text: string): string[] {
-  return [
-    ...new Set(
-      text
-        .split(/[\s,]+/)
-        .map(normalizeTagToken)
-        .filter(Boolean),
-    ),
-  ];
+  const { include, exclude } = splitTagInput(text);
+  return [...new Set([...include, ...exclude])];
 }
 
 /**

@@ -32,6 +32,60 @@ export function parseTagList(value?: string): string[] {
   return [...new Set(value.split(",").map(normalizeTagToken).filter(Boolean))];
 }
 
+export function sameTagSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const other = new Set(b);
+  return a.every((tag) => other.has(tag));
+}
+
+/**
+ * One tag line, the way the board search box reads it. Plain tokens are
+ * required; a leading "-" excludes. A token in both lists is excluded.
+ */
+export function splitTagInput(text: string): { include: string[]; exclude: string[] } {
+  const include: string[] = [];
+  const exclude: string[] = [];
+  const seenIn = new Set<string>();
+  const seenEx = new Set<string>();
+  for (const raw of text.split(/[\s,]+/)) {
+    if (!raw) continue;
+    const isExclude = raw.startsWith("-") && raw.length > 1;
+    const normalized = normalizeTagToken(isExclude ? raw.slice(1) : raw);
+    if (!normalized) continue;
+    if (isExclude) {
+      if (seenEx.has(normalized)) continue;
+      seenEx.add(normalized);
+      exclude.push(normalized);
+    } else if (!seenIn.has(normalized)) {
+      seenIn.add(normalized);
+      include.push(normalized);
+    }
+  }
+  return { include: include.filter((tag) => !seenEx.has(tag)), exclude };
+}
+
+/** Saved default lists: at most one home per tag, and the edited list wins. */
+export function mergeTagEdit(
+  kind: "include" | "exclude",
+  raw: string,
+  include: string[],
+  exclude: string[],
+): { include: string[]; exclude: string[] } {
+  const parsed = splitTagInput(raw);
+  const addingExclude =
+    kind === "exclude" ? [...parsed.include, ...parsed.exclude] : parsed.exclude;
+  const addingInclude = (kind === "include" ? parsed.include : []).filter(
+    (tag) => !addingExclude.includes(tag),
+  );
+  const nextExclude = [
+    ...new Set([...exclude.filter((tag) => !addingInclude.includes(tag)), ...addingExclude]),
+  ];
+  const nextInclude = [
+    ...new Set([...include.filter((tag) => !nextExclude.includes(tag)), ...addingInclude]),
+  ];
+  return { include: nextInclude.slice(0, 30), exclude: nextExclude.slice(0, 30) };
+}
+
 const nonEmptyString = (value: unknown): string | undefined =>
   typeof value === "string" && value !== "" ? value : undefined;
 
