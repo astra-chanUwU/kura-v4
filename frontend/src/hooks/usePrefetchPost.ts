@@ -95,19 +95,22 @@ export function usePrefetchPost(post: Post) {
  * Warm the posts a viewer is likely to step to next (the post page's
  * Previous/Next), under the same media rules as hover prefetch.
  */
-export function usePrefetchNeighbors(prev?: Post, next?: Post) {
+export function usePrefetchNeighbors(prevId?: string, nextId?: string) {
   const client = useQueryClient();
   useEffect(() => {
-    for (const post of [next, prev]) {
-      if (!post) continue;
-      void client.prefetchQuery({
-        queryKey: queryKeys.post(post.id),
-        queryFn: ({ signal }) => api.post(post.id, signal),
-        staleTime: 60_000,
-      });
-      if (shouldPrefetchMedia(post, connectionInfo(), reducedDataPreferred())) {
-        warmMedia(post.media_url);
-      }
+    for (const id of [nextId, prevId]) {
+      if (!id) continue;
+      void client
+        .fetchQuery({
+          queryKey: queryKeys.post(id),
+          queryFn: ({ signal }) => api.post(id, signal),
+          staleTime: 60_000,
+        })
+        .then((post) => {
+          if (shouldPrefetchMedia(post, connectionInfo(), reducedDataPreferred())) {
+            warmMedia(post.media_url);
+          }
+        });
     }
-  }, [client, prev, next]);
+  }, [client, prevId, nextId]);
 }

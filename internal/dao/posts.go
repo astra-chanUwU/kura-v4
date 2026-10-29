@@ -80,19 +80,66 @@ func (d *PostsDAO) ListPosts(ctx context.Context, limit, offset int32, includeNS
 	return out, nil
 }
 
-// ListPostIndex returns the lightweight fields the client-side fuzzy
-// search runs over (no storage keys or owner data).
-func (d *PostsDAO) ListPostIndex(ctx context.Context, includeNSFW bool) ([]model.Post, error) {
-	rows, err := d.q.ListPostIndex(ctx, includeNSFW)
+func matchParams(q model.PostQuery) sqlcgen.CountBoardMatchesParams {
+	return sqlcgen.CountBoardMatchesParams{
+		Tags: q.Tags, Exclude: q.Exclude, Q: q.Q, QLike: q.QLike, ArtistLike: q.ArtistLike, IncludeNsfw: q.IncludeNSFW,
+	}
+}
+
+func (d *PostsDAO) CountBoardMatches(ctx context.Context, q model.PostQuery) (int64, error) {
+	return d.q.CountBoardMatches(ctx, matchParams(q))
+}
+
+func (d *PostsDAO) SearchPosts(ctx context.Context, q model.PostQuery) ([]model.Post, error) {
+	rows, err := d.q.SearchPosts(ctx, sqlcgen.SearchPostsParams{
+		Tags: q.Tags, Exclude: q.Exclude, Q: q.Q, QLike: q.QLike, ArtistLike: q.ArtistLike, IncludeNsfw: q.IncludeNSFW,
+		Sort: q.Sort, RowOffset: q.Offset, RowLimit: q.Limit,
+	})
 	if err != nil {
 		return nil, err
 	}
 	out := make([]model.Post, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, model.Post{ID: r.ID.String(), Artist: r.Artist, Source: r.Source, SourceID: r.SourceID,
-			ThumbnailKey: r.ThumbnailKey, ContentType: r.ContentType, Width: int(r.Width), Height: int(r.Height), CreatedAt: r.CreatedAt, Tags: splitTags(r.TagsCsv), Rating: r.Rating, Hidden: r.Hidden, Deleted: r.Deleted})
+		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.ThumbnailKey, r.TagsCsv, r.Width, r.Height, r.Rating, r.Hidden, r.Deleted))
 	}
 	return out, nil
+}
+
+func (d *PostsDAO) SuggestTags(ctx context.Context, q string, limit int32, includeNSFW bool) ([]model.TagCount, error) {
+	rows, err := d.q.SuggestTags(ctx, sqlcgen.SuggestTagsParams{Q: q, IncludeNsfw: includeNSFW, RowLimit: limit})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.TagCount, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, model.TagCount{Tag: r.Tag, Count: r.Count})
+	}
+	return out, nil
+}
+
+func (d *PostsDAO) PostNeighbors(ctx context.Context, id string, q model.PostQuery) (model.Neighbors, error) {
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		return model.Neighbors{Index: -1}, nil
+	}
+	row, err := d.q.PostNeighbors(ctx, sqlcgen.PostNeighborsParams{
+		PostID: uid, Sort: q.Sort, Tags: q.Tags, Exclude: q.Exclude, Q: q.Q, QLike: q.QLike, ArtistLike: q.ArtistLike, IncludeNsfw: q.IncludeNSFW,
+	})
+	if err != nil {
+		return model.Neighbors{}, err
+	}
+	return model.Neighbors{Index: int(row.Idx), Total: row.Total, PrevID: sqlText(row.PrevID), NextID: sqlText(row.NextID)}, nil
+}
+
+func sqlText(v any) string {
+	switch t := v.(type) {
+	case string:
+		return t
+	case []byte:
+		return string(t)
+	default:
+		return ""
+	}
 }
 func (d *PostsDAO) GetPostBySHA(ctx context.Context, sha string) (model.Post, error) {
 	r, err := d.q.GetPostBySHA(ctx, sha)

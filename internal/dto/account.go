@@ -43,6 +43,26 @@ type Post struct {
 	Tags          []string `json:"tags"`
 }
 
+// SearchPage is one page of a board search and the full match count.
+type SearchPage struct {
+	Total int64  `json:"total"`
+	Posts []Post `json:"posts"`
+}
+
+// TagCount is a tag suggestion and how many visible posts carry it.
+type TagCount struct {
+	Tag   string `json:"tag"`
+	Count int64  `json:"count"`
+}
+
+// PostNeighbors is a post's place in a search sequence.
+type PostNeighbors struct {
+	Index  int    `json:"index"`
+	Total  int64  `json:"total"`
+	PrevID string `json:"prev_id"`
+	NextID string `json:"next_id"`
+}
+
 // UpdatePostMeta replaces a post's artist and tags.
 type UpdatePostMeta struct {
 	Artist string   `json:"artist"`

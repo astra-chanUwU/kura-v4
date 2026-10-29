@@ -57,7 +57,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
   const navigate = useNavigate();
   const filter = filterFromSearch(search);
   const nav = usePostNeighbors(id, filter);
-  usePrefetchNeighbors(nav.prev, nav.next);
+  usePrefetchNeighbors(nav.prev?.id, nav.next?.id);
   const [pendingNav, setPendingNav] = useState<PendingNav | null>(null);
   const { signedIn, user } = useMe();
   const { updatePostMeta } = usePostActions();

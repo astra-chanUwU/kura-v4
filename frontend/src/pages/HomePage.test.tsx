@@ -81,35 +81,29 @@ vi.mock("../hooks/useKura", () => ({
     signedIn: board.signedIn,
     error: null,
   }),
-  usePosts: () => ({
-    posts: board.posts,
-    loading: false,
-    error: null,
-    retry: vi.fn(),
-    hasMore: false,
-    loadingMore: false,
-    loadMore: vi.fn(),
-  }),
-  // Faithful to the real hook's contract: selected tags filter the board
-  // with AND semantics, so adding a tag swaps in the filtered result list.
-  usePostSearch: (_query: string, selectedTags: string[], excludedTags: string[] = []) => {
-    const active = selectedTags.length > 0 || excludedTags.length > 0;
-    const results = active
+  useBoard: (filter: { tags: string[]; exclude: string[]; q: string }) => {
+    const active = filter.tags.length > 0 || filter.exclude.length > 0 || filter.q.trim() !== "";
+    const posts = active
       ? board.posts.filter(
           (post) =>
-            selectedTags.every((tag) => post.tags.includes(tag)) &&
-            !excludedTags.some((tag) => post.tags.includes(tag)),
+            filter.tags.every((tag) => post.tags.includes(tag)) &&
+            !filter.exclude.some((tag) => post.tags.includes(tag)),
         )
-      : [];
+      : board.posts;
     return {
-      active,
+      posts,
+      total: posts.length,
+      loading: false,
       searching: false,
-      results,
-      total: board.posts.length,
-      shown: results.length,
-      suggestions: [],
+      error: null,
+      retry: vi.fn(),
+      hasMore: false,
+      loadingMore: false,
+      loadMore: vi.fn(),
+      active,
     };
   },
+  useTagSuggestions: () => ({ suggestions: [], loading: false }),
   useInvalidate: () => vi.fn(),
   useMyLists: () => ({ data: [] }),
   useToggleFavorite: () => ({ mutate: vi.fn(), isPending: false }),

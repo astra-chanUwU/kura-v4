@@ -34,6 +34,8 @@ func writeError(c fiber.Ctx, err error) error {
 		return fiber.NewError(401, "That username and sign-in didn't match. Check it and try again.")
 	case errors.Is(err, accounts.ErrUsernameTaken):
 		return fiber.NewError(409, "That username is taken. Try another one.")
+	case errors.Is(err, board.ErrBadSort):
+		return fiber.NewError(400, "Sort must be newest or oldest.")
 	case errors.Is(err, accounts.ErrAdultConfirmationRequired):
 		return fiber.NewError(400, "Please confirm that you are 18 or older first.")
 	case errors.Is(err, accounts.ErrLastSignInMethod):

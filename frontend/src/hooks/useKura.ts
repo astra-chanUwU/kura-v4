@@ -1,18 +1,18 @@
 import {
+  keepPreviousData,
   useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
   type InfiniteData,
+  type QueryClient,
   type QueryKey,
 } from "@tanstack/react-query";
-import Fuse from "fuse.js";
-import { useEffect, useMemo, useState } from "react";
-import type { ChangeEntry, Post } from "../types/api";
+import { useEffect, useState } from "react";
+import type { ChangeEntry, Post, SearchPage } from "../types/api";
 import type { Role } from "../domain/roles";
 import {
-  filterPosts,
-  neighborsOf,
+  isFilterActive,
   normalizeTagToken,
   splitTagInput,
   type BoardFilter,
@@ -62,24 +62,50 @@ export function isSignedOut(error: unknown): boolean {
   return error instanceof ApiError && error.status === 401;
 }
 
-export function usePosts() {
+function invalidateSearch(client: QueryClient) {
+  void client.invalidateQueries({ queryKey: ["board"] });
+  void client.invalidateQueries({ queryKey: ["tag-suggestions"] });
+  void client.invalidateQueries({ queryKey: ["neighbors"] });
+}
+
+/** The board, filtered or not. Pages come from the server, 40 at a time. */
+export function useBoard(filter: BoardFilter, enabled = true) {
   const query = useInfiniteQuery({
-    queryKey: queryKeys.posts(),
-    queryFn: ({ pageParam, signal }) => api.posts(pageParam, signal),
+    queryKey: queryKeys.board(filter),
+    queryFn: ({ pageParam, signal }) => api.search(filter, pageParam, signal),
     initialPageParam: 0,
-    getNextPageParam: (lastPage, allPages) =>
-      lastPage.length < 40 ? undefined : allPages.reduce((n, page) => n + page.length, 0),
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((n, page) => n + page.posts.length, 0);
+      return loaded < lastPage.total ? loaded : undefined;
+    },
+    enabled,
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
   return {
-    posts: query.data?.pages.flat() ?? [],
+    posts: query.data?.pages.flatMap((page) => page.posts) ?? [],
+    total: query.data?.pages.at(-1)?.total ?? 0,
     loading: query.isPending,
+    searching: query.isFetching && !query.isPending,
     error: query.error,
     retry: () => void query.refetch(),
     hasMore: query.hasNextPage ?? false,
     loadingMore: query.isFetchingNextPage,
     loadMore: () => void query.fetchNextPage(),
+    active: isFilterActive(filter),
   };
+}
+
+/** Tag names for the search box. Empty text returns the most common tags. */
+export function useTagSuggestions(text: string, enabled: boolean) {
+  const q = text.trim().toLowerCase();
+  const query = useQuery({
+    queryKey: queryKeys.tagSuggestions(q),
+    queryFn: ({ signal }) => api.tagSuggestions(q, signal),
+    enabled,
+    staleTime: 60_000,
+  });
+  return { suggestions: query.data ?? [], loading: query.isFetching };
 }
 
 // Debounce a rapidly changing value (e.g. keystrokes) so downstream
@@ -101,82 +127,6 @@ export function tagTokens(text: string): string[] {
   return [...new Set([...include, ...exclude])];
 }
 
-/**
- * Search over the whole board. The server sends a lightweight index of
- * every post once; Fuse.js runs locally, so typos still find things
- * ("serraphyl" -> Serraphyll) without hammering the API.
- *
- * Selected tags chain with AND semantics (a post must carry every one),
- * like a booru; any remaining free text fuzzy-matches within that set.
- * Autocomplete suggestions come from the tags already in the index.
- */
-export function usePostSearch(
-  query: string,
-  selectedTags: string[],
-  excludedTags: string[],
-  wantIndex: boolean,
-  appliedQuery = "",
-  stagedTags: string[] = [],
-) {
-  // `query` is live input: it only drives autocomplete suggestions.
-  // Results are deliberate — they follow the applied tags plus the
-  // query as it was when Filter was pressed (`appliedQuery`), so
-  // staging several tags costs no re-filtering in between.
-  const trimmed = query.trim();
-  const appliedTrimmed = appliedQuery.trim();
-  const active = appliedTrimmed.length > 0 || selectedTags.length > 0 || excludedTags.length > 0;
-  const index = useQuery({
-    queryKey: queryKeys.searchIndex(),
-    queryFn: ({ signal }) => api.searchIndex(signal),
-    enabled: wantIndex,
-    staleTime: 5 * 60_000,
-  });
-
-  // Tag frequencies across the board, for autocomplete.
-  const tagCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const post of index.data ?? []) {
-      for (const tag of post.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
-    }
-    return [...counts.entries()]
-      .map(([tag, count]) => ({ tag, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [index.data]);
-
-  const suggestions = useMemo(() => {
-    if (!index.data) return [];
-    const available = tagCounts.filter(
-      (t) =>
-        !selectedTags.includes(t.tag) &&
-        !excludedTags.includes(t.tag) &&
-        !stagedTags.includes(t.tag),
-    );
-    if (trimmed.length < 1) return available.slice(0, 8);
-    return new Fuse(available, { keys: ["tag"], threshold: 0.35, ignoreLocation: true })
-      .search(trimmed)
-      .slice(0, 8)
-      .map((r) => r.item);
-  }, [index.data, tagCounts, selectedTags, excludedTags, stagedTags, trimmed]);
-
-  const results = useMemo(() => {
-    if (!active || !index.data) return [];
-    return filterPosts(index.data, {
-      tags: selectedTags,
-      exclude: excludedTags,
-      q: appliedTrimmed,
-    }).slice(0, 200);
-  }, [active, index.data, selectedTags, excludedTags, appliedTrimmed]);
-
-  return {
-    active,
-    searching: active && index.isPending,
-    results,
-    total: index.data?.length ?? 0,
-    shown: results.length,
-    suggestions,
-  };
-}
-
 export function usePost(id: string) {
   return useQuery({ queryKey: queryKeys.post(id), queryFn: ({ signal }) => api.post(id, signal) });
 }
@@ -187,25 +137,19 @@ export function usePost(id: string) {
  * previous/next picture without dropping the viewer's filters.
  */
 export function usePostNeighbors(id: string, filter: BoardFilter): Neighbors & { ready: boolean } {
-  const index = useQuery({
-    queryKey: queryKeys.searchIndex(),
-    queryFn: ({ signal }) => api.searchIndex(signal),
-    staleTime: 5 * 60_000,
+  const query = useQuery({
+    queryKey: queryKeys.neighbors(id, filter),
+    queryFn: ({ signal }) => api.neighbors(id, filter, signal),
+    staleTime: 60_000,
   });
-  const tagsKey = filter.tags.join(",");
-  const excludeKey = filter.exclude.join(",");
-  const sequence = useMemo(
-    () =>
-      index.data
-        ? filterPosts(index.data, {
-            tags: tagsKey ? tagsKey.split(",") : [],
-            exclude: excludeKey ? excludeKey.split(",") : [],
-            q: filter.q,
-          })
-        : [],
-    [index.data, tagsKey, excludeKey, filter.q],
-  );
-  return { ...neighborsOf(sequence, id), ready: !!index.data };
+  if (!query.data) return { index: -1, total: 0, ready: false };
+  return {
+    index: query.data.index,
+    total: query.data.total,
+    prev: query.data.prev_id ? { id: query.data.prev_id } : undefined,
+    next: query.data.next_id ? { id: query.data.next_id } : undefined,
+    ready: true,
+  };
 }
 
 export function useFavorites(enabled: boolean) {
@@ -247,7 +191,7 @@ export function useInvalidate() {
   const client = useQueryClient();
   return () => {
     void client.invalidateQueries({ queryKey: queryKeys.posts() });
-    void client.invalidateQueries({ queryKey: queryKeys.searchIndex() });
+    invalidateSearch(client);
     void client.invalidateQueries({ queryKey: queryKeys.favorites() });
     void client.invalidateQueries({ queryKey: queryKeys.myPosts() });
     void client.invalidateQueries({ queryKey: queryKeys.myLists() });
@@ -281,6 +225,15 @@ export function useToggleFavorite() {
         patch(queryKeys.posts(), {
           ...board,
           pages: board.pages.map((page) => page.map(patchPost)),
+        });
+      }
+      for (const [key, data] of client.getQueriesData<InfiniteData<SearchPage>>({
+        queryKey: ["board"],
+      })) {
+        if (!data) continue;
+        patch(key, {
+          ...data,
+          pages: data.pages.map((page) => ({ ...page, posts: page.posts.map(patchPost) })),
         });
       }
       for (const key of [queryKeys.favorites(), queryKeys.myPosts()] as const) {
@@ -319,6 +272,7 @@ export function useAuthActions() {
     purgeUserCaches();
     client.setQueryData(queryKeys.me(), me);
     void client.invalidateQueries({ queryKey: queryKeys.posts() });
+    invalidateSearch(client);
     void client.invalidateQueries({ queryKey: ["list"] });
     return me;
   };
@@ -353,13 +307,13 @@ export function usePostActions() {
       api.updatePostMeta(postId, artist, tags, rating).then(() => {
         void client.invalidateQueries({ queryKey: queryKeys.post(postId) });
         void client.invalidateQueries({ queryKey: queryKeys.posts() });
-        void client.invalidateQueries({ queryKey: queryKeys.searchIndex() });
+        invalidateSearch(client);
         void client.invalidateQueries({ queryKey: queryKeys.postHistory(postId) });
       }),
     upload: (file: File, tags = "", rating = "sfw") =>
       api.upload(file, tags, rating).then((post) => {
         void client.invalidateQueries({ queryKey: queryKeys.posts() });
-        void client.invalidateQueries({ queryKey: queryKeys.searchIndex() });
+        invalidateSearch(client);
         void client.invalidateQueries({ queryKey: queryKeys.myPosts() });
         return post;
       }),
@@ -400,7 +354,11 @@ export function useAccountActions() {
       website: string;
     }) => api.updateProfile(body).then(refresh),
     setPreferences: (showNsfw: boolean, over18: boolean) =>
-      api.setPreferences(showNsfw, over18).then(refresh),
+      api.setPreferences(showNsfw, over18).then((me) => {
+        refresh();
+        invalidateSearch(client);
+        return me;
+      }),
     setTagPreferences: (includeTags: string[], excludeTags: string[]) =>
       api.setTagPreferences(includeTags, excludeTags).then(refresh),
     setAppearance: (theme: string, font: string) => api.setAppearance(theme, font).then(refresh),
@@ -452,7 +410,7 @@ export function useStaffActions() {
   const refreshPost = (postId: string) => {
     void client.invalidateQueries({ queryKey: queryKeys.post(postId) });
     void client.invalidateQueries({ queryKey: queryKeys.posts() });
-    void client.invalidateQueries({ queryKey: queryKeys.searchIndex() });
+    invalidateSearch(client);
     void client.invalidateQueries({ queryKey: queryKeys.postHistory(postId) });
     void client.invalidateQueries({ queryKey: queryKeys.hiddenPosts() });
     void client.invalidateQueries({ queryKey: ["admin-history"] });

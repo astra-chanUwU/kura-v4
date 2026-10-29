@@ -4,10 +4,14 @@ import type {
   ListSummary,
   Me,
   Post,
+  PostNeighbors,
   Profile,
+  SearchPage,
+  TagCount,
   User,
   WebAuthnCeremony,
 } from "../types/api";
+import type { BoardFilter } from "../domain/boardFilter";
 import type { Role } from "../domain/roles";
 import { getJSON, sendJSON, sendRaw } from "./client";
 import { createPasskey, getPasskey } from "./webauthn";
@@ -106,9 +110,27 @@ export const api = {
   removePasskey: (id: string) => sendJSON<Me>(`/me/passkeys/${id}`, "DELETE"),
   profile: (username: string, signal?: AbortSignal) =>
     getJSON<Profile>(`/users/${username}`, signal),
-  searchIndex: (signal?: AbortSignal) => getJSON<Post[]>("/search-index", signal),
   posts: (offset: number, signal?: AbortSignal) =>
     getJSON<Post[]>(`/posts?limit=40&offset=${offset}`, signal),
+  search: (filter: BoardFilter, offset: number, signal?: AbortSignal) => {
+    const params = new URLSearchParams({ limit: "40", offset: String(offset) });
+    if (filter.tags.length > 0) params.set("tags", filter.tags.join(","));
+    if (filter.exclude.length > 0) params.set("exclude", filter.exclude.join(","));
+    if (filter.q.trim() !== "") params.set("q", filter.q.trim());
+    if (filter.sort === "oldest") params.set("sort", "oldest");
+    return getJSON<SearchPage>(`/search?${params}`, signal);
+  },
+  tagSuggestions: (q: string, signal?: AbortSignal) =>
+    getJSON<TagCount[]>(`/tags?q=${encodeURIComponent(q)}&limit=8`, signal),
+  neighbors: (id: string, filter: BoardFilter, signal?: AbortSignal) => {
+    const params = new URLSearchParams();
+    if (filter.tags.length > 0) params.set("tags", filter.tags.join(","));
+    if (filter.exclude.length > 0) params.set("exclude", filter.exclude.join(","));
+    if (filter.q.trim() !== "") params.set("q", filter.q.trim());
+    if (filter.sort === "oldest") params.set("sort", "oldest");
+    const query = params.toString();
+    return getJSON<PostNeighbors>(`/posts/${id}/neighbors${query ? `?${query}` : ""}`, signal);
+  },
   post: (id: string, signal?: AbortSignal) => getJSON<Post>(`/posts/${id}`, signal),
   favorites: (signal?: AbortSignal) => getJSON<Post[]>("/me/favorites", signal),
   myPosts: (signal?: AbortSignal) => getJSON<Post[]>("/me/posts", signal),

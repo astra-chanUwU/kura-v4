@@ -22,7 +22,10 @@ type Repository interface {
 	ReplacePostMeta(ctx context.Context, p model.Post) error
 	ReplacePostMetaAudited(ctx context.Context, p model.Post, entry model.ChangeEntry) error
 	InsertHistory(ctx context.Context, entry model.ChangeEntry) (model.ChangeEntry, error)
-	ListPostIndex(ctx context.Context, includeNSFW bool) ([]model.Post, error)
+	SearchPosts(ctx context.Context, q model.PostQuery) ([]model.Post, error)
+	CountBoardMatches(ctx context.Context, q model.PostQuery) (int64, error)
+	SuggestTags(ctx context.Context, q string, limit int32, includeNSFW bool) ([]model.TagCount, error)
+	PostNeighbors(ctx context.Context, id string, q model.PostQuery) (model.Neighbors, error)
 	GetPostBySHA(ctx context.Context, sha string) (model.Post, error)
 	CountPostsByOwner(ctx context.Context, ownerID string) (int64, error)
 	ListPostsByOwner(ctx context.Context, ownerID string) ([]model.Post, error)
@@ -107,20 +110,54 @@ func (s *Service) ListByOwner(ctx context.Context, userID string) ([]model.Post,
 	return posts, err
 }
 
-// SearchIndex returns every post's searchable fields for client-side
-// fuzzy search. Capped so a huge board cannot produce an unbounded reply.
-func (s *Service) SearchIndex(ctx context.Context, includeNSFW bool) ([]model.Post, error) {
-	posts, err := s.repo.ListPostIndex(ctx, includeNSFW)
+// Search returns one page of public posts matching q, plus the full
+// match count. The board pages through this instead of downloading
+// every post.
+func (s *Service) Search(ctx context.Context, q model.PostQuery) (model.SearchPage, error) {
+	prepared, err := PrepareQuery(q)
 	if err != nil {
-		return nil, err
+		return model.SearchPage{}, err
+	}
+	total, err := s.repo.CountBoardMatches(ctx, prepared)
+	if err != nil {
+		return model.SearchPage{}, err
+	}
+	posts, err := s.repo.SearchPosts(ctx, prepared)
+	if err != nil {
+		return model.SearchPage{}, err
 	}
 	if posts == nil {
 		posts = []model.Post{}
 	}
-	if len(posts) > 10000 {
-		posts = posts[:10000]
+	return model.SearchPage{Total: total, Posts: posts}, nil
+}
+
+// SuggestTags lists tags on the visible board, most common first.
+// A non-empty q prefers a prefix and then a close spelling.
+func (s *Service) SuggestTags(ctx context.Context, q string, limit int32, includeNSFW bool) ([]model.TagCount, error) {
+	q = strings.ToLower(strings.TrimSpace(q))
+	q = clipText(q, 40)
+	if limit <= 0 {
+		limit = 8
 	}
-	return posts, nil
+	if limit > 24 {
+		limit = 24
+	}
+	tags, err := s.repo.SuggestTags(ctx, q, limit, includeNSFW)
+	if tags == nil {
+		tags = []model.TagCount{}
+	}
+	return tags, err
+}
+
+// Neighbors reports where id sits in the same sequence Search would
+// return, plus the previous and next post ids.
+func (s *Service) Neighbors(ctx context.Context, id string, q model.PostQuery) (model.Neighbors, error) {
+	prepared, err := PrepareQuery(q)
+	if err != nil {
+		return model.Neighbors{}, err
+	}
+	return s.repo.PostNeighbors(ctx, id, prepared)
 }
 
 // SetMeta replaces a post's artist and tags (communal tagging: any

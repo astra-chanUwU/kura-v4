@@ -41,11 +41,6 @@ DELETE FROM post_tags WHERE post_id=$1;
 -- name: InsertPostTag :exec
 INSERT INTO post_tags (post_id, tag) VALUES ($1,$2) ON CONFLICT DO NOTHING;
 
--- name: ListPostIndex :many
-SELECT p.id, p.artist, p.source, p.source_id, p.thumbnail_key, p.content_type, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted, p.created_at,
-  COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
-FROM posts p WHERE p.hidden_at IS NULL AND ($1::bool OR p.rating='sfw') ORDER BY p.created_at DESC, p.id DESC;
-
 -- name: CountPostsByOwner :one
 SELECT count(*) FROM posts WHERE owner_id=$1;
 

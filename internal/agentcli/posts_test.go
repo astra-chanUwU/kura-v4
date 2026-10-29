@@ -36,6 +36,46 @@ func TestPostsListVisitorSkipsNSFW(t *testing.T) {
 	require.Equal(t, int32(0), offset)
 }
 
+func TestPostsSearchPassesTheQuery(t *testing.T) {
+	session, acc := postsSession(t, model.RoleMember)
+	var got model.PostQuery
+	b := &postsBoard{
+		search: func(ctx context.Context, q model.PostQuery) (model.SearchPage, error) {
+			got = q
+			return model.SearchPage{Total: 2, Posts: []model.Post{{ID: "p1", Rating: "sfw"}}}, nil
+		},
+	}
+	code, env, raw := postsRun(t, Deps{Accounts: acc, Board: b}, []string{
+		"posts", "search",
+		"--tags", "yuri,cute",
+		"--exclude", "gif",
+		"--q", "sera",
+		"--artist", "Serr",
+		"--sort", "oldest",
+		"--limit", "10",
+		"--offset", "20",
+	}, session)
+	require.Equal(t, 0, code)
+	require.True(t, env.OK)
+	require.Equal(t, "posts.search", env.Command)
+	require.Equal(t, []string{"yuri", "cute"}, got.Tags)
+	require.Equal(t, []string{"gif"}, got.Exclude)
+	require.Equal(t, "sera", got.Q)
+	require.Equal(t, "Serr", got.Artist)
+	require.Equal(t, "oldest", got.Sort)
+	require.Equal(t, int32(10), got.Limit)
+	require.Equal(t, int32(20), got.Offset)
+	require.False(t, got.IncludeNSFW)
+	data := postsData(t, env)
+	require.Equal(t, float64(2), data["total"])
+	require.Contains(t, raw, "p1")
+
+	code, env, _ = postsRun(t, Deps{Accounts: acc, Board: b}, []string{"posts", "search", "--sort", "score", "--q", "yuri"}, session)
+	require.Equal(t, 2, code)
+	require.False(t, env.OK)
+	require.Equal(t, "usage", env.Error.Code)
+}
+
 func TestPostsGetHiddenVisitor(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "session")
 	const id = "hidden-post-id"
@@ -280,6 +320,7 @@ type postsBoard struct {
 	setMeta  func(context.Context, *model.User, string, string, []string, string) (model.Post, error)
 	get      func(context.Context, string) (model.Post, error)
 	list     func(context.Context, int32, int32, bool) ([]model.Post, error)
+	search   func(context.Context, model.PostQuery) (model.SearchPage, error)
 	record   func(context.Context, model.User, model.Post)
 }
 
@@ -316,6 +357,13 @@ func (f *postsBoard) Get(ctx context.Context, id string) (model.Post, error) {
 		panic("Get")
 	}
 	return f.get(ctx, id)
+}
+
+func (f *postsBoard) Search(ctx context.Context, q model.PostQuery) (model.SearchPage, error) {
+	if f.search == nil {
+		panic("Search")
+	}
+	return f.search(ctx, q)
 }
 
 func (f *postsBoard) List(ctx context.Context, limit, offset int32, includeNSFW bool) ([]model.Post, error) {

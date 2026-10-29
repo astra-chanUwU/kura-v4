@@ -1,11 +1,15 @@
 import Fuse from "fuse.js";
 import type { Post } from "../types/api";
 
-/** The board's applied filter: required tags, excluded tags, free text. */
+/** Newest is the board's default order. Oldest reverses it. */
+export type BoardSort = "newest" | "oldest";
+
+/** The board's applied filter: required tags, excluded tags, free text, order. */
 export interface BoardFilter {
   tags: string[];
   exclude: string[];
   q: string;
+  sort?: BoardSort;
 }
 
 /** The same filter as URL search params (?tags=a,b&exclude=c&q=x). */
@@ -13,6 +17,7 @@ export interface BoardSearch {
   tags?: string;
   exclude?: string;
   q?: string;
+  sort?: BoardSort;
 }
 
 export const EMPTY_FILTER: BoardFilter = { tags: [], exclude: [], q: "" };
@@ -90,12 +95,18 @@ const nonEmptyString = (value: unknown): string | undefined =>
   typeof value === "string" && value !== "" ? value : undefined;
 
 /** Router validateSearch for every route that carries the board filter. */
+export function boardSort(value: unknown): BoardSort {
+  return value === "oldest" ? "oldest" : "newest";
+}
+
 export function validateBoardSearch(search: Record<string, unknown>): BoardSearch {
-  return {
+  const out: BoardSearch = {
     tags: nonEmptyString(search.tags),
     exclude: nonEmptyString(search.exclude),
     q: nonEmptyString(search.q),
   };
+  if (search.sort === "oldest") out.sort = "oldest";
+  return out;
 }
 
 export function filterFromSearch(search: BoardSearch): BoardFilter {
@@ -103,16 +114,19 @@ export function filterFromSearch(search: BoardSearch): BoardFilter {
     tags: parseTagList(search.tags),
     exclude: parseTagList(search.exclude),
     q: (search.q ?? "").trim(),
+    sort: boardSort(search.sort),
   };
 }
 
 export function searchFromFilter(filter: BoardFilter): BoardSearch {
   const q = filter.q.trim();
-  return {
+  const out: BoardSearch = {
     tags: filter.tags.length > 0 ? filter.tags.join(",") : undefined,
     exclude: filter.exclude.length > 0 ? filter.exclude.join(",") : undefined,
     q: q !== "" ? q : undefined,
   };
+  if (filter.sort === "oldest") out.sort = "oldest";
+  return out;
 }
 
 export function isFilterActive(filter: BoardFilter): boolean {
@@ -157,8 +171,8 @@ export interface Neighbors {
   /** Zero-based position of the post, or -1 when it is not in the sequence. */
   index: number;
   total: number;
-  prev?: Post;
-  next?: Post;
+  prev?: { id: string };
+  next?: { id: string };
 }
 
 export function neighborsOf(sequence: Post[], id: string): Neighbors {

@@ -305,65 +305,6 @@ func (q *Queries) ListHiddenPosts(ctx context.Context) ([]ListHiddenPostsRow, er
 	return items, nil
 }
 
-const listPostIndex = `-- name: ListPostIndex :many
-SELECT p.id, p.artist, p.source, p.source_id, p.thumbnail_key, p.content_type, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted, p.created_at,
-  COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
-FROM posts p WHERE p.hidden_at IS NULL AND ($1::bool OR p.rating='sfw') ORDER BY p.created_at DESC, p.id DESC
-`
-
-type ListPostIndexRow struct {
-	ID           uuid.UUID
-	Artist       string
-	Source       string
-	SourceID     string
-	ThumbnailKey string
-	ContentType  string
-	Width        int32
-	Height       int32
-	Rating       string
-	Hidden       bool
-	Deleted      bool
-	CreatedAt    time.Time
-	TagsCsv      string
-}
-
-func (q *Queries) ListPostIndex(ctx context.Context, dollar_1 bool) ([]ListPostIndexRow, error) {
-	rows, err := q.db.QueryContext(ctx, listPostIndex, dollar_1)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListPostIndexRow{}
-	for rows.Next() {
-		var i ListPostIndexRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Artist,
-			&i.Source,
-			&i.SourceID,
-			&i.ThumbnailKey,
-			&i.ContentType,
-			&i.Width,
-			&i.Height,
-			&i.Rating,
-			&i.Hidden,
-			&i.Deleted,
-			&i.CreatedAt,
-			&i.TagsCsv,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listPosts = `-- name: ListPosts :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
   p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,

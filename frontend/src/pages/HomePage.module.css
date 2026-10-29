@@ -478,6 +478,29 @@
   }
 }
 
+.sortGroup {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
+  overflow: hidden;
+}
+.sortGroup button {
+  padding: 0.35rem 0.55rem;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.sortGroup button:last-child {
+  border-right: none;
+}
+.sortGroup button.viewActive {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
 .viewControls {
   display: flex;
   gap: 0.75rem;

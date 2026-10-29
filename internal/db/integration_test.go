@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/astra-chanUwU/kura-v4/internal/board"
 	"github.com/astra-chanUwU/kura-v4/internal/dao"
 	"github.com/astra-chanUwU/kura-v4/internal/db"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
@@ -77,6 +78,76 @@ func TestPostgresContracts(t *testing.T) {
 	require.NoError(t, conn.QueryRowContext(ctx, "SELECT state FROM jobs WHERE id = $1", id).Scan(&state))
 	require.Equal(t, "failed", state)
 
+	postsDAO := dao.NewPosts(conn)
+	seed := func(name, artist, rating string, tags []string) model.Post {
+		t.Helper()
+		created, err := postsDAO.CreatePost(ctx, model.Post{
+			OriginalName: name, StorageKey: name, ContentType: "image/jpeg", SizeBytes: 1,
+			Artist: artist, Rating: rating,
+		}, name+"-sha")
+		require.NoError(t, err)
+		for _, tag := range tags {
+			require.NoError(t, postsDAO.InsertPostTag(ctx, created.ID, tag))
+		}
+		return created
+	}
+	cute := seed("cute.jpg", "Serraphyll", "sfw", []string{"yuri", "cute"})
+	gif := seed("gif.jpg", "", "sfw", []string{"yuri", "gif"})
+	nsfw := seed("nsfw.jpg", "", "nsfw", []string{"landscape"})
+	hidden := seed("hidden.jpg", "", "sfw", []string{"yuri"})
+	_, err = conn.ExecContext(ctx, `UPDATE posts SET created_at = now() - interval '3 days' WHERE id = $1`, cute.ID)
+	require.NoError(t, err)
+	_, err = conn.ExecContext(ctx, `UPDATE posts SET created_at = now() - interval '2 days' WHERE id = $1`, nsfw.ID)
+	require.NoError(t, err)
+	_, err = conn.ExecContext(ctx, `UPDATE posts SET created_at = now() - interval '1 day' WHERE id = $1`, gif.ID)
+	require.NoError(t, err)
+	_, err = conn.ExecContext(ctx, `UPDATE posts SET hidden_at = now() WHERE id = $1`, hidden.ID)
+	require.NoError(t, err)
+
+	prepared, err := board.PrepareQuery(model.PostQuery{Tags: []string{"yuri"}, Exclude: []string{"gif"}})
+	require.NoError(t, err)
+	total, err := postsDAO.CountBoardMatches(ctx, prepared)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), total, "tag AND plus exclude, and hidden and nsfw stay out")
+	page, err := postsDAO.SearchPosts(ctx, prepared)
+	require.NoError(t, err)
+	require.Equal(t, []string{cute.ID}, idsOf(page))
+
+	typo, err := board.PrepareQuery(model.PostQuery{Q: "serraphyl"})
+	require.NoError(t, err)
+	found, err := postsDAO.SearchPosts(ctx, typo)
+	require.NoError(t, err)
+	require.Equal(t, []string{cute.ID}, idsOf(found))
+
+	oldest, err := board.PrepareQuery(model.PostQuery{Tags: []string{"yuri"}, Sort: "oldest", IncludeNSFW: true})
+	require.NoError(t, err)
+	ordered, err := postsDAO.SearchPosts(ctx, oldest)
+	require.NoError(t, err)
+	require.Equal(t, []string{cute.ID, gif.ID}, idsOf(ordered))
+	counted, err := postsDAO.CountBoardMatches(ctx, oldest)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), counted)
+
+	neighbors, err := postsDAO.PostNeighbors(ctx, gif.ID, oldest)
+	require.NoError(t, err)
+	require.Equal(t, 1, neighbors.Index)
+	require.Equal(t, int64(2), neighbors.Total)
+	require.Equal(t, cute.ID, neighbors.PrevID)
+	require.Empty(t, neighbors.NextID)
+
+	suggestions, err := postsDAO.SuggestTags(ctx, "yur", 8, false)
+	require.NoError(t, err)
+	require.NotEmpty(t, suggestions)
+	require.Equal(t, "yuri", suggestions[0].Tag)
+
 	require.NoError(t, goose.DownToContext(ctx, conn, "migrations", 0))
 	require.NoError(t, db.Migrate(ctx, conn), "fresh schema can be rebuilt after rollback")
+}
+
+func idsOf(posts []model.Post) []string {
+	out := make([]string, len(posts))
+	for i, post := range posts {
+		out[i] = post.ID
+	}
+	return out
 }

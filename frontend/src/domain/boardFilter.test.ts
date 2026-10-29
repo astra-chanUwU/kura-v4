@@ -52,7 +52,19 @@ describe("board filter URL round trip", () => {
       tags: ["yuri", "cute", "silver_hair"],
       exclude: [],
       q: "hi",
+      sort: "newest",
     });
+  });
+
+  it("keeps oldest and drops any other sort", () => {
+    expect(validateBoardSearch({ sort: "oldest" })).toEqual({
+      tags: undefined,
+      exclude: undefined,
+      q: undefined,
+      sort: "oldest",
+    });
+    expect(validateBoardSearch({ sort: "score" }).sort).toBeUndefined();
+    expect(searchFromFilter({ tags: [], exclude: [], q: "", sort: "oldest" }).sort).toBe("oldest");
   });
 
   it("omits empty parts when writing the URL", () => {

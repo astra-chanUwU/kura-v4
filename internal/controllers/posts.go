@@ -30,8 +30,10 @@ func (h *Posts) favs(c fiber.Ctx) map[string]bool {
 }
 
 func (h *Posts) RegisterRoutes(api fiber.Router) {
-	api.Get("/search-index", h.searchIndex)
+	api.Get("/search", h.search)
+	api.Get("/tags", h.tags)
 	api.Get("/posts", h.list)
+	api.Get("/posts/:id/neighbors", h.neighbors)
 	api.Get("/posts/:id", h.get)
 	api.Post("/posts", h.create)
 	api.Patch("/posts/:id/meta", h.updateMeta)
@@ -61,13 +63,66 @@ func (h *Posts) RegisterMedia(app fiber.Router) {
 	app.Get("/posts/:id/thumb", h.thumbnail)
 }
 
-// searchIndex serves the fields the frontend's fuzzy search runs over.
-func (h *Posts) searchIndex(c fiber.Ctx) error {
-	posts, err := h.board.SearchIndex(c.Context(), viewerSeesNSFW(c))
+func (h *Posts) searchQuery(c fiber.Ctx) model.PostQuery {
+	limit := int32(40)
+	if v, err := strconv.Atoi(c.Query("limit")); err == nil && v > 0 {
+		limit = min(int32(v), 100)
+	}
+	offset := int32(0)
+	if v, err := strconv.Atoi(c.Query("offset")); err == nil && v > 0 {
+		offset = int32(v)
+	}
+	return model.PostQuery{
+		Tags:        splitCSV(c.Query("tags")),
+		Exclude:     splitCSV(c.Query("exclude")),
+		Q:           c.Query("q"),
+		Artist:      c.Query("artist"),
+		Sort:        c.Query("sort"),
+		Limit:       limit,
+		Offset:      offset,
+		IncludeNSFW: viewerSeesNSFW(c),
+	}
+}
+
+func splitCSV(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return []string{}
+	}
+	return strings.Split(value, ",")
+}
+
+// search is the board: required tags, excluded tags, free text, and sort,
+// one page at a time.
+func (h *Posts) search(c fiber.Ctx) error {
+	page, err := h.board.Search(c.Context(), h.searchQuery(c))
 	if err != nil {
 		return writeError(c, err)
 	}
-	return c.JSON(postsDTO(posts, h.favs(c)))
+	return c.JSON(dto.SearchPage{Total: page.Total, Posts: postsDTO(page.Posts, h.favs(c))})
+}
+
+func (h *Posts) tags(c fiber.Ctx) error {
+	limit := int32(8)
+	if v, err := strconv.Atoi(c.Query("limit")); err == nil && v > 0 {
+		limit = min(int32(v), 24)
+	}
+	tags, err := h.board.SuggestTags(c.Context(), c.Query("q"), limit, viewerSeesNSFW(c))
+	if err != nil {
+		return writeError(c, err)
+	}
+	out := make([]dto.TagCount, 0, len(tags))
+	for _, tag := range tags {
+		out = append(out, dto.TagCount{Tag: tag.Tag, Count: tag.Count})
+	}
+	return c.JSON(out)
+}
+
+func (h *Posts) neighbors(c fiber.Ctx) error {
+	n, err := h.board.Neighbors(c.Context(), c.Params("id"), h.searchQuery(c))
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.JSON(dto.PostNeighbors{Index: n.Index, Total: n.Total, PrevID: n.PrevID, NextID: n.NextID})
 }
 
 func (h *Posts) list(c fiber.Ctx) error {

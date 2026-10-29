@@ -107,44 +107,58 @@ func (e *Engine) postsSearch(ctx context.Context, args []string) int {
 	if err != nil {
 		return e.failErr(cmd, err)
 	}
-	parsed, code, argsOK := e.postsArgs(args, cmd, 0, "tags", "artist")
+	parsed, code, argsOK := e.postsArgs(args, cmd, 0, "tags", "exclude", "q", "artist", "sort", "limit", "offset")
 	if !argsOK {
 		return code
 	}
-	if !parsed.Has("tags") && !parsed.Has("artist") {
+	if !parsed.Has("tags") && !parsed.Has("exclude") && !parsed.Has("q") && !parsed.Has("artist") {
 		return e.badUsage(cmd, postsCommandUsage(cmd))
 	}
-	var want []string
-	if parsed.Has("tags") {
-		want = board.NormalizeTags([]string{parsed.Get("tags")})
-		if len(want) == 0 {
-			return e.badUsage(cmd, "Give at least one tag.")
-		}
+	if parsed.Has("tags") && len(board.NormalizeTags(splitList(parsed.Get("tags")))) == 0 {
+		return e.badUsage(cmd, "Give at least one tag.")
+	}
+	if parsed.Has("exclude") && len(board.NormalizeTags(splitList(parsed.Get("exclude")))) == 0 {
+		return e.badUsage(cmd, "Give at least one tag to exclude.")
+	}
+	limit, err := parsed.Int("limit", 40, 1, 100)
+	if err != nil {
+		return e.badUsage(cmd, err.Error())
+	}
+	offset, err := parsed.Int("offset", 0, 0, 1_000_000)
+	if err != nil {
+		return e.badUsage(cmd, err.Error())
+	}
+	sort := parsed.Get("sort")
+	if parsed.Has("sort") && sort != "newest" && sort != "oldest" {
+		return e.badUsage(cmd, "Sort must be newest or oldest.")
 	}
 	if e.deps.Board == nil {
 		return e.fail(cmd, "internal", "Something went wrong. Please try again.")
 	}
-	indexed, err := e.deps.Board.SearchIndex(ctx, SeesNSFW(actor))
+	page, err := e.deps.Board.Search(ctx, model.PostQuery{
+		Tags:        splitList(parsed.Get("tags")),
+		Exclude:     splitList(parsed.Get("exclude")),
+		Q:           parsed.Get("q"),
+		Artist:      parsed.Get("artist"),
+		Sort:        sort,
+		Limit:       int32(limit),
+		Offset:      int32(offset),
+		IncludeNSFW: SeesNSFW(actor),
+	})
 	if err != nil {
 		return e.failErr(cmd, err)
 	}
-	matched := make([]model.Post, 0)
-	for _, post := range indexed {
-		if !postsHaveTags(post.Tags, want) {
-			continue
-		}
-		if parsed.Has("artist") {
-			needle := strings.ToLower(strings.TrimSpace(parsed.Get("artist")))
-			if !strings.Contains(strings.ToLower(post.Artist), needle) {
-				continue
-			}
-		}
-		matched = append(matched, post)
-		if len(matched) == 100 {
-			break
-		}
+	return e.ok(cmd, map[string]any{
+		"total": page.Total,
+		"posts": presentPosts(page.Posts, e.favs(ctx, e.actorID(actor))),
+	})
+}
+
+func splitList(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return []string{}
 	}
-	return e.ok(cmd, presentPosts(matched, e.favs(ctx, e.actorID(actor))))
+	return strings.Split(value, ",")
 }
 
 func (e *Engine) postsMine(ctx context.Context, args []string) int {
@@ -384,20 +398,4 @@ func postsCommandUsage(name string) string {
 		}
 	}
 	return "kura agent " + name
-}
-
-func postsHaveTags(tags, want []string) bool {
-	if len(want) == 0 {
-		return true
-	}
-	have := make(map[string]struct{}, len(tags))
-	for _, tag := range tags {
-		have[tag] = struct{}{}
-	}
-	for _, tag := range want {
-		if _, ok := have[tag]; !ok {
-			return false
-		}
-	}
-	return true
 }

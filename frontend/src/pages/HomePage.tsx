@@ -5,15 +5,21 @@ import { PostCard } from "../components/PostCard";
 import { PostRow } from "../components/PostRow";
 import { UploadDialog } from "../components/UploadDialog";
 import uploadStyles from "../components/UploadDialog.module.css";
-import { sameTagSet, searchFromFilter, splitTagInput } from "../domain/boardFilter";
+import {
+  boardSort,
+  isFilterActive,
+  sameTagSet,
+  searchFromFilter,
+  splitTagInput,
+} from "../domain/boardFilter";
 import { boardMemoryFor, writeBoardMemory } from "../domain/boardMemory";
 import {
   normalizeTagToken,
   tagTokens,
+  useBoard,
   useDebouncedValue,
   useMe,
-  usePostSearch,
-  usePosts,
+  useTagSuggestions,
 } from "../hooks/useKura";
 import { useBoardView } from "../hooks/useBoardView";
 import { useSite } from "../hooks/useSite";
@@ -27,7 +33,6 @@ export function HomePage() {
   const [uploadNotice, setUploadNotice] = useState("");
   const [pageDragging, setPageDragging] = useState(false);
   const { loading: siteLoading, error: siteError, retry: siteRetry } = useSite();
-  const { posts, loading, error, retry, hasMore, loadingMore, loadMore } = usePosts();
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [showToTop, setShowToTop] = useState(false);
   useEffect(() => {
@@ -36,20 +41,6 @@ export function HomePage() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  // Infinite scroll: load the next page before the sentinel nears view.
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting) && hasMore && !loadingMore) loadMore();
-      },
-      { rootMargin: "900px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, loadMore]);
   // Board layout preference: column count (0 = auto) and page width.
   const { view, changeView } = useBoardView();
   // Dragging files anywhere over the board offers the upload dialog.
@@ -93,6 +84,7 @@ export function HomePage() {
     tags?: string;
     exclude?: string;
     q?: string;
+    sort?: string;
   };
   const navigate = useNavigate();
   // Set on an empty board the user asked for (Clear, or the last chip
@@ -113,7 +105,7 @@ export function HomePage() {
           ),
         ]
       : [];
-  const urlKey = `${urlSearch.tags ?? ""}|${urlSearch.exclude ?? ""}|${urlSearch.q ?? ""}`;
+  const urlKey = `${urlSearch.tags ?? ""}|${urlSearch.exclude ?? ""}|${urlSearch.q ?? ""}|${urlSearch.sort === "oldest" ? "oldest" : ""}`;
   const hasUrlFilter = !!(urlSearch.tags || urlSearch.exclude || urlSearch.q);
   // A chip edit or Clear sets this before navigate() resolves. The
   // history flag can land a render later; this stops that render from
@@ -125,20 +117,23 @@ export function HomePage() {
     include: string[],
     exclude: string[],
     q: string,
-    opts?: { replace?: boolean; cleared?: boolean },
+    opts?: { replace?: boolean; cleared?: boolean; sort?: "newest" | "oldest" },
   ) => {
     const cleared = opts?.cleared === true;
+    const sort = opts?.sort ?? boardSort(urlSearch.sort);
     writeBoardMemory({ userId: viewerId, tags: include, exclude, q, cleared });
-    pendingWrite.current = `${include.join(",")}|${exclude.join(",")}|${q}`;
+    pendingWrite.current = `${include.join(",")}|${exclude.join(",")}|${q}|${sort === "oldest" ? "oldest" : ""}`;
+    const search: { tags?: string; exclude?: string; q?: string; sort?: "oldest" } = {
+      tags: include.length > 0 ? include.join(",") : undefined,
+      exclude: exclude.length > 0 ? exclude.join(",") : undefined,
+      q: q !== "" ? q : undefined,
+    };
+    if (sort === "oldest") search.sort = "oldest";
     void navigate({
       to: "/",
       replace: opts?.replace ?? true,
       state: { boardCleared: cleared },
-      search: {
-        tags: include.length > 0 ? include.join(",") : undefined,
-        exclude: exclude.length > 0 ? exclude.join(",") : undefined,
-        q: q !== "" ? q : undefined,
-      },
+      search,
     });
   };
 
@@ -315,18 +310,31 @@ export function HomePage() {
   // Keystrokes update the input instantly, but filtering (and anything
   // network-adjacent) only sees the debounced value, 200ms behind.
   const debouncedSearchText = useDebouncedValue(searchText, 200);
-  const search = usePostSearch(
-    debouncedSearchText,
-    appliedTags,
-    appliedExcludedTags,
-    searchFocused ||
-      selectedTags.length > 0 ||
-      excludedTags.length > 0 ||
-      appliedTags.length > 0 ||
-      appliedExcludedTags.length > 0,
-    appliedQuery,
-    [...selectedTags, ...excludedTags],
+  const appliedFilter = {
+    tags: appliedTags,
+    exclude: appliedExcludedTags,
+    q: appliedQuery,
+    sort: boardSort(urlSearch.sort),
+  };
+  const board = useBoard(appliedFilter, !defaultsPending);
+  const { posts, loading, error, retry, hasMore, loadingMore, loadMore, total } = board;
+  const tagSuggestions = useTagSuggestions(debouncedSearchText, searchFocused);
+  const suggestions = tagSuggestions.suggestions.filter(
+    (item) => !selectedTags.includes(item.tag) && !excludedTags.includes(item.tag),
   );
+  // Infinite scroll, including a filtered board. The server pages every search.
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting) && hasMore && !loadingMore) loadMore();
+      },
+      { rootMargin: "900px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loadMore]);
   // Changing the tag set means a new result list: jump back to the
   // start of the board instead of leaving the user mid-scroll.
   const goToBoardTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
@@ -389,7 +397,14 @@ export function HomePage() {
     ];
     commitFilter(nextInclude, nextExclude, appliedQuery);
   };
-  const shownPosts = search.active ? search.results : posts;
+  const shownPosts = posts;
+  const filterActive = isFilterActive(appliedFilter);
+  const changeSort = (sort: "newest" | "oldest") => {
+    if (boardSort(urlSearch.sort) === sort) return;
+    skipSeed.current = true;
+    writeUrl(appliedTags, appliedExcludedTags, appliedQuery, { sort });
+    goToBoardTop();
+  };
   // The picture link carries the chips, including ones staged from the
   // strip and not yet applied. Opening one writes that filter into the
   // board history entry first, so Back restores it. No scroll.
@@ -397,6 +412,7 @@ export function HomePage() {
     tags: selectedTags,
     exclude: excludedTags,
     q: appliedQuery,
+    sort: boardSort(urlSearch.sort),
   });
   const commitStaged = () => {
     if (sameTagSet(selectedTags, appliedTags) && sameTagSet(excludedTags, appliedExcludedTags)) {
@@ -520,7 +536,7 @@ export function HomePage() {
                   e.preventDefault();
                   const delta = e.key === "ArrowDown" ? 1 : -1;
                   setHighlight((h) =>
-                    Math.max(0, Math.min(search.suggestions.length - 1, h + delta)),
+                    Math.max(0, Math.min(suggestions.length - 1, h + delta)),
                   );
                 } else if (e.key === "Enter" && searchFocused) {
                   e.preventDefault();
@@ -534,7 +550,7 @@ export function HomePage() {
                   ) {
                     addTagsFromText(searchText);
                   } else {
-                    const pick = search.suggestions[highlight] ?? search.suggestions[0];
+                    const pick = suggestions[highlight] ?? suggestions[0];
                     if (pick) addTag(pick.tag);
                     else addTagsFromText(searchText);
                   }
@@ -559,9 +575,9 @@ export function HomePage() {
               }
               aria-label="Search the board"
             />
-            {searchFocused && search.suggestions.length > 0 && (
+            {searchFocused && suggestions.length > 0 && (
               <ul className={styles.suggestions} aria-label="Tag suggestions">
-                {search.suggestions.map((s, i) => (
+                {suggestions.map((s, i) => (
                   <li key={s.tag} className={styles.suggestionRow}>
                     <button
                       type="button"
@@ -633,12 +649,30 @@ export function HomePage() {
               </button>
             )}
           </div>
-          {search.active &&
-            (search.searching ? (
+          <div className={styles.sortGroup} role="group" aria-label="Sort">
+            <button
+              type="button"
+              aria-pressed={boardSort(urlSearch.sort) === "newest"}
+              className={boardSort(urlSearch.sort) === "newest" ? styles.viewActive : ""}
+              onClick={() => changeSort("newest")}
+            >
+              Newest
+            </button>
+            <button
+              type="button"
+              aria-pressed={boardSort(urlSearch.sort) === "oldest"}
+              className={boardSort(urlSearch.sort) === "oldest" ? styles.viewActive : ""}
+              onClick={() => changeSort("oldest")}
+            >
+              Oldest
+            </button>
+          </div>
+          {filterActive &&
+            (board.searching ? (
               <span className={styles.searchMeta}>Searching…</span>
             ) : (
               <span className={styles.searchMeta}>
-                {search.results.length} result{search.results.length === 1 ? "" : "s"}
+                {total} result{total === 1 ? "" : "s"}
                 {appliedTags.length > 0 ? " with all selected tags" : ""}
                 {appliedExcludedTags.length > 0
                   ? `, excluding ${appliedExcludedTags.length} tag${appliedExcludedTags.length === 1 ? "" : "s"}`
@@ -747,12 +781,12 @@ export function HomePage() {
           </button>
         </div>
       )}
-      {!loading && !failed && !defaultsPending && !search.active && posts.length === 0 && (
+      {!loading && !failed && !defaultsPending && !filterActive && posts.length === 0 && (
         <div className={styles.empty}>
           <p>No images yet</p>
         </div>
       )}
-      {search.active && !defaultsPending && !search.searching && search.results.length === 0 && (
+      {filterActive && !loading && !defaultsPending && !board.searching && posts.length === 0 && (
         <div className={styles.empty}>
           <p>
             {searchText.trim()
@@ -795,9 +829,9 @@ export function HomePage() {
       >
         ↑
       </button>
-      {!search.active && <div ref={sentinelRef} aria-hidden="true" />}
-      {!search.active && loadingMore && <p className={styles.message}>Loading more…</p>}
-      {!search.active && !loading && !failed && posts.length > 0 && !hasMore && (
+      <div ref={sentinelRef} aria-hidden="true" />
+      {loadingMore && <p className={styles.message}>Loading more…</p>}
+      {!loading && !board.searching && !failed && posts.length > 0 && !hasMore && (
         <p className={styles.message}>That's everything.</p>
       )}
     </section>

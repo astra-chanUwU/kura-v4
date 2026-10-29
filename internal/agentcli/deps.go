@@ -41,7 +41,7 @@ type Board interface {
 	Get(ctx context.Context, id string) (model.Post, error)
 	List(ctx context.Context, limit, offset int32, includeNSFW bool) ([]model.Post, error)
 	ListByOwner(ctx context.Context, userID string) ([]model.Post, error)
-	SearchIndex(ctx context.Context, includeNSFW bool) ([]model.Post, error)
+	Search(ctx context.Context, q model.PostQuery) (model.SearchPage, error)
 	RecordCreation(ctx context.Context, actor model.User, post model.Post)
 	Contributions(ctx context.Context, userID string) (int64, error)
 }

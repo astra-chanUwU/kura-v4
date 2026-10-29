@@ -41,6 +41,20 @@ export interface Post {
   source_url: string;
   tags: string[];
 }
+export interface SearchPage {
+  total: number;
+  posts: Post[];
+}
+export interface TagCount {
+  tag: string;
+  count: number;
+}
+export interface PostNeighbors {
+  index: number;
+  total: number;
+  prev_id: string;
+  next_id: string;
+}
 export interface ListSummary {
   id: string;
   owner_username: string;
