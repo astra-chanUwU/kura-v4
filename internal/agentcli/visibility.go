@@ -25,19 +25,3 @@ func CanSee(actor *model.User, p model.Post) bool {
 	}
 	return p.OwnerID != nil && *p.OwnerID == actor.ID
 }
-
-// filterNSFW drops NSFW posts for viewers who have not opted in.
-// Hidden posts are left alone; callers that already queried a public
-// list do not need this, and an owner's contribution list keeps hides.
-func filterNSFW(actor *model.User, posts []model.Post) []model.Post {
-	if SeesNSFW(actor) {
-		return posts
-	}
-	out := make([]model.Post, 0, len(posts))
-	for _, p := range posts {
-		if p.Rating != "nsfw" {
-			out = append(out, p)
-		}
-	}
-	return out
-}

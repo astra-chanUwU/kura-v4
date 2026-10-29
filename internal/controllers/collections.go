@@ -3,7 +3,6 @@ package controllers
 import (
 	"github.com/astra-chanUwU/kura-v4/internal/collections"
 	"github.com/astra-chanUwU/kura-v4/internal/dto"
-	"github.com/astra-chanUwU/kura-v4/internal/model"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -40,20 +39,6 @@ func (h *Collections) favorites(c fiber.Ctx) error {
 		favs[p.ID] = true
 	}
 	return c.JSON(dto.SearchPage{Total: page.Total, Posts: postsDTO(page.Posts, favs)})
-}
-
-// visiblePosts hides NSFW posts from viewers who have not opted in.
-func visiblePosts(c fiber.Ctx, posts []model.Post) []model.Post {
-	if viewerSeesNSFW(c) {
-		return posts
-	}
-	out := make([]model.Post, 0, len(posts))
-	for _, p := range posts {
-		if p.Rating != "nsfw" {
-			out = append(out, p)
-		}
-	}
-	return out
 }
 
 func (h *Collections) favorite(c fiber.Ctx) error {
