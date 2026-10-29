@@ -7,11 +7,20 @@ DELETE FROM favorites WHERE user_id=$1 AND post_id=$2;
 -- name: ListFavoritePostIDs :many
 SELECT post_id FROM favorites WHERE user_id=$1;
 
+-- name: CountFavorites :one
+SELECT count(*)::bigint AS total
+FROM favorites f JOIN posts p ON p.id = f.post_id
+WHERE f.user_id = sqlc.arg(user_id)
+  AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw');
+
 -- name: ListFavorites :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at, p.rating,
   COALESCE(u.username,'')::text AS owner_username
 FROM favorites f JOIN posts p ON p.id=f.post_id LEFT JOIN users u ON u.id=p.owner_id
-WHERE f.user_id=$1 ORDER BY f.created_at DESC;
+WHERE f.user_id = sqlc.arg(user_id)
+  AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw')
+ORDER BY f.created_at DESC, p.id DESC
+LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
 
 -- name: CreateList :one
 INSERT INTO lists (owner_id, title, description, visibility) VALUES ($1,$2,$3,$4)
@@ -42,11 +51,23 @@ RETURNING id, owner_id, title, description, visibility, created_at, updated_at;
 -- name: DeleteList :execrows
 DELETE FROM lists WHERE id=$1 AND owner_id=$2;
 
+-- name: CountListItems :one
+SELECT count(*)::bigint AS total
+FROM list_items i JOIN posts p ON p.id = i.post_id
+WHERE i.list_id = sqlc.arg(list_id)
+  AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw');
+
+-- name: ListItemIDs :many
+SELECT post_id FROM list_items WHERE list_id = $1 ORDER BY position, post_id;
+
 -- name: ListItems :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at, p.rating,
   COALESCE(u.username,'')::text AS owner_username
 FROM list_items i JOIN posts p ON p.id=i.post_id LEFT JOIN users u ON u.id=p.owner_id
-WHERE i.list_id=$1 ORDER BY i.position;
+WHERE i.list_id = sqlc.arg(list_id)
+  AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw')
+ORDER BY i.position
+LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
 
 -- name: NextListPosition :one
 SELECT COALESCE(max(position)+1,0)::int AS pos FROM list_items WHERE list_id=$1;

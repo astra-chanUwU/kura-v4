@@ -22,13 +22,16 @@ type Repository interface {
 	AddFavorite(ctx context.Context, userID, postID string) error
 	RemoveFavorite(ctx context.Context, userID, postID string) error
 	FavoriteIDs(ctx context.Context, userID string) ([]string, error)
-	ListFavorites(ctx context.Context, userID string) ([]model.Post, error)
+	ListFavorites(ctx context.Context, userID string, includeNSFW bool, limit, offset int32) ([]model.Post, error)
+	CountFavorites(ctx context.Context, userID string, includeNSFW bool) (int64, error)
 	CreateList(ctx context.Context, ownerID, title, desc, vis string) (model.List, error)
 	GetList(ctx context.Context, id string) (model.List, error)
 	ListsByOwner(ctx context.Context, ownerID string, publicOnly bool) ([]model.List, error)
 	UpdateList(ctx context.Context, id, ownerID, title, desc, vis string) (model.List, error)
 	DeleteList(ctx context.Context, id, ownerID string) (int64, error)
-	ListItems(ctx context.Context, listID string) ([]model.Post, error)
+	ListItems(ctx context.Context, listID string, includeNSFW bool, limit, offset int32) ([]model.Post, error)
+	CountListItems(ctx context.Context, listID string, includeNSFW bool) (int64, error)
+	ListItemIDs(ctx context.Context, listID string) ([]string, error)
 	NextPosition(ctx context.Context, listID string) (int32, error)
 	AddItem(ctx context.Context, listID, postID string, pos int32) error
 	RemoveItem(ctx context.Context, listID, postID string) error
@@ -48,12 +51,20 @@ func (s *Service) Favorite(ctx context.Context, userID, postID string) error {
 func (s *Service) Unfavorite(ctx context.Context, userID, postID string) error {
 	return s.repo.RemoveFavorite(ctx, userID, postID)
 }
-func (s *Service) Favorites(ctx context.Context, userID string) ([]model.Post, error) {
-	posts, err := s.repo.ListFavorites(ctx, userID)
+func (s *Service) Favorites(ctx context.Context, userID string, includeNSFW bool, limit, offset int) (model.SearchPage, error) {
+	lim, off := model.PageBounds(limit, offset)
+	total, err := s.repo.CountFavorites(ctx, userID, includeNSFW)
+	if err != nil {
+		return model.SearchPage{}, err
+	}
+	posts, err := s.repo.ListFavorites(ctx, userID, includeNSFW, lim, off)
+	if err != nil {
+		return model.SearchPage{}, err
+	}
 	if posts == nil {
 		posts = []model.Post{}
 	}
-	return posts, err
+	return model.SearchPage{Total: total, Posts: posts}, nil
 }
 func (s *Service) FavoriteIDs(ctx context.Context, userID string) (map[string]bool, error) {
 	ids, err := s.repo.FavoriteIDs(ctx, userID)
@@ -96,7 +107,7 @@ func (s *Service) PublicLists(ctx context.Context, ownerID string) ([]model.List
 }
 
 // GetList enforces visibility: private lists are only visible to their owner.
-func (s *Service) GetList(ctx context.Context, viewerID *string, id string) (model.ListDetail, error) {
+func (s *Service) GetList(ctx context.Context, viewerID *string, id string, includeNSFW bool, limit, offset int) (model.ListDetail, error) {
 	list, err := s.repo.GetList(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.ListDetail{}, ErrNotFound
@@ -107,11 +118,16 @@ func (s *Service) GetList(ctx context.Context, viewerID *string, id string) (mod
 	if list.Visibility != "public" && (viewerID == nil || *viewerID != list.OwnerID) {
 		return model.ListDetail{}, ErrNotFound // do not leak that a private list exists
 	}
-	items, err := s.repo.ListItems(ctx, id)
+	lim, off := model.PageBounds(limit, offset)
+	total, err := s.repo.CountListItems(ctx, id, includeNSFW)
+	if err != nil {
+		return model.ListDetail{}, err
+	}
+	items, err := s.repo.ListItems(ctx, id, includeNSFW, lim, off)
 	if items == nil {
 		items = []model.Post{}
 	}
-	return model.ListDetail{List: list, Items: items}, err
+	return model.ListDetail{List: list, Items: items, Total: total}, err
 }
 
 func (s *Service) ownedList(ctx context.Context, ownerID, id string) (model.List, error) {
@@ -182,11 +198,11 @@ func (s *Service) Reorder(ctx context.Context, ownerID, listID string, postIDs [
 	if _, err := s.ownedList(ctx, ownerID, listID); err != nil {
 		return err
 	}
-	items, err := s.repo.ListItems(ctx, listID)
+	ids, err := s.repo.ListItemIDs(ctx, listID)
 	if err != nil {
 		return err
 	}
-	if len(postIDs) != len(items) {
+	if len(postIDs) != len(ids) {
 		return &ValidationError{Message: "Reorder must include every item in the list."}
 	}
 	seen := make(map[string]bool, len(postIDs))
@@ -196,10 +212,57 @@ func (s *Service) Reorder(ctx context.Context, ownerID, listID string, postIDs [
 		}
 		seen[id] = true
 	}
-	for _, item := range items {
-		if !seen[item.ID] {
+	for _, id := range ids {
+		if !seen[id] {
 			return &ValidationError{Message: "Reorder must include every item in the list."}
 		}
 	}
 	return s.repo.Reorder(ctx, listID, postIDs)
+}
+
+// MoveItem places postID immediately after afterID. An empty afterID
+// moves it to the start. Items the caller has not loaded stay put.
+func (s *Service) MoveItem(ctx context.Context, ownerID, listID, postID, afterID string) error {
+	if _, err := s.ownedList(ctx, ownerID, listID); err != nil {
+		return err
+	}
+	if postID == "" {
+		return &ValidationError{Message: "Choose a post to move."}
+	}
+	if postID == afterID {
+		return nil
+	}
+	ids, err := s.repo.ListItemIDs(ctx, listID)
+	if err != nil {
+		return err
+	}
+	from := -1
+	for i, id := range ids {
+		if id == postID {
+			from = i
+			break
+		}
+	}
+	if from < 0 {
+		return &ValidationError{Message: "That post is not in this list."}
+	}
+	rest := append(append([]string{}, ids[:from]...), ids[from+1:]...)
+	insert := 0
+	if afterID != "" {
+		insert = -1
+		for i, id := range rest {
+			if id == afterID {
+				insert = i + 1
+				break
+			}
+		}
+		if insert < 0 {
+			return &ValidationError{Message: "Move relative to a post in this list."}
+		}
+	}
+	next := make([]string, 0, len(rest)+1)
+	next = append(next, rest[:insert]...)
+	next = append(next, postID)
+	next = append(next, rest[insert:]...)
+	return s.repo.Reorder(ctx, listID, next)
 }

@@ -161,9 +161,13 @@ func (h *Admin) hiddenPosts(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	posts, err := h.mod.ListHiddenPosts(c.Context(), *user)
+	limit, offset := queryPage(c)
+	page, err := h.mod.ListHiddenPosts(c.Context(), *user, c.Query("kind"), limit, offset)
 	if err != nil {
 		return writeError(c, err)
 	}
-	return c.JSON(postsDTO(posts, map[string]bool{}))
+	return c.JSON(dto.HiddenPage{
+		Total: page.Total, Hidden: page.Hidden, Deleted: page.Deleted,
+		Posts: postsDTO(page.Posts, map[string]bool{}),
+	})
 }

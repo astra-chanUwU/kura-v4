@@ -5,7 +5,7 @@ import { IconEye, IconTrash } from "../components/icons";
 import { ThemedSelect } from "../components/ThemedSelect";
 import { shortError, useToasts } from "../components/Toasts";
 import { atLeast } from "../domain/roles";
-import { useHiddenPosts, useMe, useStaffActions } from "../hooks/useKura";
+import { useHiddenPosts, useLoadMore, useMe, useStaffActions } from "../hooks/useKura";
 import { StaffSection } from "./StaffLayout";
 import styles from "./HiddenPostsPage.module.css";
 import simple from "./Simple.module.css";
@@ -20,16 +20,12 @@ export function HiddenPostsPage() {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const isStaff = !!user && atLeast(user.role, "moderator");
   const isAdmin = !!user && atLeast(user.role, "admin");
-  const hidden = useHiddenPosts(isStaff);
+  const hidden = useHiddenPosts(isStaff, filter);
+  const moreRef = useLoadMore(hidden.hasMore && !hidden.loadingMore, hidden.loadMore);
 
   if (!user) return null;
 
-  const all = hidden.data ?? [];
-  const shown = all.filter((p) =>
-    filter === "all" ? true : filter === "deleted" ? p.deleted : !p.deleted,
-  );
-  const hiddenCount = all.filter((p) => !p.deleted).length;
-  const deletedCount = all.filter((p) => p.deleted).length;
+  const shown = hidden.posts;
 
   const run = (action: Promise<unknown>, ok: string) =>
     void action
@@ -50,9 +46,9 @@ export function HiddenPostsPage() {
     >
       <div className={styles.filterRow}>
         <ThemedSelect label="Show" value={filter} onChange={(next) => setFilter(next as Filter)}>
-          <option value="all">All removed ({all.length})</option>
-          <option value="hidden">Hidden only ({hiddenCount})</option>
-          <option value="deleted">Deleted only ({deletedCount})</option>
+          <option value="all">All removed ({hidden.hidden + hidden.deleted})</option>
+          <option value="hidden">Hidden only ({hidden.hidden})</option>
+          <option value="deleted">Deleted only ({hidden.deleted})</option>
         </ThemedSelect>
       </div>
       {hidden.isPending && <p className={simple.muted}>Loading…</p>}
@@ -112,6 +108,8 @@ export function HiddenPostsPage() {
           </article>
         ))}
       </div>
+      <div ref={moreRef} aria-hidden="true" />
+      {hidden.loadingMore && <p className={simple.muted}>Loading more…</p>}
       <ConfirmDialog
         open={pendingDeleteId !== null}
         title="Delete this post?"

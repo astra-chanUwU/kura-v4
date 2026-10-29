@@ -188,6 +188,72 @@ func (_c *MockRepository_ApplyUserRole_Call) RunAndReturn(run func(ctx context.C
 	return _c
 }
 
+// CountRemovedPosts provides a mock function for the type MockRepository
+func (_mock *MockRepository) CountRemovedPosts(ctx context.Context) (int64, int64, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountRemovedPosts")
+	}
+
+	var r0 int64
+	var r1 int64
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (int64, int64, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) int64); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) int64); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Get(1).(int64)
+	}
+	if returnFunc, ok := ret.Get(2).(func(context.Context) error); ok {
+		r2 = returnFunc(ctx)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
+}
+
+// MockRepository_CountRemovedPosts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountRemovedPosts'
+type MockRepository_CountRemovedPosts_Call struct {
+	*mock.Call
+}
+
+// CountRemovedPosts is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockRepository_Expecter) CountRemovedPosts(ctx any) *MockRepository_CountRemovedPosts_Call {
+	return &MockRepository_CountRemovedPosts_Call{Call: _e.mock.On("CountRemovedPosts", ctx)}
+}
+
+func (_c *MockRepository_CountRemovedPosts_Call) Run(run func(ctx context.Context)) *MockRepository_CountRemovedPosts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_CountRemovedPosts_Call) Return(n int64, n1 int64, err error) *MockRepository_CountRemovedPosts_Call {
+	_c.Call.Return(n, n1, err)
+	return _c
+}
+
+func (_c *MockRepository_CountRemovedPosts_Call) RunAndReturn(run func(ctx context.Context) (int64, int64, error)) *MockRepository_CountRemovedPosts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CountSuperAdmins provides a mock function for the type MockRepository
 func (_mock *MockRepository) CountSuperAdmins(ctx context.Context) (int64, error) {
 	ret := _mock.Called(ctx)
@@ -447,8 +513,8 @@ func (_c *MockRepository_GetUser_Call) RunAndReturn(run func(ctx context.Context
 }
 
 // ListHiddenPosts provides a mock function for the type MockRepository
-func (_mock *MockRepository) ListHiddenPosts(ctx context.Context) ([]model.Post, error) {
-	ret := _mock.Called(ctx)
+func (_mock *MockRepository) ListHiddenPosts(ctx context.Context, kind string, limit int32, offset int32) ([]model.Post, error) {
+	ret := _mock.Called(ctx, kind, limit, offset)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListHiddenPosts")
@@ -456,18 +522,18 @@ func (_mock *MockRepository) ListHiddenPosts(ctx context.Context) ([]model.Post,
 
 	var r0 []model.Post
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]model.Post, error)); ok {
-		return returnFunc(ctx)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, int32, int32) ([]model.Post, error)); ok {
+		return returnFunc(ctx, kind, limit, offset)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context) []model.Post); ok {
-		r0 = returnFunc(ctx)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, int32, int32) []model.Post); ok {
+		r0 = returnFunc(ctx, kind, limit, offset)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]model.Post)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = returnFunc(ctx)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, int32, int32) error); ok {
+		r1 = returnFunc(ctx, kind, limit, offset)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -481,18 +547,36 @@ type MockRepository_ListHiddenPosts_Call struct {
 
 // ListHiddenPosts is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockRepository_Expecter) ListHiddenPosts(ctx any) *MockRepository_ListHiddenPosts_Call {
-	return &MockRepository_ListHiddenPosts_Call{Call: _e.mock.On("ListHiddenPosts", ctx)}
+//   - kind string
+//   - limit int32
+//   - offset int32
+func (_e *MockRepository_Expecter) ListHiddenPosts(ctx any, kind any, limit any, offset any) *MockRepository_ListHiddenPosts_Call {
+	return &MockRepository_ListHiddenPosts_Call{Call: _e.mock.On("ListHiddenPosts", ctx, kind, limit, offset)}
 }
 
-func (_c *MockRepository_ListHiddenPosts_Call) Run(run func(ctx context.Context)) *MockRepository_ListHiddenPosts_Call {
+func (_c *MockRepository_ListHiddenPosts_Call) Run(run func(ctx context.Context, kind string, limit int32, offset int32)) *MockRepository_ListHiddenPosts_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 int32
+		if args[2] != nil {
+			arg2 = args[2].(int32)
+		}
+		var arg3 int32
+		if args[3] != nil {
+			arg3 = args[3].(int32)
+		}
 		run(
 			arg0,
+			arg1,
+			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -503,7 +587,7 @@ func (_c *MockRepository_ListHiddenPosts_Call) Return(posts []model.Post, err er
 	return _c
 }
 
-func (_c *MockRepository_ListHiddenPosts_Call) RunAndReturn(run func(ctx context.Context) ([]model.Post, error)) *MockRepository_ListHiddenPosts_Call {
+func (_c *MockRepository_ListHiddenPosts_Call) RunAndReturn(run func(ctx context.Context, kind string, limit int32, offset int32) ([]model.Post, error)) *MockRepository_ListHiddenPosts_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -31,7 +31,7 @@ vi.mock("../hooks/useKura", () => ({
       : null;
     return { me: user ? { user } : null, user, loading: false };
   },
-  useHiddenPosts: () => ({ data: Array.from({ length: hoisted.hiddenCount }, (_, i) => i) }),
+  useHiddenPosts: () => ({ hidden: hoisted.hiddenCount, deleted: 0, posts: [] }),
 }));
 
 describe("StaffLayout", () => {

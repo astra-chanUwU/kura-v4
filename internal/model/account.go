@@ -101,4 +101,12 @@ type List struct {
 type ListDetail struct {
 	List  List
 	Items []Post
+	Total int64
+}
+
+type HiddenPage struct {
+	Total   int64
+	Hidden  int64
+	Deleted int64
+	Posts   []Post
 }

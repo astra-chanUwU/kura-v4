@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/astra-chanUwU/kura-v4/internal/model"
+	"github.com/google/uuid"
 )
 
 var ErrNotFound = errors.New("post not found")
@@ -24,11 +25,12 @@ type Repository interface {
 	InsertHistory(ctx context.Context, entry model.ChangeEntry) (model.ChangeEntry, error)
 	SearchPosts(ctx context.Context, q model.PostQuery) ([]model.Post, error)
 	CountBoardMatches(ctx context.Context, q model.PostQuery) (int64, error)
-	SuggestTags(ctx context.Context, q string, limit int32, includeNSFW bool) ([]model.TagCount, error)
+	SuggestTags(ctx context.Context, prefix string, filter model.PostQuery, limit int32) ([]model.TagCount, error)
 	PostNeighbors(ctx context.Context, id string, q model.PostQuery) (model.Neighbors, error)
 	GetPostBySHA(ctx context.Context, sha string) (model.Post, error)
 	CountPostsByOwner(ctx context.Context, ownerID string) (int64, error)
-	ListPostsByOwner(ctx context.Context, ownerID string) ([]model.Post, error)
+	CountVisiblePostsByOwner(ctx context.Context, ownerID string, includeNSFW bool) (int64, error)
+	ListPostsByOwner(ctx context.Context, ownerID string, includeNSFW bool, limit, offset int32) ([]model.Post, error)
 }
 
 // Media is the original-file store the board reads and writes through.
@@ -100,14 +102,23 @@ func (s *Service) Contributions(ctx context.Context, userID string) (int64, erro
 	return s.repo.CountPostsByOwner(ctx, userID)
 }
 
-// ListByOwner returns a user's own posts, newest first — their
-// contributions panel. Callers apply NSFW visibility for the viewer.
-func (s *Service) ListByOwner(ctx context.Context, userID string) ([]model.Post, error) {
-	posts, err := s.repo.ListPostsByOwner(ctx, userID)
+// ListByOwner returns one page of a user's own posts, newest first.
+// Hidden posts stay. NSFW is included only when includeNSFW is set,
+// so the page size matches what the viewer is allowed to see.
+func (s *Service) ListByOwner(ctx context.Context, userID string, includeNSFW bool, limit, offset int) (model.SearchPage, error) {
+	lim, off := model.PageBounds(limit, offset)
+	total, err := s.repo.CountVisiblePostsByOwner(ctx, userID, includeNSFW)
+	if err != nil {
+		return model.SearchPage{}, err
+	}
+	posts, err := s.repo.ListPostsByOwner(ctx, userID, includeNSFW, lim, off)
+	if err != nil {
+		return model.SearchPage{}, err
+	}
 	if posts == nil {
 		posts = []model.Post{}
 	}
-	return posts, err
+	return model.SearchPage{Total: total, Posts: posts}, nil
 }
 
 // Search returns one page of public posts matching q, plus the full
@@ -117,6 +128,21 @@ func (s *Service) Search(ctx context.Context, q model.PostQuery) (model.SearchPa
 	prepared, err := PrepareQuery(q)
 	if err != nil {
 		return model.SearchPage{}, err
+	}
+	if strings.TrimSpace(q.AfterID) != "" {
+		if _, err := uuid.Parse(q.AfterID); err != nil {
+			return model.SearchPage{}, ErrBadCursor
+		}
+		post, err := s.repo.GetPost(ctx, q.AfterID)
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, ErrNotFound) {
+			return model.SearchPage{}, ErrBadCursor
+		}
+		if err != nil {
+			return model.SearchPage{}, err
+		}
+		prepared.AfterID = post.ID
+		prepared.AfterAt = post.CreatedAt
+		prepared.Offset = 0
 	}
 	total, err := s.repo.CountBoardMatches(ctx, prepared)
 	if err != nil {
@@ -132,18 +158,22 @@ func (s *Service) Search(ctx context.Context, q model.PostQuery) (model.SearchPa
 	return model.SearchPage{Total: total, Posts: posts}, nil
 }
 
-// SuggestTags lists tags on the visible board, most common first.
-// A non-empty q prefers a prefix and then a close spelling.
-func (s *Service) SuggestTags(ctx context.Context, q string, limit int32, includeNSFW bool) ([]model.TagCount, error) {
-	q = strings.ToLower(strings.TrimSpace(q))
-	q = clipText(q, 40)
+// SuggestTags lists tags inside filter, most common first.
+// prefix prefers a prefix and then a close spelling. An empty filter
+// counts the whole visible board.
+func (s *Service) SuggestTags(ctx context.Context, prefix string, filter model.PostQuery, limit int32) ([]model.TagCount, error) {
+	prepared, err := PrepareQuery(filter)
+	if err != nil {
+		return nil, err
+	}
+	prefix = clipText(strings.ToLower(strings.TrimSpace(prefix)), 40)
 	if limit <= 0 {
 		limit = 8
 	}
 	if limit > 24 {
 		limit = 24
 	}
-	tags, err := s.repo.SuggestTags(ctx, q, limit, includeNSFW)
+	tags, err := s.repo.SuggestTags(ctx, prefix, prepared, limit)
 	if tags == nil {
 		tags = []model.TagCount{}
 	}

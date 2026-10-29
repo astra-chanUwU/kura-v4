@@ -119,15 +119,19 @@ func TestRollbackRoleReChecksHierarchy(t *testing.T) {
 
 func TestListHiddenPostsNeedsModerator(t *testing.T) {
 	repo := NewMockRepository(t)
-	_, err := NewService(repo).ListHiddenPosts(context.Background(), member)
+	_, err := NewService(repo).ListHiddenPosts(context.Background(), member, "all", 0, 0)
 	require.ErrorIs(t, err, ErrForbidden)
 
 	repo2 := NewMockRepository(t)
 	want := []model.Post{{ID: "p1", Hidden: true, Deleted: true}, {ID: "p2", Hidden: true}}
-	repo2.EXPECT().ListHiddenPosts(mock.Anything).Return(want, nil)
-	got, err := NewService(repo2).ListHiddenPosts(context.Background(), moderator)
+	repo2.EXPECT().CountRemovedPosts(mock.Anything).Return(int64(1), int64(1), nil)
+	repo2.EXPECT().ListHiddenPosts(mock.Anything, "all", int32(40), int32(0)).Return(want, nil)
+	got, err := NewService(repo2).ListHiddenPosts(context.Background(), moderator, "", 0, 0)
 	require.NoError(t, err)
-	require.Equal(t, want, got)
+	require.Equal(t, want, got.Posts)
+	require.Equal(t, int64(2), got.Total)
+	require.Equal(t, int64(1), got.Hidden)
+	require.Equal(t, int64(1), got.Deleted)
 }
 
 func TestAdminDeleteMarksDeletedAndRollbackRestoresIt(t *testing.T) {

@@ -10,6 +10,10 @@ import (
 // ErrBadSort is returned when a search sort is not newest or oldest.
 var ErrBadSort = errString("sort must be newest or oldest")
 
+// ErrBadCursor is returned when a search page continues from a post
+// that is not in this library.
+var ErrBadCursor = errString("after must be a post in this library")
+
 type errString string
 
 func (e errString) Error() string { return string(e) }
@@ -77,6 +81,10 @@ func likeContains(s string) string {
 	if s == "" {
 		return ""
 	}
+	return "%" + escapeLike(s) + "%"
+}
+
+func escapeLike(s string) string {
 	replacer := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
-	return "%" + replacer.Replace(s) + "%"
+	return replacer.Replace(s)
 }

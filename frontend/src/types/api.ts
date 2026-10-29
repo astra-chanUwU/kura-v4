@@ -68,6 +68,13 @@ export interface ListSummary {
 export interface ListDetail {
   list: ListSummary;
   items: Post[];
+  total: number;
+}
+export interface HiddenPage {
+  total: number;
+  hidden: number;
+  deleted: number;
+  posts: Post[];
 }
 export interface Profile {
   user: User;

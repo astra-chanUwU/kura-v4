@@ -9,12 +9,13 @@ import { PostCard } from "../components/PostCard";
 import { PostRow } from "../components/PostRow";
 import { useBoardView } from "../hooks/useBoardView";
 import { shortError, useToasts } from "../components/Toasts";
-import { useList, useListActions, useMe } from "../hooks/useKura";
+import { useList, useListActions, useLoadMore, useMe } from "../hooks/useKura";
 import styles from "./Simple.module.css";
 import listStyles from "./ListPage.module.css";
 
 export function ListPage({ id }: { id: string }) {
-  const { data, isPending, error } = useList(id);
+  const { data, isPending, error, hasMore, loadingMore, loadMore } = useList(id);
+  const moreRef = useLoadMore(Boolean(hasMore) && !loadingMore, loadMore);
   const { user } = useMe();
   const { view, changeView } = useBoardView();
   const actions = useListActions(id);
@@ -117,13 +118,19 @@ export function ListPage({ id }: { id: string }) {
 
   const refresh = actions.refresh;
 
-  const saveOrder = (next: Post[]) => {
+  const saveOrder = (next: Post[], movedId: string) => {
     const nextIds = next.map((p) => p.id);
     if (nextIds.join(",") === serverKey) {
       setLocal(null);
       return;
     }
-    void actions.reorderList(id, nextIds).catch(() => {
+    const total = data.total ?? next.length;
+    const at = nextIds.indexOf(movedId);
+    const request =
+      items.length >= total
+        ? actions.reorderList(id, nextIds)
+        : actions.moveListItem(id, movedId, at > 0 ? (nextIds[at - 1] ?? "") : "");
+    void request.catch(() => {
       setLocal(null);
       setEditError("Could not reorder.");
     });
@@ -131,11 +138,11 @@ export function ListPage({ id }: { id: string }) {
 
   // Apply a new order: FLIP-animate it and save at once. Shared by the
   // arrow buttons and by drag-and-drop's single commit on drop.
-  const applyOrder = (next: Post[], skipFlipId?: string) => {
+  const applyOrder = (next: Post[], movedId: string) => {
     captureFlip();
-    flipSkipRef.current = skipFlipId ?? null;
+    flipSkipRef.current = movedId;
     setLocal({ posts: next, baseKey: serverKey });
-    saveOrder(next);
+    saveOrder(next, movedId);
   };
 
   // One-step move used by the arrow buttons (also the keyboard/touch
@@ -148,7 +155,7 @@ export function ListPage({ id }: { id: string }) {
     const [moved] = next.splice(index, 1);
     if (!moved) return;
     next.splice(target, 0, moved);
-    applyOrder(next);
+    applyOrder(next, postId);
   };
 
   // Where a drop over item `index` would insert: before it on its
@@ -440,6 +447,8 @@ export function ListPage({ id }: { id: string }) {
           </div>
         ))}
       </div>
+      <div ref={moreRef} aria-hidden="true" />
+      {loadingMore && <p className={styles.muted}>Loading more…</p>}
       <ConfirmDialog
         open={confirmDelete}
         title="Delete this list?"

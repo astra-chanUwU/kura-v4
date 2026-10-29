@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/astra-chanUwU/kura-v4/internal/accounts"
 	"github.com/astra-chanUwU/kura-v4/internal/board"
@@ -36,6 +37,8 @@ func writeError(c fiber.Ctx, err error) error {
 		return fiber.NewError(409, "That username is taken. Try another one.")
 	case errors.Is(err, board.ErrBadSort):
 		return fiber.NewError(400, "Sort must be newest or oldest.")
+	case errors.Is(err, board.ErrBadCursor):
+		return fiber.NewError(400, "That page cursor is not a post in this library.")
 	case errors.Is(err, accounts.ErrAdultConfirmationRequired):
 		return fiber.NewError(400, "Please confirm that you are 18 or older first.")
 	case errors.Is(err, accounts.ErrLastSignInMethod):
@@ -63,6 +66,12 @@ func currentUser(c fiber.Ctx) *model.User {
 		return &u
 	}
 	return nil
+}
+
+func queryPage(c fiber.Ctx) (int, int) {
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	offset, _ := strconv.Atoi(c.Query("offset"))
+	return limit, offset
 }
 
 func requireUser(c fiber.Ctx) (*model.User, error) {

@@ -167,23 +167,25 @@ func (e *Engine) postsMine(ctx context.Context, args []string) int {
 	if !ok {
 		return 1
 	}
-	_, code, argsOK := e.postsArgs(args, cmd, 0)
+	parsed, code, argsOK := e.postsArgs(args, cmd, 0, "limit", "offset")
 	if !argsOK {
 		return code
+	}
+	limit, offset, ok := e.pageArgs(cmd, parsed)
+	if !ok {
+		return 2
 	}
 	if e.deps.Board == nil {
 		return e.fail(cmd, "internal", "Something went wrong. Please try again.")
 	}
-	posts, err := e.deps.Board.ListByOwner(ctx, user.ID)
+	page, err := e.deps.Board.ListByOwner(ctx, user.ID, SeesNSFW(&user), limit, offset)
 	if err != nil {
 		return e.failErr(cmd, err)
 	}
-	// Hidden posts stay. This is the owner's contribution list.
-	posts = filterNSFW(&user, posts)
-	if posts == nil {
-		posts = []model.Post{}
-	}
-	return e.ok(cmd, presentPosts(posts, e.favs(ctx, user.ID)))
+	return e.ok(cmd, map[string]any{
+		"total": page.Total,
+		"posts": presentPosts(page.Posts, e.favs(ctx, user.ID)),
+	})
 }
 
 func (e *Engine) postsUpload(ctx context.Context, args []string) int {
@@ -338,9 +340,13 @@ func (e *Engine) postsHidden(ctx context.Context, args []string) int {
 	if !ok {
 		return 1
 	}
-	_, code, argsOK := e.postsArgs(args, cmd, 0)
+	parsed, code, argsOK := e.postsArgs(args, cmd, 0, "kind", "limit", "offset")
 	if !argsOK {
 		return code
+	}
+	limit, offset, ok := e.pageArgs(cmd, parsed)
+	if !ok {
+		return 2
 	}
 	if !e.requireMin(cmd, user, "moderator") {
 		return 1
@@ -348,14 +354,30 @@ func (e *Engine) postsHidden(ctx context.Context, args []string) int {
 	if e.deps.Moderation == nil {
 		return e.fail(cmd, "internal", "Something went wrong. Please try again.")
 	}
-	posts, err := e.deps.Moderation.ListHiddenPosts(ctx, user)
+	page, err := e.deps.Moderation.ListHiddenPosts(ctx, user, parsed.Get("kind"), limit, offset)
 	if err != nil {
 		return e.failErr(cmd, err)
 	}
-	if posts == nil {
-		posts = []model.Post{}
+	return e.ok(cmd, map[string]any{
+		"total":   page.Total,
+		"hidden":  page.Hidden,
+		"deleted": page.Deleted,
+		"posts":   presentPosts(page.Posts, map[string]bool{}),
+	})
+}
+
+func (e *Engine) pageArgs(cmd string, parsed Args) (int, int, bool) {
+	limit, err := parsed.Int("limit", 40, 1, 100)
+	if err != nil {
+		e.badUsage(cmd, err.Error())
+		return 0, 0, false
 	}
-	return e.ok(cmd, presentPosts(posts, map[string]bool{}))
+	offset, err := parsed.Int("offset", 0, 0, 1000000)
+	if err != nil {
+		e.badUsage(cmd, err.Error())
+		return 0, 0, false
+	}
+	return limit, offset, true
 }
 
 func (e *Engine) postsSetHidden(ctx context.Context, args []string, command, minRole string, hidden, deleted bool) int {

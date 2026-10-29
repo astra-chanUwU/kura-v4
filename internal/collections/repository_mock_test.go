@@ -179,6 +179,150 @@ func (_c *MockRepository_AddItem_Call) RunAndReturn(run func(ctx context.Context
 	return _c
 }
 
+// CountFavorites provides a mock function for the type MockRepository
+func (_mock *MockRepository) CountFavorites(ctx context.Context, userID string, includeNSFW bool) (int64, error) {
+	ret := _mock.Called(ctx, userID, includeNSFW)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountFavorites")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) (int64, error)); ok {
+		return returnFunc(ctx, userID, includeNSFW)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) int64); ok {
+		r0 = returnFunc(ctx, userID, includeNSFW)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
+		r1 = returnFunc(ctx, userID, includeNSFW)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_CountFavorites_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountFavorites'
+type MockRepository_CountFavorites_Call struct {
+	*mock.Call
+}
+
+// CountFavorites is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID string
+//   - includeNSFW bool
+func (_e *MockRepository_Expecter) CountFavorites(ctx any, userID any, includeNSFW any) *MockRepository_CountFavorites_Call {
+	return &MockRepository_CountFavorites_Call{Call: _e.mock.On("CountFavorites", ctx, userID, includeNSFW)}
+}
+
+func (_c *MockRepository_CountFavorites_Call) Run(run func(ctx context.Context, userID string, includeNSFW bool)) *MockRepository_CountFavorites_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_CountFavorites_Call) Return(n int64, err error) *MockRepository_CountFavorites_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockRepository_CountFavorites_Call) RunAndReturn(run func(ctx context.Context, userID string, includeNSFW bool) (int64, error)) *MockRepository_CountFavorites_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CountListItems provides a mock function for the type MockRepository
+func (_mock *MockRepository) CountListItems(ctx context.Context, listID string, includeNSFW bool) (int64, error) {
+	ret := _mock.Called(ctx, listID, includeNSFW)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountListItems")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) (int64, error)); ok {
+		return returnFunc(ctx, listID, includeNSFW)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) int64); ok {
+		r0 = returnFunc(ctx, listID, includeNSFW)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
+		r1 = returnFunc(ctx, listID, includeNSFW)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_CountListItems_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountListItems'
+type MockRepository_CountListItems_Call struct {
+	*mock.Call
+}
+
+// CountListItems is a helper method to define mock.On call
+//   - ctx context.Context
+//   - listID string
+//   - includeNSFW bool
+func (_e *MockRepository_Expecter) CountListItems(ctx any, listID any, includeNSFW any) *MockRepository_CountListItems_Call {
+	return &MockRepository_CountListItems_Call{Call: _e.mock.On("CountListItems", ctx, listID, includeNSFW)}
+}
+
+func (_c *MockRepository_CountListItems_Call) Run(run func(ctx context.Context, listID string, includeNSFW bool)) *MockRepository_CountListItems_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_CountListItems_Call) Return(n int64, err error) *MockRepository_CountListItems_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockRepository_CountListItems_Call) RunAndReturn(run func(ctx context.Context, listID string, includeNSFW bool) (int64, error)) *MockRepository_CountListItems_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateList provides a mock function for the type MockRepository
 func (_mock *MockRepository) CreateList(ctx context.Context, ownerID string, title string, desc string, vis string) (model.List, error) {
 	ret := _mock.Called(ctx, ownerID, title, desc, vis)
@@ -470,8 +614,8 @@ func (_c *MockRepository_GetList_Call) RunAndReturn(run func(ctx context.Context
 }
 
 // ListFavorites provides a mock function for the type MockRepository
-func (_mock *MockRepository) ListFavorites(ctx context.Context, userID string) ([]model.Post, error) {
-	ret := _mock.Called(ctx, userID)
+func (_mock *MockRepository) ListFavorites(ctx context.Context, userID string, includeNSFW bool, limit int32, offset int32) ([]model.Post, error) {
+	ret := _mock.Called(ctx, userID, includeNSFW, limit, offset)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListFavorites")
@@ -479,18 +623,18 @@ func (_mock *MockRepository) ListFavorites(ctx context.Context, userID string) (
 
 	var r0 []model.Post
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]model.Post, error)); ok {
-		return returnFunc(ctx, userID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, int32, int32) ([]model.Post, error)); ok {
+		return returnFunc(ctx, userID, includeNSFW, limit, offset)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []model.Post); ok {
-		r0 = returnFunc(ctx, userID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, int32, int32) []model.Post); ok {
+		r0 = returnFunc(ctx, userID, includeNSFW, limit, offset)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]model.Post)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, userID)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool, int32, int32) error); ok {
+		r1 = returnFunc(ctx, userID, includeNSFW, limit, offset)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -505,11 +649,97 @@ type MockRepository_ListFavorites_Call struct {
 // ListFavorites is a helper method to define mock.On call
 //   - ctx context.Context
 //   - userID string
-func (_e *MockRepository_Expecter) ListFavorites(ctx any, userID any) *MockRepository_ListFavorites_Call {
-	return &MockRepository_ListFavorites_Call{Call: _e.mock.On("ListFavorites", ctx, userID)}
+//   - includeNSFW bool
+//   - limit int32
+//   - offset int32
+func (_e *MockRepository_Expecter) ListFavorites(ctx any, userID any, includeNSFW any, limit any, offset any) *MockRepository_ListFavorites_Call {
+	return &MockRepository_ListFavorites_Call{Call: _e.mock.On("ListFavorites", ctx, userID, includeNSFW, limit, offset)}
 }
 
-func (_c *MockRepository_ListFavorites_Call) Run(run func(ctx context.Context, userID string)) *MockRepository_ListFavorites_Call {
+func (_c *MockRepository_ListFavorites_Call) Run(run func(ctx context.Context, userID string, includeNSFW bool, limit int32, offset int32)) *MockRepository_ListFavorites_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		var arg3 int32
+		if args[3] != nil {
+			arg3 = args[3].(int32)
+		}
+		var arg4 int32
+		if args[4] != nil {
+			arg4 = args[4].(int32)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_ListFavorites_Call) Return(posts []model.Post, err error) *MockRepository_ListFavorites_Call {
+	_c.Call.Return(posts, err)
+	return _c
+}
+
+func (_c *MockRepository_ListFavorites_Call) RunAndReturn(run func(ctx context.Context, userID string, includeNSFW bool, limit int32, offset int32) ([]model.Post, error)) *MockRepository_ListFavorites_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListItemIDs provides a mock function for the type MockRepository
+func (_mock *MockRepository) ListItemIDs(ctx context.Context, listID string) ([]string, error) {
+	ret := _mock.Called(ctx, listID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListItemIDs")
+	}
+
+	var r0 []string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]string, error)); ok {
+		return returnFunc(ctx, listID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []string); ok {
+		r0 = returnFunc(ctx, listID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, listID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_ListItemIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListItemIDs'
+type MockRepository_ListItemIDs_Call struct {
+	*mock.Call
+}
+
+// ListItemIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - listID string
+func (_e *MockRepository_Expecter) ListItemIDs(ctx any, listID any) *MockRepository_ListItemIDs_Call {
+	return &MockRepository_ListItemIDs_Call{Call: _e.mock.On("ListItemIDs", ctx, listID)}
+}
+
+func (_c *MockRepository_ListItemIDs_Call) Run(run func(ctx context.Context, listID string)) *MockRepository_ListItemIDs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -527,19 +757,19 @@ func (_c *MockRepository_ListFavorites_Call) Run(run func(ctx context.Context, u
 	return _c
 }
 
-func (_c *MockRepository_ListFavorites_Call) Return(posts []model.Post, err error) *MockRepository_ListFavorites_Call {
-	_c.Call.Return(posts, err)
+func (_c *MockRepository_ListItemIDs_Call) Return(strings []string, err error) *MockRepository_ListItemIDs_Call {
+	_c.Call.Return(strings, err)
 	return _c
 }
 
-func (_c *MockRepository_ListFavorites_Call) RunAndReturn(run func(ctx context.Context, userID string) ([]model.Post, error)) *MockRepository_ListFavorites_Call {
+func (_c *MockRepository_ListItemIDs_Call) RunAndReturn(run func(ctx context.Context, listID string) ([]string, error)) *MockRepository_ListItemIDs_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ListItems provides a mock function for the type MockRepository
-func (_mock *MockRepository) ListItems(ctx context.Context, listID string) ([]model.Post, error) {
-	ret := _mock.Called(ctx, listID)
+func (_mock *MockRepository) ListItems(ctx context.Context, listID string, includeNSFW bool, limit int32, offset int32) ([]model.Post, error) {
+	ret := _mock.Called(ctx, listID, includeNSFW, limit, offset)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListItems")
@@ -547,18 +777,18 @@ func (_mock *MockRepository) ListItems(ctx context.Context, listID string) ([]mo
 
 	var r0 []model.Post
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]model.Post, error)); ok {
-		return returnFunc(ctx, listID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, int32, int32) ([]model.Post, error)); ok {
+		return returnFunc(ctx, listID, includeNSFW, limit, offset)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []model.Post); ok {
-		r0 = returnFunc(ctx, listID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, int32, int32) []model.Post); ok {
+		r0 = returnFunc(ctx, listID, includeNSFW, limit, offset)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]model.Post)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, listID)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool, int32, int32) error); ok {
+		r1 = returnFunc(ctx, listID, includeNSFW, limit, offset)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -573,11 +803,14 @@ type MockRepository_ListItems_Call struct {
 // ListItems is a helper method to define mock.On call
 //   - ctx context.Context
 //   - listID string
-func (_e *MockRepository_Expecter) ListItems(ctx any, listID any) *MockRepository_ListItems_Call {
-	return &MockRepository_ListItems_Call{Call: _e.mock.On("ListItems", ctx, listID)}
+//   - includeNSFW bool
+//   - limit int32
+//   - offset int32
+func (_e *MockRepository_Expecter) ListItems(ctx any, listID any, includeNSFW any, limit any, offset any) *MockRepository_ListItems_Call {
+	return &MockRepository_ListItems_Call{Call: _e.mock.On("ListItems", ctx, listID, includeNSFW, limit, offset)}
 }
 
-func (_c *MockRepository_ListItems_Call) Run(run func(ctx context.Context, listID string)) *MockRepository_ListItems_Call {
+func (_c *MockRepository_ListItems_Call) Run(run func(ctx context.Context, listID string, includeNSFW bool, limit int32, offset int32)) *MockRepository_ListItems_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -587,9 +820,24 @@ func (_c *MockRepository_ListItems_Call) Run(run func(ctx context.Context, listI
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		var arg3 int32
+		if args[3] != nil {
+			arg3 = args[3].(int32)
+		}
+		var arg4 int32
+		if args[4] != nil {
+			arg4 = args[4].(int32)
+		}
 		run(
 			arg0,
 			arg1,
+			arg2,
+			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -600,7 +848,7 @@ func (_c *MockRepository_ListItems_Call) Return(posts []model.Post, err error) *
 	return _c
 }
 
-func (_c *MockRepository_ListItems_Call) RunAndReturn(run func(ctx context.Context, listID string) ([]model.Post, error)) *MockRepository_ListItems_Call {
+func (_c *MockRepository_ListItems_Call) RunAndReturn(run func(ctx context.Context, listID string, includeNSFW bool, limit int32, offset int32) ([]model.Post, error)) *MockRepository_ListItems_Call {
 	_c.Call.Return(run)
 	return _c
 }

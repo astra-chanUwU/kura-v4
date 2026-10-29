@@ -157,6 +157,6 @@ func (s *stubModeration) Rollback(_ context.Context, actor model.User, historyID
 	return model.ChangeEntry{ID: historyID, EntityType: "post", EntityID: "post-1", Action: "rollback"}, nil
 }
 
-func (s *stubModeration) ListHiddenPosts(context.Context, model.User) ([]model.Post, error) {
+func (s *stubModeration) ListHiddenPosts(context.Context, model.User, string, int, int) (model.HiddenPage, error) {
 	panic("ListHiddenPosts")
 }

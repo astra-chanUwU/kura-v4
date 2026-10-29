@@ -78,7 +78,9 @@ func TestFavoritesListNSFW(t *testing.T) {
 			cols := &stubCollections{posts: posts}
 			code, env := execAgent(t, Deps{Accounts: accounts, Collections: cols}, []string{"favorites", "list"}, opt)
 			require.Equal(t, 0, code)
-			require.Equal(t, tc.want, envelopePostIDs(t, env.Data))
+			page, ok := env.Data.(map[string]any)
+			require.True(t, ok)
+			require.Equal(t, tc.want, envelopePostIDs(t, page["posts"]))
 		})
 	}
 }
@@ -200,8 +202,18 @@ func (s *stubCollections) Unfavorite(context.Context, string, string) error {
 	panic("Unfavorite")
 }
 
-func (s *stubCollections) Favorites(context.Context, string) ([]model.Post, error) {
-	return s.posts, nil
+func (s *stubCollections) Favorites(_ context.Context, _ string, includeNSFW bool, _, _ int) (model.SearchPage, error) {
+	posts := s.posts
+	if !includeNSFW {
+		kept := make([]model.Post, 0, len(posts))
+		for _, post := range posts {
+			if post.Rating != "nsfw" {
+				kept = append(kept, post)
+			}
+		}
+		posts = kept
+	}
+	return model.SearchPage{Total: int64(len(posts)), Posts: posts}, nil
 }
 
 func (s *stubCollections) FavoriteIDs(context.Context, string) (map[string]bool, error) {
@@ -221,7 +233,7 @@ func (s *stubCollections) MyLists(context.Context, string) ([]model.List, error)
 	panic("MyLists")
 }
 
-func (s *stubCollections) GetList(_ context.Context, viewerID *string, id string) (model.ListDetail, error) {
+func (s *stubCollections) GetList(_ context.Context, viewerID *string, id string, _ bool, _, _ int) (model.ListDetail, error) {
 	s.getCalled = true
 	s.viewerID = viewerID
 	s.getID = id

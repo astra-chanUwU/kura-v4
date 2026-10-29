@@ -1,9 +1,12 @@
 package model
 
+import "time"
+
 // PostQuery is a board search. Tags are required together (AND).
 // Exclude drops any post carrying one of those tags. Q matches the
 // artist credit or a tag, including a close misspelling. Artist is an
 // extra artist substring, used by the agent. Sort is newest or oldest.
+// AfterID continues a page from that post instead of skipping rows.
 type PostQuery struct {
 	Tags        []string
 	Exclude     []string
@@ -14,7 +17,23 @@ type PostQuery struct {
 	Sort        string
 	Limit       int32
 	Offset      int32
+	AfterID     string
+	AfterAt     time.Time
 	IncludeNSFW bool
+}
+
+// PageBounds clamps a list page the same way on every route.
+func PageBounds(limit, offset int) (int32, int32) {
+	if limit <= 0 {
+		limit = 40
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return int32(limit), int32(offset)
 }
 
 // SearchPage is one page of a board search plus the full match count,

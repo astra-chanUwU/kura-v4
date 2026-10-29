@@ -41,6 +41,44 @@ func (q *Queries) AddListItem(ctx context.Context, arg AddListItemParams) error 
 	return err
 }
 
+const countFavorites = `-- name: CountFavorites :one
+SELECT count(*)::bigint AS total
+FROM favorites f JOIN posts p ON p.id = f.post_id
+WHERE f.user_id = $1
+  AND ($2::bool OR p.rating = 'sfw')
+`
+
+type CountFavoritesParams struct {
+	UserID      uuid.UUID
+	IncludeNsfw bool
+}
+
+func (q *Queries) CountFavorites(ctx context.Context, arg CountFavoritesParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countFavorites, arg.UserID, arg.IncludeNsfw)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
+const countListItems = `-- name: CountListItems :one
+SELECT count(*)::bigint AS total
+FROM list_items i JOIN posts p ON p.id = i.post_id
+WHERE i.list_id = $1
+  AND ($2::bool OR p.rating = 'sfw')
+`
+
+type CountListItemsParams struct {
+	ListID      uuid.UUID
+	IncludeNsfw bool
+}
+
+func (q *Queries) CountListItems(ctx context.Context, arg CountListItemsParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countListItems, arg.ListID, arg.IncludeNsfw)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
 const createList = `-- name: CreateList :one
 INSERT INTO lists (owner_id, title, description, visibility) VALUES ($1,$2,$3,$4)
 RETURNING id, owner_id, title, description, visibility, created_at, updated_at
@@ -159,8 +197,18 @@ const listFavorites = `-- name: ListFavorites :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at, p.rating,
   COALESCE(u.username,'')::text AS owner_username
 FROM favorites f JOIN posts p ON p.id=f.post_id LEFT JOIN users u ON u.id=p.owner_id
-WHERE f.user_id=$1 ORDER BY f.created_at DESC
+WHERE f.user_id = $1
+  AND ($2::bool OR p.rating = 'sfw')
+ORDER BY f.created_at DESC, p.id DESC
+LIMIT $4 OFFSET $3
 `
+
+type ListFavoritesParams struct {
+	UserID      uuid.UUID
+	IncludeNsfw bool
+	RowOffset   int32
+	RowLimit    int32
+}
 
 type ListFavoritesRow struct {
 	ID            uuid.UUID
@@ -174,8 +222,13 @@ type ListFavoritesRow struct {
 	OwnerUsername string
 }
 
-func (q *Queries) ListFavorites(ctx context.Context, userID uuid.UUID) ([]ListFavoritesRow, error) {
-	rows, err := q.db.QueryContext(ctx, listFavorites, userID)
+func (q *Queries) ListFavorites(ctx context.Context, arg ListFavoritesParams) ([]ListFavoritesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listFavorites,
+		arg.UserID,
+		arg.IncludeNsfw,
+		arg.RowOffset,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -207,12 +260,49 @@ func (q *Queries) ListFavorites(ctx context.Context, userID uuid.UUID) ([]ListFa
 	return items, nil
 }
 
+const listItemIDs = `-- name: ListItemIDs :many
+SELECT post_id FROM list_items WHERE list_id = $1 ORDER BY position, post_id
+`
+
+func (q *Queries) ListItemIDs(ctx context.Context, listID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.QueryContext(ctx, listItemIDs, listID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var post_id uuid.UUID
+		if err := rows.Scan(&post_id); err != nil {
+			return nil, err
+		}
+		items = append(items, post_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listItems = `-- name: ListItems :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at, p.rating,
   COALESCE(u.username,'')::text AS owner_username
 FROM list_items i JOIN posts p ON p.id=i.post_id LEFT JOIN users u ON u.id=p.owner_id
-WHERE i.list_id=$1 ORDER BY i.position
+WHERE i.list_id = $1
+  AND ($2::bool OR p.rating = 'sfw')
+ORDER BY i.position
+LIMIT $4 OFFSET $3
 `
+
+type ListItemsParams struct {
+	ListID      uuid.UUID
+	IncludeNsfw bool
+	RowOffset   int32
+	RowLimit    int32
+}
 
 type ListItemsRow struct {
 	ID            uuid.UUID
@@ -226,8 +316,13 @@ type ListItemsRow struct {
 	OwnerUsername string
 }
 
-func (q *Queries) ListItems(ctx context.Context, listID uuid.UUID) ([]ListItemsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listItems, listID)
+func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListItemsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listItems,
+		arg.ListID,
+		arg.IncludeNsfw,
+		arg.RowOffset,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

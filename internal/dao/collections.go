@@ -60,12 +60,20 @@ func (d *CollectionsDAO) FavoriteIDs(ctx context.Context, userID string) ([]stri
 	}
 	return out, nil
 }
-func (d *CollectionsDAO) ListFavorites(ctx context.Context, userID string) ([]model.Post, error) {
+func (d *CollectionsDAO) CountFavorites(ctx context.Context, userID string, includeNSFW bool) (int64, error) {
+	u, err := uuid.Parse(userID)
+	if err != nil {
+		return 0, err
+	}
+	return d.q.CountFavorites(ctx, sqlcgen.CountFavoritesParams{UserID: u, IncludeNsfw: includeNSFW})
+}
+
+func (d *CollectionsDAO) ListFavorites(ctx context.Context, userID string, includeNSFW bool, limit, offset int32) ([]model.Post, error) {
 	u, err := uuid.Parse(userID)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := d.q.ListFavorites(ctx, u)
+	rows, err := d.q.ListFavorites(ctx, sqlcgen.ListFavoritesParams{UserID: u, IncludeNsfw: includeNSFW, RowLimit: limit, RowOffset: offset})
 	if err != nil {
 		return nil, err
 	}
@@ -156,12 +164,36 @@ func (d *CollectionsDAO) DeleteList(ctx context.Context, id, ownerID string) (in
 	}
 	return d.q.DeleteList(ctx, sqlcgen.DeleteListParams{ID: uid, OwnerID: o})
 }
-func (d *CollectionsDAO) ListItems(ctx context.Context, listID string) ([]model.Post, error) {
+func (d *CollectionsDAO) CountListItems(ctx context.Context, listID string, includeNSFW bool) (int64, error) {
+	uid, err := uuid.Parse(listID)
+	if err != nil {
+		return 0, err
+	}
+	return d.q.CountListItems(ctx, sqlcgen.CountListItemsParams{ListID: uid, IncludeNsfw: includeNSFW})
+}
+
+func (d *CollectionsDAO) ListItemIDs(ctx context.Context, listID string) ([]string, error) {
 	uid, err := uuid.Parse(listID)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := d.q.ListItems(ctx, uid)
+	ids, err := d.q.ListItemIDs(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = id.String()
+	}
+	return out, nil
+}
+
+func (d *CollectionsDAO) ListItems(ctx context.Context, listID string, includeNSFW bool, limit, offset int32) ([]model.Post, error) {
+	uid, err := uuid.Parse(listID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := d.q.ListItems(ctx, sqlcgen.ListItemsParams{ListID: uid, IncludeNsfw: includeNSFW, RowLimit: limit, RowOffset: offset})
 	if err != nil {
 		return nil, err
 	}

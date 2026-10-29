@@ -91,9 +91,19 @@ func (d *PostsDAO) CountBoardMatches(ctx context.Context, q model.PostQuery) (in
 }
 
 func (d *PostsDAO) SearchPosts(ctx context.Context, q model.PostQuery) ([]model.Post, error) {
+	var afterID uuid.NullUUID
+	var afterAt sql.NullTime
+	if q.AfterID != "" {
+		id, err := uuid.Parse(q.AfterID)
+		if err != nil {
+			return nil, err
+		}
+		afterID = uuid.NullUUID{UUID: id, Valid: true}
+		afterAt = sql.NullTime{Time: q.AfterAt, Valid: true}
+	}
 	rows, err := d.q.SearchPosts(ctx, sqlcgen.SearchPostsParams{
 		Tags: q.Tags, Exclude: q.Exclude, Q: q.Q, QLike: q.QLike, ArtistLike: q.ArtistLike, IncludeNsfw: q.IncludeNSFW,
-		Sort: q.Sort, RowOffset: q.Offset, RowLimit: q.Limit,
+		AfterID: afterID, Sort: q.Sort, AfterAt: afterAt, RowOffset: q.Offset, RowLimit: q.Limit,
 	})
 	if err != nil {
 		return nil, err
@@ -105,8 +115,18 @@ func (d *PostsDAO) SearchPosts(ctx context.Context, q model.PostQuery) ([]model.
 	return out, nil
 }
 
-func (d *PostsDAO) SuggestTags(ctx context.Context, q string, limit int32, includeNSFW bool) ([]model.TagCount, error) {
-	rows, err := d.q.SuggestTags(ctx, sqlcgen.SuggestTagsParams{Q: q, IncludeNsfw: includeNSFW, RowLimit: limit})
+func (d *PostsDAO) SuggestTags(ctx context.Context, prefix string, filter model.PostQuery, limit int32) ([]model.TagCount, error) {
+	tags, exclude := filter.Tags, filter.Exclude
+	if tags == nil {
+		tags = []string{}
+	}
+	if exclude == nil {
+		exclude = []string{}
+	}
+	rows, err := d.q.SuggestTags(ctx, sqlcgen.SuggestTagsParams{
+		Tags: tags, Exclude: exclude, Match: filter.Q, MatchLike: filter.QLike, IncludeNsfw: filter.IncludeNSFW,
+		Q: prefix, RowLimit: limit,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -148,12 +168,24 @@ func (d *PostsDAO) GetPostBySHA(ctx context.Context, sha string) (model.Post, er
 	}
 	return postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.ThumbnailKey, r.TagsCsv, r.Width, r.Height, r.Rating, r.Hidden, r.Deleted), nil
 }
-func (d *PostsDAO) ListPostsByOwner(ctx context.Context, ownerID string) ([]model.Post, error) {
+func (d *PostsDAO) CountVisiblePostsByOwner(ctx context.Context, ownerID string, includeNSFW bool) (int64, error) {
+	uid, err := uuid.Parse(ownerID)
+	if err != nil {
+		return 0, err
+	}
+	return d.q.CountVisiblePostsByOwner(ctx, sqlcgen.CountVisiblePostsByOwnerParams{
+		OwnerID: uuid.NullUUID{UUID: uid, Valid: true}, IncludeNsfw: includeNSFW,
+	})
+}
+
+func (d *PostsDAO) ListPostsByOwner(ctx context.Context, ownerID string, includeNSFW bool, limit, offset int32) ([]model.Post, error) {
 	uid, err := uuid.Parse(ownerID)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := d.q.ListPostsByOwner(ctx, uuid.NullUUID{UUID: uid, Valid: true})
+	rows, err := d.q.ListPostsByOwner(ctx, sqlcgen.ListPostsByOwnerParams{
+		OwnerID: uuid.NullUUID{UUID: uid, Valid: true}, IncludeNsfw: includeNSFW, RowLimit: limit, RowOffset: offset,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -223,8 +255,16 @@ func (d *PostsDAO) SetPostHidden(ctx context.Context, id string, hidden, deleted
 	return d.q.SetPostHidden(ctx, sqlcgen.SetPostHiddenParams{ID: uid, Column2: hidden, Column3: deleted, Column4: actor})
 }
 
-func (d *PostsDAO) ListHiddenPosts(ctx context.Context) ([]model.Post, error) {
-	rows, err := d.q.ListHiddenPosts(ctx)
+func (d *PostsDAO) CountRemovedPosts(ctx context.Context) (int64, int64, error) {
+	row, err := d.q.CountRemovedPosts(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	return row.Hidden, row.Deleted, nil
+}
+
+func (d *PostsDAO) ListHiddenPosts(ctx context.Context, kind string, limit, offset int32) ([]model.Post, error) {
+	rows, err := d.q.ListHiddenPosts(ctx, sqlcgen.ListHiddenPostsParams{Kind: kind, RowLimit: limit, RowOffset: offset})
 	if err != nil {
 		return nil, err
 	}

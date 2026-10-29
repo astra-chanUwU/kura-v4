@@ -179,6 +179,78 @@ func (_c *MockRepository_CountPostsByOwner_Call) RunAndReturn(run func(ctx conte
 	return _c
 }
 
+// CountVisiblePostsByOwner provides a mock function for the type MockRepository
+func (_mock *MockRepository) CountVisiblePostsByOwner(ctx context.Context, ownerID string, includeNSFW bool) (int64, error) {
+	ret := _mock.Called(ctx, ownerID, includeNSFW)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountVisiblePostsByOwner")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) (int64, error)); ok {
+		return returnFunc(ctx, ownerID, includeNSFW)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) int64); ok {
+		r0 = returnFunc(ctx, ownerID, includeNSFW)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
+		r1 = returnFunc(ctx, ownerID, includeNSFW)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_CountVisiblePostsByOwner_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountVisiblePostsByOwner'
+type MockRepository_CountVisiblePostsByOwner_Call struct {
+	*mock.Call
+}
+
+// CountVisiblePostsByOwner is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ownerID string
+//   - includeNSFW bool
+func (_e *MockRepository_Expecter) CountVisiblePostsByOwner(ctx any, ownerID any, includeNSFW any) *MockRepository_CountVisiblePostsByOwner_Call {
+	return &MockRepository_CountVisiblePostsByOwner_Call{Call: _e.mock.On("CountVisiblePostsByOwner", ctx, ownerID, includeNSFW)}
+}
+
+func (_c *MockRepository_CountVisiblePostsByOwner_Call) Run(run func(ctx context.Context, ownerID string, includeNSFW bool)) *MockRepository_CountVisiblePostsByOwner_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_CountVisiblePostsByOwner_Call) Return(n int64, err error) *MockRepository_CountVisiblePostsByOwner_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockRepository_CountVisiblePostsByOwner_Call) RunAndReturn(run func(ctx context.Context, ownerID string, includeNSFW bool) (int64, error)) *MockRepository_CountVisiblePostsByOwner_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreatePost provides a mock function for the type MockRepository
 func (_mock *MockRepository) CreatePost(ctx context.Context, p model.Post, sha string) (model.Post, error) {
 	ret := _mock.Called(ctx, p, sha)
@@ -596,8 +668,8 @@ func (_c *MockRepository_ListPosts_Call) RunAndReturn(run func(ctx context.Conte
 }
 
 // ListPostsByOwner provides a mock function for the type MockRepository
-func (_mock *MockRepository) ListPostsByOwner(ctx context.Context, ownerID string) ([]model.Post, error) {
-	ret := _mock.Called(ctx, ownerID)
+func (_mock *MockRepository) ListPostsByOwner(ctx context.Context, ownerID string, includeNSFW bool, limit int32, offset int32) ([]model.Post, error) {
+	ret := _mock.Called(ctx, ownerID, includeNSFW, limit, offset)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListPostsByOwner")
@@ -605,18 +677,18 @@ func (_mock *MockRepository) ListPostsByOwner(ctx context.Context, ownerID strin
 
 	var r0 []model.Post
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]model.Post, error)); ok {
-		return returnFunc(ctx, ownerID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, int32, int32) ([]model.Post, error)); ok {
+		return returnFunc(ctx, ownerID, includeNSFW, limit, offset)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []model.Post); ok {
-		r0 = returnFunc(ctx, ownerID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, int32, int32) []model.Post); ok {
+		r0 = returnFunc(ctx, ownerID, includeNSFW, limit, offset)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]model.Post)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, ownerID)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool, int32, int32) error); ok {
+		r1 = returnFunc(ctx, ownerID, includeNSFW, limit, offset)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -631,11 +703,14 @@ type MockRepository_ListPostsByOwner_Call struct {
 // ListPostsByOwner is a helper method to define mock.On call
 //   - ctx context.Context
 //   - ownerID string
-func (_e *MockRepository_Expecter) ListPostsByOwner(ctx any, ownerID any) *MockRepository_ListPostsByOwner_Call {
-	return &MockRepository_ListPostsByOwner_Call{Call: _e.mock.On("ListPostsByOwner", ctx, ownerID)}
+//   - includeNSFW bool
+//   - limit int32
+//   - offset int32
+func (_e *MockRepository_Expecter) ListPostsByOwner(ctx any, ownerID any, includeNSFW any, limit any, offset any) *MockRepository_ListPostsByOwner_Call {
+	return &MockRepository_ListPostsByOwner_Call{Call: _e.mock.On("ListPostsByOwner", ctx, ownerID, includeNSFW, limit, offset)}
 }
 
-func (_c *MockRepository_ListPostsByOwner_Call) Run(run func(ctx context.Context, ownerID string)) *MockRepository_ListPostsByOwner_Call {
+func (_c *MockRepository_ListPostsByOwner_Call) Run(run func(ctx context.Context, ownerID string, includeNSFW bool, limit int32, offset int32)) *MockRepository_ListPostsByOwner_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -645,9 +720,24 @@ func (_c *MockRepository_ListPostsByOwner_Call) Run(run func(ctx context.Context
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		var arg3 int32
+		if args[3] != nil {
+			arg3 = args[3].(int32)
+		}
+		var arg4 int32
+		if args[4] != nil {
+			arg4 = args[4].(int32)
+		}
 		run(
 			arg0,
 			arg1,
+			arg2,
+			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -658,7 +748,7 @@ func (_c *MockRepository_ListPostsByOwner_Call) Return(posts []model.Post, err e
 	return _c
 }
 
-func (_c *MockRepository_ListPostsByOwner_Call) RunAndReturn(run func(ctx context.Context, ownerID string) ([]model.Post, error)) *MockRepository_ListPostsByOwner_Call {
+func (_c *MockRepository_ListPostsByOwner_Call) RunAndReturn(run func(ctx context.Context, ownerID string, includeNSFW bool, limit int32, offset int32) ([]model.Post, error)) *MockRepository_ListPostsByOwner_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1056,8 +1146,8 @@ func (_c *MockRepository_SetPostThumbnail_Call) RunAndReturn(run func(ctx contex
 }
 
 // SuggestTags provides a mock function for the type MockRepository
-func (_mock *MockRepository) SuggestTags(ctx context.Context, q string, limit int32, includeNSFW bool) ([]model.TagCount, error) {
-	ret := _mock.Called(ctx, q, limit, includeNSFW)
+func (_mock *MockRepository) SuggestTags(ctx context.Context, prefix string, filter model.PostQuery, limit int32) ([]model.TagCount, error) {
+	ret := _mock.Called(ctx, prefix, filter, limit)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SuggestTags")
@@ -1065,18 +1155,18 @@ func (_mock *MockRepository) SuggestTags(ctx context.Context, q string, limit in
 
 	var r0 []model.TagCount
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, int32, bool) ([]model.TagCount, error)); ok {
-		return returnFunc(ctx, q, limit, includeNSFW)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, model.PostQuery, int32) ([]model.TagCount, error)); ok {
+		return returnFunc(ctx, prefix, filter, limit)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, int32, bool) []model.TagCount); ok {
-		r0 = returnFunc(ctx, q, limit, includeNSFW)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, model.PostQuery, int32) []model.TagCount); ok {
+		r0 = returnFunc(ctx, prefix, filter, limit)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]model.TagCount)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, int32, bool) error); ok {
-		r1 = returnFunc(ctx, q, limit, includeNSFW)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, model.PostQuery, int32) error); ok {
+		r1 = returnFunc(ctx, prefix, filter, limit)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1090,14 +1180,14 @@ type MockRepository_SuggestTags_Call struct {
 
 // SuggestTags is a helper method to define mock.On call
 //   - ctx context.Context
-//   - q string
+//   - prefix string
+//   - filter model.PostQuery
 //   - limit int32
-//   - includeNSFW bool
-func (_e *MockRepository_Expecter) SuggestTags(ctx any, q any, limit any, includeNSFW any) *MockRepository_SuggestTags_Call {
-	return &MockRepository_SuggestTags_Call{Call: _e.mock.On("SuggestTags", ctx, q, limit, includeNSFW)}
+func (_e *MockRepository_Expecter) SuggestTags(ctx any, prefix any, filter any, limit any) *MockRepository_SuggestTags_Call {
+	return &MockRepository_SuggestTags_Call{Call: _e.mock.On("SuggestTags", ctx, prefix, filter, limit)}
 }
 
-func (_c *MockRepository_SuggestTags_Call) Run(run func(ctx context.Context, q string, limit int32, includeNSFW bool)) *MockRepository_SuggestTags_Call {
+func (_c *MockRepository_SuggestTags_Call) Run(run func(ctx context.Context, prefix string, filter model.PostQuery, limit int32)) *MockRepository_SuggestTags_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1107,13 +1197,13 @@ func (_c *MockRepository_SuggestTags_Call) Run(run func(ctx context.Context, q s
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
-		var arg2 int32
+		var arg2 model.PostQuery
 		if args[2] != nil {
-			arg2 = args[2].(int32)
+			arg2 = args[2].(model.PostQuery)
 		}
-		var arg3 bool
+		var arg3 int32
 		if args[3] != nil {
-			arg3 = args[3].(bool)
+			arg3 = args[3].(int32)
 		}
 		run(
 			arg0,
@@ -1130,7 +1220,7 @@ func (_c *MockRepository_SuggestTags_Call) Return(tagCounts []model.TagCount, er
 	return _c
 }
 
-func (_c *MockRepository_SuggestTags_Call) RunAndReturn(run func(ctx context.Context, q string, limit int32, includeNSFW bool) ([]model.TagCount, error)) *MockRepository_SuggestTags_Call {
+func (_c *MockRepository_SuggestTags_Call) RunAndReturn(run func(ctx context.Context, prefix string, filter model.PostQuery, limit int32) ([]model.TagCount, error)) *MockRepository_SuggestTags_Call {
 	_c.Call.Return(run)
 	return _c
 }

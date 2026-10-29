@@ -8,7 +8,7 @@ import {
   type QueryClient,
   type QueryKey,
 } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ChangeEntry, Post, SearchPage } from "../types/api";
 import type { Role } from "../domain/roles";
 import {
@@ -73,10 +73,11 @@ export function useBoard(filter: BoardFilter, enabled = true) {
   const query = useInfiniteQuery({
     queryKey: queryKeys.board(filter),
     queryFn: ({ pageParam, signal }) => api.search(filter, pageParam, signal),
-    initialPageParam: 0,
+    initialPageParam: "",
     getNextPageParam: (lastPage, allPages) => {
       const loaded = allPages.reduce((n, page) => n + page.posts.length, 0);
-      return loaded < lastPage.total ? loaded : undefined;
+      const cursor = lastPage.posts.at(-1)?.id;
+      return loaded < lastPage.total && cursor ? cursor : undefined;
     },
     enabled,
     placeholderData: keepPreviousData,
@@ -96,16 +97,38 @@ export function useBoard(filter: BoardFilter, enabled = true) {
   };
 }
 
-/** Tag names for the search box. Empty text returns the most common tags. */
-export function useTagSuggestions(text: string, enabled: boolean) {
+/** Tag names for the search box, counted inside the board filter already on. */
+export function useTagSuggestions(text: string, filter: BoardFilter, enabled: boolean) {
   const q = text.trim().toLowerCase();
   const query = useQuery({
-    queryKey: queryKeys.tagSuggestions(q),
-    queryFn: ({ signal }) => api.tagSuggestions(q, signal),
+    queryKey: queryKeys.tagSuggestions(q, filter),
+    queryFn: ({ signal }) => api.tagSuggestions(q, filter, signal),
     enabled,
     staleTime: 60_000,
   });
   return { suggestions: query.data ?? [], loading: query.isFetching };
+}
+
+function nextOffset(loaded: number, total: number): number | undefined {
+  return loaded < total ? loaded : undefined;
+}
+
+/** Watches a sentinel and asks for the next page as it nears the viewport. */
+export function useLoadMore(enabled: boolean, loadMore: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !enabled || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadMore();
+      },
+      { rootMargin: "900px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [enabled, loadMore]);
+  return ref;
 }
 
 // Debounce a rapidly changing value (e.g. keystrokes) so downstream
@@ -152,20 +175,46 @@ export function usePostNeighbors(id: string, filter: BoardFilter): Neighbors & {
   };
 }
 
-export function useFavorites(enabled: boolean) {
-  return useQuery({
-    queryKey: queryKeys.favorites(),
-    queryFn: ({ signal }) => api.favorites(signal),
+function usePagedPosts(
+  key: readonly unknown[],
+  fetchPage: (offset: number, signal: AbortSignal) => Promise<SearchPage>,
+  enabled: boolean,
+) {
+  const query = useInfiniteQuery({
+    queryKey: key,
+    queryFn: ({ pageParam, signal }) => fetchPage(pageParam, signal),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((n, page) => n + page.posts.length, 0);
+      return nextOffset(loaded, lastPage.total);
+    },
     enabled,
   });
+  return {
+    posts: query.data?.pages.flatMap((page) => page.posts) ?? [],
+    total: query.data?.pages.at(-1)?.total ?? 0,
+    isPending: query.isPending,
+    error: query.error,
+    hasMore: query.hasNextPage ?? false,
+    loadingMore: query.isFetchingNextPage,
+    loadMore: () => void query.fetchNextPage(),
+  };
+}
+
+export function useFavorites(enabled: boolean) {
+  return usePagedPosts(
+    queryKeys.favorites(),
+    (offset, signal) => api.favorites(offset, signal),
+    enabled,
+  );
 }
 
 export function useMyPosts(enabled: boolean) {
-  return useQuery({
-    queryKey: queryKeys.myPosts(),
-    queryFn: ({ signal }) => api.myPosts(signal),
+  return usePagedPosts(
+    queryKeys.myPosts(),
+    (offset, signal) => api.myPosts(offset, signal),
     enabled,
-  });
+  );
 }
 
 export function useMyLists(enabled: boolean) {
@@ -177,7 +226,26 @@ export function useMyLists(enabled: boolean) {
 }
 
 export function useList(id: string) {
-  return useQuery({ queryKey: queryKeys.list(id), queryFn: ({ signal }) => api.list(id, signal) });
+  const query = useInfiniteQuery({
+    queryKey: queryKeys.list(id),
+    queryFn: ({ pageParam, signal }) => api.list(id, pageParam, signal),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((n, page) => n + page.items.length, 0);
+      return nextOffset(loaded, lastPage.total);
+    },
+    enabled: id !== "",
+  });
+  const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const first = query.data?.pages[0];
+  return {
+    data: first ? { list: first.list, items, total: first.total } : undefined,
+    isPending: query.isPending,
+    error: query.error,
+    hasMore: query.hasNextPage ?? false,
+    loadingMore: query.isFetchingNextPage,
+    loadMore: () => void query.fetchNextPage(),
+  };
 }
 
 export function useProfile(username: string) {
@@ -237,11 +305,23 @@ export function useToggleFavorite() {
         });
       }
       for (const key of [queryKeys.favorites(), queryKeys.myPosts()] as const) {
-        const list = client.getQueryData<Post[]>(key);
-        if (list) patch(key, list.map(patchPost));
+        const list = client.getQueryData<InfiniteData<SearchPage>>(key);
+        if (list) {
+          patch(key, {
+            ...list,
+            pages: list.pages.map((page) => ({ ...page, posts: page.posts.map(patchPost) })),
+          });
+        }
       }
-      for (const [key, detail] of client.getQueriesData<ListDetail>({ queryKey: ["list"] })) {
-        if (detail) patch(key, { ...detail, items: detail.items.map(patchPost) });
+      for (const [key, detail] of client.getQueriesData<InfiniteData<ListDetail>>({
+        queryKey: ["list"],
+      })) {
+        if (detail) {
+          patch(key, {
+            ...detail,
+            pages: detail.pages.map((page) => ({ ...page, items: page.items.map(patchPost) })),
+          });
+        }
       }
       return { touched };
     },
@@ -337,6 +417,8 @@ export function useListActions(listId?: string) {
     deleteList: (id: string) => api.deleteList(id).then(refresh),
     removeFromList: (id: string, postId: string) => api.removeFromList(id, postId).then(refresh),
     reorderList: (id: string, postIds: string[]) => api.reorderList(id, postIds).then(refresh),
+    moveListItem: (id: string, postId: string, afterId: string) =>
+      api.moveListItem(id, postId, afterId).then(refresh),
     refresh,
   };
 }
@@ -381,12 +463,29 @@ export function useAdminUsers(enabled: boolean) {
   });
 }
 
-export function useHiddenPosts(enabled: boolean) {
-  return useQuery({
-    queryKey: queryKeys.hiddenPosts(),
-    queryFn: ({ signal }) => api.hiddenPosts(signal),
+export function useHiddenPosts(enabled: boolean, kind: "all" | "hidden" | "deleted" = "all") {
+  const query = useInfiniteQuery({
+    queryKey: queryKeys.hiddenPosts(kind),
+    queryFn: ({ pageParam, signal }) => api.hiddenPosts(kind, pageParam, signal),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((n, page) => n + page.posts.length, 0);
+      return nextOffset(loaded, lastPage.total);
+    },
     enabled,
   });
+  const first = query.data?.pages[0];
+  return {
+    posts: query.data?.pages.flatMap((page) => page.posts) ?? [],
+    total: first?.total ?? 0,
+    hidden: first?.hidden ?? 0,
+    deleted: first?.deleted ?? 0,
+    isPending: query.isPending,
+    error: query.error,
+    hasMore: (query.hasNextPage ?? false) && enabled,
+    loadingMore: query.isFetchingNextPage,
+    loadMore: () => void query.fetchNextPage(),
+  };
 }
 
 export function useRecentHistory(actorId: string | undefined, enabled: boolean) {
@@ -412,7 +511,7 @@ export function useStaffActions() {
     void client.invalidateQueries({ queryKey: queryKeys.posts() });
     invalidateSearch(client);
     void client.invalidateQueries({ queryKey: queryKeys.postHistory(postId) });
-    void client.invalidateQueries({ queryKey: queryKeys.hiddenPosts() });
+    void client.invalidateQueries({ queryKey: ["hidden-posts"] });
     void client.invalidateQueries({ queryKey: ["admin-history"] });
   };
   return {

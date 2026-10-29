@@ -18,6 +18,7 @@ import {
   useAccountActions,
   useAuthActions,
   useFavorites,
+  useLoadMore,
   useInvalidate,
   useListActions,
   useMe,
@@ -35,6 +36,7 @@ import {
   normalizeFont,
   normalizeTheme,
 } from "../domain/appearance";
+import type { Post } from "../types/api";
 import styles from "./Simple.module.css";
 
 const DISMISS_KEY = "kura-passkey-tip-dismissed";
@@ -576,38 +578,28 @@ export function MePage() {
 
       {tab === "contributions" && (
         <div>
-          <p className={styles.muted}>
-            Everything you have added to the board, newest first.
-            {(myPosts.data ?? []).length > 0
-              ? ` ${myPosts.data?.length} picture${(myPosts.data?.length ?? 0) === 1 ? "" : "s"} here — hidden NSFW uploads only appear while “Show NSFW posts” is on.`
-              : ""}
-          </p>
-          {myPosts.isPending && <p className={styles.muted}>Loading…</p>}
-          {(myPosts.data ?? []).length === 0 && !myPosts.isPending && (
-            <p className={styles.muted}>
-              Nothing yet. Use “Upload” on the board to add your first picture — it will show up
-              here and at the top of the board.
-            </p>
-          )}
-          <div className={styles.grid}>
-            {(myPosts.data ?? []).map((post) => (
-              <PostCard key={post.id} post={post} />
-            ))}
-          </div>
+          <Contributions
+            posts={myPosts.posts}
+            total={myPosts.total}
+            pending={myPosts.isPending}
+            hasMore={myPosts.hasMore}
+            loadingMore={myPosts.loadingMore}
+            loadMore={myPosts.loadMore}
+          />
         </div>
       )}
 
       {tab === "favorites" && (
         <div>
           <p className={styles.muted}>Private — only you can see your favorites.</p>
-          {(favorites.data ?? []).length === 0 && (
-            <p className={styles.muted}>No favorites yet. Tap “♡ Save” on any picture.</p>
-          )}
-          <div className={styles.grid}>
-            {(favorites.data ?? []).map((post) => (
-              <PostCard key={post.id} post={post} />
-            ))}
-          </div>
+          <PagedPosts
+            posts={favorites.posts}
+            pending={favorites.isPending}
+            empty="No favorites yet. Tap “♡ Save” on any picture."
+            hasMore={favorites.hasMore}
+            loadingMore={favorites.loadingMore}
+            loadMore={favorites.loadMore}
+          />
         </div>
       )}
 
@@ -886,5 +878,71 @@ export function MePage() {
         </div>
       )}
     </section>
+  );
+}
+
+function Contributions({
+  posts,
+  total,
+  pending,
+  hasMore,
+  loadingMore,
+  loadMore,
+}: {
+  posts: Post[];
+  total: number;
+  pending: boolean;
+  hasMore: boolean;
+  loadingMore: boolean;
+  loadMore: () => void;
+}) {
+  return (
+    <div>
+      <p className={styles.muted}>
+        Everything you have added to the board, newest first.
+        {total > 0
+          ? ` ${total} picture${total === 1 ? "" : "s"} here — hidden NSFW uploads only appear while “Show NSFW posts” is on.`
+          : ""}
+      </p>
+      <PagedPosts
+        posts={posts}
+        pending={pending}
+        empty="Nothing yet. Use “Upload” on the board to add your first picture — it will show up here and at the top of the board."
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        loadMore={loadMore}
+      />
+    </div>
+  );
+}
+
+function PagedPosts({
+  posts,
+  pending,
+  empty,
+  hasMore,
+  loadingMore,
+  loadMore,
+}: {
+  posts: Post[];
+  pending: boolean;
+  empty: string;
+  hasMore: boolean;
+  loadingMore: boolean;
+  loadMore: () => void;
+}) {
+  const moreRef = useLoadMore(hasMore && !loadingMore, loadMore);
+  return (
+    <>
+      {pending && <p className={styles.muted}>Loading…</p>}
+      {!pending && posts.length === 0 && <p className={styles.muted}>{empty}</p>}
+      <div className={styles.grid}>
+        {posts.map((post) => (
+          <PostCard key={post.id} post={post} />
+        ))}
+      </div>
+      <div ref={moreRef} aria-hidden="true" />
+      {loadingMore && <p className={styles.muted}>Loading more…</p>}
+    </>
   );
 }

@@ -119,6 +119,14 @@ type List struct {
 type ListDetail struct {
 	List  List   `json:"list"`
 	Items []Post `json:"items"`
+	Total int64  `json:"total"`
+}
+
+type HiddenPage struct {
+	Total   int64  `json:"total"`
+	Hidden  int64  `json:"hidden"`
+	Deleted int64  `json:"deleted"`
+	Posts   []Post `json:"posts"`
 }
 
 type Passkey struct {
@@ -172,6 +180,8 @@ type ListInput struct {
 
 type ReorderInput struct {
 	PostIDs []string `json:"post_ids"`
+	PostID  string   `json:"post_id"`
+	AfterID string   `json:"after_id"`
 }
 
 // WebAuthnCeremony starts a ceremony; the client echoes CeremonyID on finish.

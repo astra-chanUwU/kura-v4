@@ -7,6 +7,7 @@ package sqlcgen
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,43 +50,72 @@ func (q *Queries) CountBoardMatches(ctx context.Context, arg CountBoardMatchesPa
 }
 
 const postNeighbors = `-- name: PostNeighbors :one
-WITH filtered AS (
-    SELECT p.id,
-        row_number() OVER (
-            ORDER BY
-                CASE WHEN $2::text = 'oldest' THEN p.created_at END ASC NULLS LAST,
-                CASE WHEN $2::text <> 'oldest' THEN p.created_at END DESC NULLS LAST,
-                p.id DESC
-        ) AS rn
+WITH matched AS MATERIALIZED (
+    SELECT p.id, p.created_at
     FROM board_match_ids(
+        $2::text[],
         $3::text[],
-        $4::text[],
+        $4::text,
         $5::text,
         $6::text,
-        $7::text,
-        $8::bool
+        $7::bool
     ) m
     JOIN posts p ON p.id = m.id
+),
+cur AS (
+    SELECT id, created_at FROM matched WHERE id = $8::uuid
 )
 SELECT
-    COALESCE((SELECT rn - 1 FROM filtered WHERE id = $1::uuid), -1)::int AS idx,
-    (SELECT count(*) FROM filtered)::bigint AS total,
+    CASE
+        WHEN NOT EXISTS (SELECT 1 FROM cur) THEN -1
+        ELSE (
+            SELECT count(*)::int
+            FROM matched p
+            CROSS JOIN cur c
+            WHERE CASE
+                WHEN $1::text = 'oldest' THEN
+                    p.created_at < c.created_at OR (p.created_at = c.created_at AND p.id > c.id)
+                ELSE
+                    p.created_at > c.created_at OR (p.created_at = c.created_at AND p.id > c.id)
+            END
+        )
+    END::int AS idx,
+    (SELECT count(*) FROM matched)::bigint AS total,
     COALESCE((
-        SELECT f2.id::text
-        FROM filtered cur
-        JOIN filtered f2 ON f2.rn = cur.rn - 1
-        WHERE cur.id = $1::uuid
+        SELECT p.id::text
+        FROM matched p
+        CROSS JOIN cur c
+        WHERE CASE
+            WHEN $1::text = 'oldest' THEN
+                p.created_at < c.created_at OR (p.created_at = c.created_at AND p.id > c.id)
+            ELSE
+                p.created_at > c.created_at OR (p.created_at = c.created_at AND p.id > c.id)
+        END
+        ORDER BY
+            CASE WHEN $1::text = 'oldest' THEN p.created_at END DESC NULLS LAST,
+            CASE WHEN $1::text <> 'oldest' THEN p.created_at END ASC NULLS LAST,
+            p.id ASC
+        LIMIT 1
     ), '') AS prev_id,
     COALESCE((
-        SELECT f2.id::text
-        FROM filtered cur
-        JOIN filtered f2 ON f2.rn = cur.rn + 1
-        WHERE cur.id = $1::uuid
+        SELECT p.id::text
+        FROM matched p
+        CROSS JOIN cur c
+        WHERE CASE
+            WHEN $1::text = 'oldest' THEN
+                p.created_at > c.created_at OR (p.created_at = c.created_at AND p.id < c.id)
+            ELSE
+                p.created_at < c.created_at OR (p.created_at = c.created_at AND p.id < c.id)
+        END
+        ORDER BY
+            CASE WHEN $1::text = 'oldest' THEN p.created_at END ASC NULLS LAST,
+            CASE WHEN $1::text <> 'oldest' THEN p.created_at END DESC NULLS LAST,
+            p.id DESC
+        LIMIT 1
     ), '') AS next_id
 `
 
 type PostNeighborsParams struct {
-	PostID      uuid.UUID
 	Sort        string
 	Tags        []string
 	Exclude     []string
@@ -93,6 +123,7 @@ type PostNeighborsParams struct {
 	QLike       string
 	ArtistLike  string
 	IncludeNsfw bool
+	PostID      uuid.UUID
 }
 
 type PostNeighborsRow struct {
@@ -102,9 +133,11 @@ type PostNeighborsRow struct {
 	NextID interface{}
 }
 
+// One pass over the matches. Position is a count of rows that sort
+// earlier, and the neighbors are the single closest rows, so the pager
+// does not number every match.
 func (q *Queries) PostNeighbors(ctx context.Context, arg PostNeighborsParams) (PostNeighborsRow, error) {
 	row := q.db.QueryRowContext(ctx, postNeighbors,
-		arg.PostID,
 		arg.Sort,
 		pq.Array(arg.Tags),
 		pq.Array(arg.Exclude),
@@ -112,6 +145,7 @@ func (q *Queries) PostNeighbors(ctx context.Context, arg PostNeighborsParams) (P
 		arg.QLike,
 		arg.ArtistLike,
 		arg.IncludeNsfw,
+		arg.PostID,
 	)
 	var i PostNeighborsRow
 	err := row.Scan(
@@ -141,11 +175,24 @@ WHERE p.id IN (
         $6::bool
     )
 )
+  AND (
+    $7::uuid IS NULL
+    OR (
+      CASE
+        WHEN $8::text = 'oldest' THEN
+          p.created_at > $9::timestamptz
+          OR (p.created_at = $9::timestamptz AND p.id < $7::uuid)
+        ELSE
+          p.created_at < $9::timestamptz
+          OR (p.created_at = $9::timestamptz AND p.id < $7::uuid)
+      END
+    )
+  )
 ORDER BY
-    CASE WHEN $7::text = 'oldest' THEN p.created_at END ASC NULLS LAST,
-    CASE WHEN $7::text <> 'oldest' THEN p.created_at END DESC NULLS LAST,
+    CASE WHEN $8::text = 'oldest' THEN p.created_at END ASC NULLS LAST,
+    CASE WHEN $8::text <> 'oldest' THEN p.created_at END DESC NULLS LAST,
     p.id DESC
-LIMIT $9 OFFSET $8
+LIMIT $11 OFFSET $10
 `
 
 type SearchPostsParams struct {
@@ -155,7 +202,9 @@ type SearchPostsParams struct {
 	QLike       string
 	ArtistLike  string
 	IncludeNsfw bool
+	AfterID     uuid.NullUUID
 	Sort        string
+	AfterAt     sql.NullTime
 	RowOffset   int32
 	RowLimit    int32
 }
@@ -189,7 +238,9 @@ func (q *Queries) SearchPosts(ctx context.Context, arg SearchPostsParams) ([]Sea
 		arg.QLike,
 		arg.ArtistLike,
 		arg.IncludeNsfw,
+		arg.AfterID,
 		arg.Sort,
+		arg.AfterAt,
 		arg.RowOffset,
 		arg.RowLimit,
 	)
@@ -237,22 +288,34 @@ const suggestTags = `-- name: SuggestTags :many
 SELECT t.tag, count(*)::bigint AS count
 FROM post_tags t
 JOIN posts p ON p.id = t.post_id
-WHERE p.hidden_at IS NULL
-  AND ($1::bool OR p.rating = 'sfw')
+WHERE p.id IN (
+    SELECT id FROM board_match_ids(
+        $1::text[],
+        $2::text[],
+        $3::text,
+        $4::text,
+        ''::text,
+        $5::bool
+    )
+)
   AND (
-    $2::text = ''
-    OR t.tag ILIKE $2 || '%'
-    OR (char_length($2::text) >= 3 AND similarity(t.tag, $2::text) > 0.35)
+    $6::text = ''
+    OR strpos(t.tag, $6::text) = 1
+    OR (char_length($6::text) >= 3 AND similarity(t.tag, $6::text) > 0.35)
   )
 GROUP BY t.tag
 ORDER BY
-    CASE WHEN $2::text <> '' AND t.tag ILIKE $2 || '%' THEN 0 ELSE 1 END,
+    CASE WHEN $6::text <> '' AND strpos(t.tag, $6::text) = 1 THEN 0 ELSE 1 END,
     count(*) DESC,
     t.tag ASC
-LIMIT $3
+LIMIT $7
 `
 
 type SuggestTagsParams struct {
+	Tags        []string
+	Exclude     []string
+	Match       string
+	MatchLike   string
 	IncludeNsfw bool
 	Q           string
 	RowLimit    int32
@@ -264,7 +327,15 @@ type SuggestTagsRow struct {
 }
 
 func (q *Queries) SuggestTags(ctx context.Context, arg SuggestTagsParams) ([]SuggestTagsRow, error) {
-	rows, err := q.db.QueryContext(ctx, suggestTags, arg.IncludeNsfw, arg.Q, arg.RowLimit)
+	rows, err := q.db.QueryContext(ctx, suggestTags,
+		pq.Array(arg.Tags),
+		pq.Array(arg.Exclude),
+		arg.Match,
+		arg.MatchLike,
+		arg.IncludeNsfw,
+		arg.Q,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

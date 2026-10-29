@@ -1,5 +1,6 @@
 import type {
   ChangeEntry,
+  HiddenPage,
   ListDetail,
   ListSummary,
   Me,
@@ -24,6 +25,15 @@ export class DuplicatePostError extends Error {
     this.name = "DuplicatePostError";
     this.post = post;
   }
+}
+
+function boardParams(filter: BoardFilter): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filter.tags.length > 0) params.set("tags", filter.tags.join(","));
+  if (filter.exclude.length > 0) params.set("exclude", filter.exclude.join(","));
+  if (filter.q.trim() !== "") params.set("q", filter.q.trim());
+  if (filter.sort === "oldest") params.set("sort", "oldest");
+  return params;
 }
 
 export const api = {
@@ -102,7 +112,8 @@ export const api = {
     getJSON<ChangeEntry[]>(`/posts/${postId}/history`, signal),
   rollback: (historyId: string) =>
     sendJSON<ChangeEntry>(`/admin/history/${historyId}/rollback`, "POST"),
-  hiddenPosts: (signal?: AbortSignal) => getJSON<Post[]>("/admin/hidden-posts", signal),
+  hiddenPosts: (kind: "all" | "hidden" | "deleted", offset: number, signal?: AbortSignal) =>
+    getJSON<HiddenPage>(`/admin/hidden-posts?kind=${kind}&limit=40&offset=${offset}`, signal),
   hidePost: (postId: string) => sendJSON<Post>(`/posts/${postId}/hide`, "POST"),
   unhidePost: (postId: string) => sendJSON<Post>(`/posts/${postId}/unhide`, "POST"),
   deletePost: (postId: string) => sendJSON<Post>(`/posts/${postId}/delete`, "POST"),
@@ -112,32 +123,34 @@ export const api = {
     getJSON<Profile>(`/users/${username}`, signal),
   posts: (offset: number, signal?: AbortSignal) =>
     getJSON<Post[]>(`/posts?limit=40&offset=${offset}`, signal),
-  search: (filter: BoardFilter, offset: number, signal?: AbortSignal) => {
-    const params = new URLSearchParams({ limit: "40", offset: String(offset) });
-    if (filter.tags.length > 0) params.set("tags", filter.tags.join(","));
-    if (filter.exclude.length > 0) params.set("exclude", filter.exclude.join(","));
-    if (filter.q.trim() !== "") params.set("q", filter.q.trim());
-    if (filter.sort === "oldest") params.set("sort", "oldest");
+  search: (filter: BoardFilter, after: string, signal?: AbortSignal) => {
+    const params = boardParams(filter);
+    params.set("limit", "40");
+    if (after !== "") params.set("after", after);
     return getJSON<SearchPage>(`/search?${params}`, signal);
   },
-  tagSuggestions: (q: string, signal?: AbortSignal) =>
-    getJSON<TagCount[]>(`/tags?q=${encodeURIComponent(q)}&limit=8`, signal),
+  tagSuggestions: (q: string, filter: BoardFilter, signal?: AbortSignal) => {
+    const params = boardParams(filter);
+    params.set("q", q);
+    params.set("text", filter.q.trim());
+    params.set("limit", "8");
+    return getJSON<TagCount[]>(`/tags?${params}`, signal);
+  },
   neighbors: (id: string, filter: BoardFilter, signal?: AbortSignal) => {
-    const params = new URLSearchParams();
-    if (filter.tags.length > 0) params.set("tags", filter.tags.join(","));
-    if (filter.exclude.length > 0) params.set("exclude", filter.exclude.join(","));
-    if (filter.q.trim() !== "") params.set("q", filter.q.trim());
-    if (filter.sort === "oldest") params.set("sort", "oldest");
+    const params = boardParams(filter);
     const query = params.toString();
     return getJSON<PostNeighbors>(`/posts/${id}/neighbors${query ? `?${query}` : ""}`, signal);
   },
   post: (id: string, signal?: AbortSignal) => getJSON<Post>(`/posts/${id}`, signal),
-  favorites: (signal?: AbortSignal) => getJSON<Post[]>("/me/favorites", signal),
-  myPosts: (signal?: AbortSignal) => getJSON<Post[]>("/me/posts", signal),
+  favorites: (offset: number, signal?: AbortSignal) =>
+    getJSON<SearchPage>(`/me/favorites?limit=40&offset=${offset}`, signal),
+  myPosts: (offset: number, signal?: AbortSignal) =>
+    getJSON<SearchPage>(`/me/posts?limit=40&offset=${offset}`, signal),
   favorite: (postId: string) => sendJSON<void>(`/me/favorites/${postId}`, "POST"),
   unfavorite: (postId: string) => sendJSON<void>(`/me/favorites/${postId}`, "DELETE"),
   myLists: (signal?: AbortSignal) => getJSON<ListSummary[]>("/me/lists", signal),
-  list: (id: string, signal?: AbortSignal) => getJSON<ListDetail>(`/lists/${id}`, signal),
+  list: (id: string, offset: number, signal?: AbortSignal) =>
+    getJSON<ListDetail>(`/lists/${id}?limit=40&offset=${offset}`, signal),
   createList: (body: { title: string; description: string; visibility: string }) =>
     sendJSON<ListSummary>("/lists", "POST", body),
   updateList: (id: string, body: { title: string; description: string; visibility: string }) =>
@@ -149,6 +162,8 @@ export const api = {
     sendJSON<void>(`/lists/${listId}/items/${postId}`, "DELETE"),
   reorderList: (listId: string, post_ids: string[]) =>
     sendJSON<void>(`/lists/${listId}/reorder`, "PUT", { post_ids }),
+  moveListItem: (listId: string, postId: string, afterId: string) =>
+    sendJSON<void>(`/lists/${listId}/reorder`, "PUT", { post_id: postId, after_id: afterId }),
   async upload(file: File, tags = "", rating = "sfw"): Promise<Post> {
     const form = new FormData();
     form.append("file", file);

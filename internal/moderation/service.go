@@ -26,7 +26,8 @@ type Repository interface {
 	ApplyUserRole(ctx context.Context, userID string, role model.Role, entry model.ChangeEntry) (model.User, error)
 	ApplyPostSnapshot(ctx context.Context, p model.Post, entry model.ChangeEntry) error
 	SetPostHidden(ctx context.Context, postID string, hidden, deleted bool, actorID string, entry model.ChangeEntry) error
-	ListHiddenPosts(ctx context.Context) ([]model.Post, error)
+	ListHiddenPosts(ctx context.Context, kind string, limit, offset int32) ([]model.Post, error)
+	CountRemovedPosts(ctx context.Context) (int64, int64, error)
 	GetHistory(ctx context.Context, id string) (model.ChangeEntry, error)
 	ListHistoryForEntity(ctx context.Context, entityType, entityID string, limit int32) ([]model.ChangeEntry, error)
 	ListRecentHistory(ctx context.Context, limit int32) ([]model.ChangeEntry, error)
@@ -263,15 +264,38 @@ func (s *Service) rollbackUser(ctx context.Context, actor model.User, entry mode
 	return rb, nil
 }
 
-// ListHiddenPosts is the staff review queue: every post currently off
-// the board, newest removal first (moderator+).
-func (s *Service) ListHiddenPosts(ctx context.Context, actor model.User) ([]model.Post, error) {
+// ListHiddenPosts is one page of the staff review queue, newest removal
+// first (moderator+). kind is all, hidden, or deleted. Hidden and
+// Deleted are the full queue counts, not the length of this page.
+func (s *Service) ListHiddenPosts(ctx context.Context, actor model.User, kind string, limit, offset int) (model.HiddenPage, error) {
 	if !actor.Role.AtLeast(model.RoleModerator) {
-		return nil, ErrForbidden
+		return model.HiddenPage{}, ErrForbidden
 	}
-	posts, err := s.repo.ListHiddenPosts(ctx)
+	switch kind {
+	case "", "all":
+		kind = "all"
+	case "hidden", "deleted":
+	default:
+		return model.HiddenPage{}, invalid("kind must be all, hidden, or deleted")
+	}
+	lim, off := model.PageBounds(limit, offset)
+	hidden, deleted, err := s.repo.CountRemovedPosts(ctx)
+	if err != nil {
+		return model.HiddenPage{}, err
+	}
+	posts, err := s.repo.ListHiddenPosts(ctx, kind, lim, off)
+	if err != nil {
+		return model.HiddenPage{}, err
+	}
 	if posts == nil {
 		posts = []model.Post{}
 	}
-	return posts, err
+	total := hidden + deleted
+	if kind == "hidden" {
+		total = hidden
+	}
+	if kind == "deleted" {
+		total = deleted
+	}
+	return model.HiddenPage{Total: total, Hidden: hidden, Deleted: deleted, Posts: posts}, nil
 }

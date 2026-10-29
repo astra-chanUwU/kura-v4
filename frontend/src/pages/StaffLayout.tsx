@@ -38,7 +38,7 @@ export function StaffLayout() {
     );
   }
 
-  const removed = hidden.data?.length ?? 0;
+  const removed = hidden.hidden + hidden.deleted;
   return (
     <section className={styles.page} aria-labelledby="staff-title">
       <header className={styles.head}>

@@ -40,7 +40,7 @@ type Board interface {
 	SetMetaAs(ctx context.Context, actor *model.User, id, artist string, tags []string, rating string) (model.Post, error)
 	Get(ctx context.Context, id string) (model.Post, error)
 	List(ctx context.Context, limit, offset int32, includeNSFW bool) ([]model.Post, error)
-	ListByOwner(ctx context.Context, userID string) ([]model.Post, error)
+	ListByOwner(ctx context.Context, userID string, includeNSFW bool, limit, offset int) (model.SearchPage, error)
 	Search(ctx context.Context, q model.PostQuery) (model.SearchPage, error)
 	RecordCreation(ctx context.Context, actor model.User, post model.Post)
 	Contributions(ctx context.Context, userID string) (int64, error)
@@ -50,11 +50,11 @@ type Board interface {
 type Collections interface {
 	Favorite(ctx context.Context, userID, postID string) error
 	Unfavorite(ctx context.Context, userID, postID string) error
-	Favorites(ctx context.Context, userID string) ([]model.Post, error)
+	Favorites(ctx context.Context, userID string, includeNSFW bool, limit, offset int) (model.SearchPage, error)
 	FavoriteIDs(ctx context.Context, userID string) (map[string]bool, error)
 	CreateList(ctx context.Context, ownerID, title, desc, vis string) (model.List, error)
 	MyLists(ctx context.Context, ownerID string) ([]model.List, error)
-	GetList(ctx context.Context, viewerID *string, id string) (model.ListDetail, error)
+	GetList(ctx context.Context, viewerID *string, id string, includeNSFW bool, limit, offset int) (model.ListDetail, error)
 	AddItem(ctx context.Context, ownerID, listID, postID string) error
 	RemoveItem(ctx context.Context, ownerID, listID, postID string) error
 }
@@ -68,7 +68,7 @@ type Moderation interface {
 	RecentHistory(ctx context.Context, actor model.User, limit int32) ([]model.ChangeEntry, error)
 	HistoryByActor(ctx context.Context, actor model.User, actorID string, limit int32) ([]model.ChangeEntry, error)
 	Rollback(ctx context.Context, actor model.User, historyID string) (model.ChangeEntry, error)
-	ListHiddenPosts(ctx context.Context, actor model.User) ([]model.Post, error)
+	ListHiddenPosts(ctx context.Context, actor model.User, kind string, limit, offset int) (model.HiddenPage, error)
 }
 
 // Site is the subset of site.Service the CLI uses.

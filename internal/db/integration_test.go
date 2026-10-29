@@ -135,13 +135,85 @@ func TestPostgresContracts(t *testing.T) {
 	require.Equal(t, cute.ID, neighbors.PrevID)
 	require.Empty(t, neighbors.NextID)
 
-	suggestions, err := postsDAO.SuggestTags(ctx, "yur", 8, false)
+	suggestions, err := postsDAO.SuggestTags(ctx, "yur", model.PostQuery{Tags: []string{}, Exclude: []string{}}, 8)
 	require.NoError(t, err)
 	require.NotEmpty(t, suggestions)
 	require.Equal(t, "yuri", suggestions[0].Tag)
 
+	scoped, err := postsDAO.SuggestTags(ctx, "", prepared, 8)
+	require.NoError(t, err)
+	require.Equal(t, []string{"cute", "yuri"}, tagNames(scoped))
+
+	oldest.Limit = 1
+	firstPage, err := postsDAO.SearchPosts(ctx, oldest)
+	require.NoError(t, err)
+	require.Equal(t, []string{cute.ID}, idsOf(firstPage))
+	oldest.AfterID = firstPage[0].ID
+	oldest.AfterAt = firstPage[0].CreatedAt
+	oldest.Offset = 0
+	secondPage, err := postsDAO.SearchPosts(ctx, oldest)
+	require.NoError(t, err)
+	require.Equal(t, []string{gif.ID}, idsOf(secondPage), "after continues the page and ignores offset")
+
+	outside, err := postsDAO.PostNeighbors(ctx, nsfw.ID, prepared)
+	require.NoError(t, err)
+	require.Equal(t, -1, outside.Index)
+	require.Equal(t, int64(1), outside.Total)
+
+	var ownerID string
+	require.NoError(t, conn.QueryRowContext(ctx, `INSERT INTO users (username, display_name) VALUES ('pager', 'Pager') RETURNING id`).Scan(&ownerID))
+	_, err = conn.ExecContext(ctx, `UPDATE posts SET owner_id = $1 WHERE id = $2 OR id = $3`, ownerID, cute.ID, nsfw.ID)
+	require.NoError(t, err)
+	visibleTotal, err := postsDAO.CountVisiblePostsByOwner(ctx, ownerID, false)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), visibleTotal, "owner count hides nsfw until opted in")
+	ownerPage, err := postsDAO.ListPostsByOwner(ctx, ownerID, false, 40, 0)
+	require.NoError(t, err)
+	require.Equal(t, []string{cute.ID}, idsOf(ownerPage))
+
+	collectionsDAO := dao.NewCollections(conn)
+	require.NoError(t, collectionsDAO.AddFavorite(ctx, ownerID, cute.ID))
+	require.NoError(t, collectionsDAO.AddFavorite(ctx, ownerID, nsfw.ID))
+	favTotal, err := collectionsDAO.CountFavorites(ctx, ownerID, false)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), favTotal)
+	favPage, err := collectionsDAO.ListFavorites(ctx, ownerID, false, 40, 0)
+	require.NoError(t, err)
+	require.Equal(t, []string{cute.ID}, idsOf(favPage))
+
+	list, err := collectionsDAO.CreateList(ctx, ownerID, "Shelf", "", "public")
+	require.NoError(t, err)
+	require.NoError(t, collectionsDAO.AddItem(ctx, list.ID, cute.ID, 0))
+	require.NoError(t, collectionsDAO.AddItem(ctx, list.ID, gif.ID, 1))
+	require.NoError(t, collectionsDAO.AddItem(ctx, list.ID, nsfw.ID, 2))
+	itemTotal, err := collectionsDAO.CountListItems(ctx, list.ID, false)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), itemTotal)
+	itemPage, err := collectionsDAO.ListItems(ctx, list.ID, false, 1, 0)
+	require.NoError(t, err)
+	require.Equal(t, []string{cute.ID}, idsOf(itemPage))
+	itemIDs, err := collectionsDAO.ListItemIDs(ctx, list.ID)
+	require.NoError(t, err)
+	require.Equal(t, []string{cute.ID, gif.ID, nsfw.ID}, itemIDs)
+
+	hiddenCount, deletedCount, err := postsDAO.CountRemovedPosts(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), hiddenCount)
+	require.Equal(t, int64(0), deletedCount)
+	hiddenPage, err := postsDAO.ListHiddenPosts(ctx, "hidden", 40, 0)
+	require.NoError(t, err)
+	require.Equal(t, []string{hidden.ID}, idsOf(hiddenPage))
+
 	require.NoError(t, goose.DownToContext(ctx, conn, "migrations", 0))
 	require.NoError(t, db.Migrate(ctx, conn), "fresh schema can be rebuilt after rollback")
+}
+
+func tagNames(tags []model.TagCount) []string {
+	out := make([]string, len(tags))
+	for i, tag := range tags {
+		out[i] = tag.Tag
+	}
+	return out
 }
 
 func idsOf(posts []model.Post) []string {

@@ -44,19 +44,44 @@ INSERT INTO post_tags (post_id, tag) VALUES ($1,$2) ON CONFLICT DO NOTHING;
 -- name: CountPostsByOwner :one
 SELECT count(*) FROM posts WHERE owner_id=$1;
 
+-- name: CountVisiblePostsByOwner :one
+SELECT count(*)::bigint AS total
+FROM posts
+WHERE owner_id = sqlc.arg(owner_id)
+  AND (sqlc.arg(include_nsfw)::bool OR rating = 'sfw');
+
 -- name: ListPostsByOwner :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
   p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
-FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.owner_id=$1 ORDER BY p.created_at DESC, p.id DESC;
+FROM posts p LEFT JOIN users u ON u.id=p.owner_id
+WHERE p.owner_id = sqlc.arg(owner_id)
+  AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw')
+ORDER BY p.created_at DESC, p.id DESC
+LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
 
 -- name: SetPostHidden :exec
 UPDATE posts SET hidden_at = CASE WHEN $2::bool THEN now() ELSE NULL END, deleted_at = CASE WHEN $2::bool AND $3::bool THEN now() ELSE NULL END, hidden_by = CASE WHEN $2::bool THEN $4::uuid ELSE NULL END WHERE id=$1;
+
+-- name: CountRemovedPosts :one
+SELECT
+  count(*) FILTER (WHERE deleted_at IS NULL)::bigint AS hidden,
+  count(*) FILTER (WHERE deleted_at IS NOT NULL)::bigint AS deleted
+FROM posts
+WHERE hidden_at IS NOT NULL;
 
 -- name: ListHiddenPosts :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
   p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
-FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.hidden_at IS NOT NULL ORDER BY p.hidden_at DESC, p.id DESC;
+FROM posts p LEFT JOIN users u ON u.id=p.owner_id
+WHERE p.hidden_at IS NOT NULL
+  AND (
+    sqlc.arg(kind)::text = 'all'
+    OR (sqlc.arg(kind)::text = 'hidden' AND p.deleted_at IS NULL)
+    OR (sqlc.arg(kind)::text = 'deleted' AND p.deleted_at IS NOT NULL)
+  )
+ORDER BY p.hidden_at DESC, p.id DESC
+LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);

@@ -30,15 +30,16 @@ func (h *Collections) favorites(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	posts, err := h.service.Favorites(c.Context(), user.ID)
+	limit, offset := queryPage(c)
+	page, err := h.service.Favorites(c.Context(), user.ID, viewerSeesNSFW(c), limit, offset)
 	if err != nil {
 		return writeError(c, err)
 	}
 	favs := map[string]bool{}
-	for _, p := range posts {
+	for _, p := range page.Posts {
 		favs[p.ID] = true
 	}
-	return c.JSON(postsDTO(visiblePosts(c, posts), favs))
+	return c.JSON(dto.SearchPage{Total: page.Total, Posts: postsDTO(page.Posts, favs)})
 }
 
 // visiblePosts hides NSFW posts from viewers who have not opted in.
@@ -111,7 +112,8 @@ func (h *Collections) getList(c fiber.Ctx) error {
 	if u := currentUser(c); u != nil {
 		viewerID = &u.ID
 	}
-	detail, err := h.service.GetList(c.Context(), viewerID, c.Params("id"))
+	limit, offset := queryPage(c)
+	detail, err := h.service.GetList(c.Context(), viewerID, c.Params("id"), viewerSeesNSFW(c), limit, offset)
 	if err != nil {
 		return writeError(c, err)
 	}
@@ -121,7 +123,7 @@ func (h *Collections) getList(c fiber.Ctx) error {
 			favs = ids
 		}
 	}
-	return c.JSON(dto.ListDetail{List: listDTO(detail.List), Items: postsDTO(visiblePosts(c, detail.Items), favs)})
+	return c.JSON(dto.ListDetail{List: listDTO(detail.List), Items: postsDTO(detail.Items, favs), Total: detail.Total})
 }
 
 func (h *Collections) updateList(c fiber.Ctx) error {
@@ -189,6 +191,12 @@ func (h *Collections) reorder(c fiber.Ctx) error {
 	var in dto.ReorderInput
 	if err := c.Bind().Body(&in); err != nil {
 		return fiber.NewError(400, "Invalid request.")
+	}
+	if in.PostID != "" {
+		if err := h.service.MoveItem(c.Context(), user.ID, c.Params("id"), in.PostID, in.AfterID); err != nil {
+			return writeError(c, err)
+		}
+		return c.SendStatus(204)
 	}
 	if err := h.service.Reorder(c.Context(), user.ID, c.Params("id"), in.PostIDs); err != nil {
 		return writeError(c, err)

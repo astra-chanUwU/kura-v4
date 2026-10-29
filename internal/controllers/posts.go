@@ -47,11 +47,12 @@ func (h *Posts) myPosts(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	posts, err := h.board.ListByOwner(c.Context(), user.ID)
+	limit, offset := queryPage(c)
+	page, err := h.board.ListByOwner(c.Context(), user.ID, viewerSeesNSFW(c), limit, offset)
 	if err != nil {
 		return writeError(c, err)
 	}
-	return c.JSON(postsDTO(visiblePosts(c, posts), h.favs(c)))
+	return c.JSON(dto.SearchPage{Total: page.Total, Posts: postsDTO(page.Posts, h.favs(c))})
 }
 
 // RegisterMedia serves original bytes for public posts. Favorites and lists
@@ -80,6 +81,7 @@ func (h *Posts) searchQuery(c fiber.Ctx) model.PostQuery {
 		Sort:        c.Query("sort"),
 		Limit:       limit,
 		Offset:      offset,
+		AfterID:     c.Query("after"),
 		IncludeNSFW: viewerSeesNSFW(c),
 	}
 }
@@ -106,7 +108,10 @@ func (h *Posts) tags(c fiber.Ctx) error {
 	if v, err := strconv.Atoi(c.Query("limit")); err == nil && v > 0 {
 		limit = min(int32(v), 24)
 	}
-	tags, err := h.board.SuggestTags(c.Context(), c.Query("q"), limit, viewerSeesNSFW(c))
+	filter := h.searchQuery(c)
+	filter.Q = c.Query("text")
+	filter.AfterID = ""
+	tags, err := h.board.SuggestTags(c.Context(), c.Query("q"), filter, limit)
 	if err != nil {
 		return writeError(c, err)
 	}

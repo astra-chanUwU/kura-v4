@@ -59,8 +59,11 @@ func (r *Moderation) ApplyPostSnapshot(ctx context.Context, p model.Post, entry 
 func (r *Moderation) SetPostHidden(ctx context.Context, postID string, hidden, deleted bool, actorID string, entry model.ChangeEntry) error {
 	return r.posts.SetPostHiddenAudited(ctx, postID, hidden, deleted, actorID, entry)
 }
-func (r *Moderation) ListHiddenPosts(ctx context.Context) ([]model.Post, error) {
-	return r.posts.ListHiddenPosts(ctx)
+func (r *Moderation) ListHiddenPosts(ctx context.Context, kind string, limit, offset int32) ([]model.Post, error) {
+	return r.posts.ListHiddenPosts(ctx, kind, limit, offset)
+}
+func (r *Moderation) CountRemovedPosts(ctx context.Context) (int64, int64, error) {
+	return r.posts.CountRemovedPosts(ctx)
 }
 func (r *Moderation) GetHistory(ctx context.Context, id string) (model.ChangeEntry, error) {
 	return r.audit.GetChangeHistory(ctx, id)

@@ -318,7 +318,7 @@ export function HomePage() {
   };
   const board = useBoard(appliedFilter, !defaultsPending);
   const { posts, loading, error, retry, hasMore, loadingMore, loadMore, total } = board;
-  const tagSuggestions = useTagSuggestions(debouncedSearchText, searchFocused);
+  const tagSuggestions = useTagSuggestions(debouncedSearchText, appliedFilter, searchFocused);
   const suggestions = tagSuggestions.suggestions.filter(
     (item) => !selectedTags.includes(item.tag) && !excludedTags.includes(item.tag),
   );
@@ -535,9 +535,7 @@ export function HomePage() {
                 if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                   e.preventDefault();
                   const delta = e.key === "ArrowDown" ? 1 : -1;
-                  setHighlight((h) =>
-                    Math.max(0, Math.min(suggestions.length - 1, h + delta)),
-                  );
+                  setHighlight((h) => Math.max(0, Math.min(suggestions.length - 1, h + delta)));
                 } else if (e.key === "Enter" && searchFocused) {
                   e.preventDefault();
                   if (searchText.trim() === "") {

@@ -23,6 +23,45 @@ func (q *Queries) CountPostsByOwner(ctx context.Context, ownerID uuid.NullUUID) 
 	return count, err
 }
 
+const countRemovedPosts = `-- name: CountRemovedPosts :one
+SELECT
+  count(*) FILTER (WHERE deleted_at IS NULL)::bigint AS hidden,
+  count(*) FILTER (WHERE deleted_at IS NOT NULL)::bigint AS deleted
+FROM posts
+WHERE hidden_at IS NOT NULL
+`
+
+type CountRemovedPostsRow struct {
+	Hidden  int64
+	Deleted int64
+}
+
+func (q *Queries) CountRemovedPosts(ctx context.Context) (CountRemovedPostsRow, error) {
+	row := q.db.QueryRowContext(ctx, countRemovedPosts)
+	var i CountRemovedPostsRow
+	err := row.Scan(&i.Hidden, &i.Deleted)
+	return i, err
+}
+
+const countVisiblePostsByOwner = `-- name: CountVisiblePostsByOwner :one
+SELECT count(*)::bigint AS total
+FROM posts
+WHERE owner_id = $1
+  AND ($2::bool OR rating = 'sfw')
+`
+
+type CountVisiblePostsByOwnerParams struct {
+	OwnerID     uuid.NullUUID
+	IncludeNsfw bool
+}
+
+func (q *Queries) CountVisiblePostsByOwner(ctx context.Context, arg CountVisiblePostsByOwnerParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countVisiblePostsByOwner, arg.OwnerID, arg.IncludeNsfw)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
 const createPost = `-- name: CreatePost :one
 INSERT INTO posts (owner_id, original_name, storage_key, content_type, size_bytes, sha256, artist, source, source_id, thumbnail_key, width, height, rating)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id, owner_id, original_name, storage_key, content_type, size_bytes, created_at, artist, source, source_id, thumbnail_key, width, height, rating, (hidden_at IS NOT NULL)::bool AS hidden, (deleted_at IS NOT NULL)::bool AS deleted
@@ -239,8 +278,22 @@ SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_
   p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
-FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.hidden_at IS NOT NULL ORDER BY p.hidden_at DESC, p.id DESC
+FROM posts p LEFT JOIN users u ON u.id=p.owner_id
+WHERE p.hidden_at IS NOT NULL
+  AND (
+    $1::text = 'all'
+    OR ($1::text = 'hidden' AND p.deleted_at IS NULL)
+    OR ($1::text = 'deleted' AND p.deleted_at IS NOT NULL)
+  )
+ORDER BY p.hidden_at DESC, p.id DESC
+LIMIT $3 OFFSET $2
 `
+
+type ListHiddenPostsParams struct {
+	Kind      string
+	RowOffset int32
+	RowLimit  int32
+}
 
 type ListHiddenPostsRow struct {
 	ID            uuid.UUID
@@ -263,8 +316,8 @@ type ListHiddenPostsRow struct {
 	TagsCsv       string
 }
 
-func (q *Queries) ListHiddenPosts(ctx context.Context) ([]ListHiddenPostsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listHiddenPosts)
+func (q *Queries) ListHiddenPosts(ctx context.Context, arg ListHiddenPostsParams) ([]ListHiddenPostsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listHiddenPosts, arg.Kind, arg.RowOffset, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -387,8 +440,19 @@ SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_
   p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
-FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.owner_id=$1 ORDER BY p.created_at DESC, p.id DESC
+FROM posts p LEFT JOIN users u ON u.id=p.owner_id
+WHERE p.owner_id = $1
+  AND ($2::bool OR p.rating = 'sfw')
+ORDER BY p.created_at DESC, p.id DESC
+LIMIT $4 OFFSET $3
 `
+
+type ListPostsByOwnerParams struct {
+	OwnerID     uuid.NullUUID
+	IncludeNsfw bool
+	RowOffset   int32
+	RowLimit    int32
+}
 
 type ListPostsByOwnerRow struct {
 	ID            uuid.UUID
@@ -411,8 +475,13 @@ type ListPostsByOwnerRow struct {
 	TagsCsv       string
 }
 
-func (q *Queries) ListPostsByOwner(ctx context.Context, ownerID uuid.NullUUID) ([]ListPostsByOwnerRow, error) {
-	rows, err := q.db.QueryContext(ctx, listPostsByOwner, ownerID)
+func (q *Queries) ListPostsByOwner(ctx context.Context, arg ListPostsByOwnerParams) ([]ListPostsByOwnerRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPostsByOwner,
+		arg.OwnerID,
+		arg.IncludeNsfw,
+		arg.RowOffset,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
