@@ -63,11 +63,12 @@ type PostNeighbors struct {
 	NextID string `json:"next_id"`
 }
 
-// UpdatePostMeta replaces a post's artist and tags.
+// UpdatePostMeta replaces a post's artist, tags, rating, and source link.
 type UpdatePostMeta struct {
-	Artist string   `json:"artist"`
-	Tags   []string `json:"tags"`
-	Rating string   `json:"rating"`
+	Artist    string   `json:"artist"`
+	Tags      []string `json:"tags"`
+	Rating    string   `json:"rating"`
+	SourceURL string   `json:"source_url"`
 }
 
 // Preferences are the account's content settings.

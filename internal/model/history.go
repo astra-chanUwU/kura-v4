@@ -34,7 +34,17 @@ func decodePost(raw json.RawMessage) (PostSnapshot, error) {
 	if s.Tags == nil {
 		s.Tags = []string{}
 	}
+	s.HasSourceURL = jsonObjectHasKey(raw, "source_url")
 	return s, err
+}
+
+func jsonObjectHasKey(raw json.RawMessage, key string) bool {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		return false
+	}
+	_, ok := obj[key]
+	return ok
 }
 
 func decodeRole(raw json.RawMessage) (RoleSnapshot, error) {
@@ -65,5 +75,5 @@ func SnapshotOf(p Post) PostSnapshot {
 	if tags == nil {
 		tags = []string{}
 	}
-	return PostSnapshot{Artist: p.Artist, Tags: tags, Rating: p.Rating, Hidden: p.Hidden, Deleted: p.Deleted}
+	return PostSnapshot{Artist: p.Artist, Tags: tags, Rating: p.Rating, Hidden: p.Hidden, Deleted: p.Deleted, SourceURL: p.SourceURL, HasSourceURL: true}
 }

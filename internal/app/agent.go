@@ -19,6 +19,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/repository"
 	"github.com/astra-chanUwU/kura-v4/internal/site"
 	"github.com/astra-chanUwU/kura-v4/internal/storage"
+	"github.com/astra-chanUwU/kura-v4/internal/tags"
 )
 
 // Agent runs one `kura agent` invocation. schema, help, and a missing
@@ -47,6 +48,7 @@ func Agent(ctx context.Context, cfg config.Config, args []string, out io.Writer)
 	postsRepo := repository.NewPosts(dao.NewPosts(conn))
 	boardSvc := board.NewService(postsRepo, media)
 	collectionsSvc := collections.NewService(repository.NewCollections(dao.NewCollections(conn)))
+	tagsSvc := tags.NewService(repository.NewTagPages(dao.NewTagPages(conn)))
 	moderationSvc := moderation.NewService(repository.NewModeration(dao.NewAccounts(conn), postsRepo, dao.NewAudit(conn)))
 	// Fail clearly if migrations have not been applied.
 	readyCtx, readyCancel := context.WithTimeout(ctx, 5*time.Second)
@@ -61,6 +63,7 @@ func Agent(ctx context.Context, cfg config.Config, args []string, out io.Writer)
 		Collections: collectionsSvc,
 		Moderation:  moderationSvc,
 		Site:        svc,
+		Tags:        tagsSvc,
 	}, args, out, agentcli.Options{})
 }
 

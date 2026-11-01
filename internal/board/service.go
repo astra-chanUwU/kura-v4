@@ -5,13 +5,25 @@ import (
 	"database/sql"
 	"errors"
 	"io"
+	"net/url"
+	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/astra-chanUwU/kura-v4/internal/model"
 	"github.com/google/uuid"
 )
 
 var ErrNotFound = errors.New("post not found")
+
+const sourceURLMessage = "Source link must be an http or https URL."
+
+// ValidationError is a rejected post field, safe to show to the member.
+type ValidationError struct{ Message string }
+
+func (e *ValidationError) Error() string { return e.Message }
+
+func invalid(msg string) error { return &ValidationError{Message: msg} }
 
 type Repository interface {
 	CreatePost(ctx context.Context, p model.Post, sha string) (model.Post, error)
@@ -31,6 +43,11 @@ type Repository interface {
 	CountPostsByOwner(ctx context.Context, ownerID string) (int64, error)
 	CountVisiblePostsByOwner(ctx context.Context, ownerID string, includeNSFW bool) (int64, error)
 	ListPostsByOwner(ctx context.Context, ownerID string, includeNSFW bool, limit, offset int32) ([]model.Post, error)
+	RelatedPosts(ctx context.Context, id string, includeNSFW bool, limit int32) ([]model.Post, error)
+	RandomPost(ctx context.Context, q model.PostQuery) (model.Post, error)
+	// TagAliasTargets maps an alternate tag name to the canonical tag.
+	// Missing names are omitted. An empty input returns an empty map.
+	TagAliasTargets(ctx context.Context, tags []string) (map[string]string, error)
 }
 
 // Media is the original-file store the board reads and writes through.
@@ -65,7 +82,15 @@ func (s *Service) OpenMedia(ctx context.Context, p model.Post) (io.ReadCloser, e
 }
 
 func (s *Service) Create(ctx context.Context, p model.Post, sha string) (model.Post, error) {
-	p.Tags = NormalizeTags(p.Tags)
+	sourceURL, err := normalizeSourceURL(p.SourceURL)
+	if err != nil {
+		return model.Post{}, err
+	}
+	p.SourceURL = sourceURL
+	p.Tags, err = s.applyAliases(ctx, NormalizeTags(p.Tags))
+	if err != nil {
+		return model.Post{}, err
+	}
 	if p.Rating != "nsfw" {
 		p.Rating = "sfw"
 	}
@@ -125,7 +150,7 @@ func (s *Service) ListByOwner(ctx context.Context, userID string, includeNSFW bo
 // match count. The board pages through this instead of downloading
 // every post.
 func (s *Service) Search(ctx context.Context, q model.PostQuery) (model.SearchPage, error) {
-	prepared, err := PrepareQuery(q)
+	prepared, err := s.prepareSearch(ctx, q)
 	if err != nil {
 		return model.SearchPage{}, err
 	}
@@ -162,7 +187,7 @@ func (s *Service) Search(ctx context.Context, q model.PostQuery) (model.SearchPa
 // prefix prefers a prefix and then a close spelling. An empty filter
 // counts the whole visible board.
 func (s *Service) SuggestTags(ctx context.Context, prefix string, filter model.PostQuery, limit int32) ([]model.TagCount, error) {
-	prepared, err := PrepareQuery(filter)
+	prepared, err := s.prepareSearch(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -183,26 +208,30 @@ func (s *Service) SuggestTags(ctx context.Context, prefix string, filter model.P
 // Neighbors reports where id sits in the same sequence Search would
 // return, plus the previous and next post ids.
 func (s *Service) Neighbors(ctx context.Context, id string, q model.PostQuery) (model.Neighbors, error) {
-	prepared, err := PrepareQuery(q)
+	prepared, err := s.prepareSearch(ctx, q)
 	if err != nil {
 		return model.Neighbors{}, err
 	}
 	return s.repo.PostNeighbors(ctx, id, prepared)
 }
 
-// SetMeta replaces a post's artist and tags (communal tagging: any
-// signed-in user may tag; the controller enforces sign-in).
-func (s *Service) SetMeta(ctx context.Context, id, artist string, tags []string, rating string) (model.Post, error) {
-	return s.setMeta(ctx, nil, id, artist, tags, rating)
+// SetMeta replaces a post's artist, tags, rating, and source link
+// (communal tagging: any signed-in user may edit; the controller enforces sign-in).
+func (s *Service) SetMeta(ctx context.Context, id, artist string, tags []string, rating, sourceURL string) (model.Post, error) {
+	return s.setMeta(ctx, nil, id, artist, tags, rating, sourceURL)
 }
 
 // SetMetaAs is SetMeta with an actor: a changed edit is written to the
 // post's change history in the same transaction, so it can be rolled back.
-func (s *Service) SetMetaAs(ctx context.Context, actor *model.User, id, artist string, tags []string, rating string) (model.Post, error) {
-	return s.setMeta(ctx, actor, id, artist, tags, rating)
+func (s *Service) SetMetaAs(ctx context.Context, actor *model.User, id, artist string, tags []string, rating, sourceURL string) (model.Post, error) {
+	return s.setMeta(ctx, actor, id, artist, tags, rating, sourceURL)
 }
 
-func (s *Service) setMeta(ctx context.Context, actor *model.User, id, artist string, tags []string, rating string) (model.Post, error) {
+func (s *Service) setMeta(ctx context.Context, actor *model.User, id, artist string, tags []string, rating, sourceURL string) (model.Post, error) {
+	sourceURL, err := normalizeSourceURL(sourceURL)
+	if err != nil {
+		return model.Post{}, err
+	}
 	post, err := s.Get(ctx, id)
 	if err != nil {
 		return model.Post{}, err
@@ -216,9 +245,14 @@ func (s *Service) setMeta(ctx context.Context, actor *model.User, id, artist str
 		artist = string([]rune(artist)[:80])
 	}
 	post.Artist = artist
-	post.Tags = NormalizeTags(tags)
+	post.SourceURL = sourceURL
+	post.Tags, err = s.applyAliases(ctx, NormalizeTags(tags))
+	if err != nil {
+		return model.Post{}, err
+	}
 	after := model.SnapshotOf(post)
-	if actor != nil && (before.Artist != after.Artist || before.Rating != after.Rating || !equalTags(before.Tags, after.Tags)) {
+	changed := before.Artist != after.Artist || before.Rating != after.Rating || before.SourceURL != after.SourceURL || !equalTags(before.Tags, after.Tags)
+	if actor != nil && changed {
 		entry := model.ChangeEntry{EntityType: "post", EntityID: post.ID, ActorID: &actor.ID, ActorUsername: actor.Username,
 			Action: "post.meta_updated", Before: model.MarshalPostSnapshot(before), After: model.MarshalPostSnapshot(after)}
 		if err := s.repo.ReplacePostMetaAudited(ctx, post, entry); err != nil {
@@ -230,6 +264,120 @@ func (s *Service) setMeta(ctx context.Context, actor *model.User, id, artist str
 		return model.Post{}, err
 	}
 	return post, nil
+}
+
+// Related lists visible posts that share a tag with id, most overlap first.
+// No shared tags is an empty slice. The caller has already checked that
+// the viewer may see the anchor.
+func (s *Service) Related(ctx context.Context, id string, includeNSFW bool, limit int) ([]model.Post, error) {
+	if strings.TrimSpace(id) == "" {
+		return nil, ErrNotFound
+	}
+	posts, err := s.repo.RelatedPosts(ctx, id, includeNSFW, clampRelated(limit))
+	if posts == nil {
+		posts = []model.Post{}
+	}
+	return posts, err
+}
+
+func clampRelated(limit int) int32 {
+	if limit <= 0 {
+		limit = 12
+	}
+	if limit > 24 {
+		limit = 24
+	}
+	return int32(limit)
+}
+
+// Random returns one visible post matching q. No match is ErrNotFound.
+func (s *Service) Random(ctx context.Context, q model.PostQuery) (model.Post, error) {
+	prepared, err := s.prepareSearch(ctx, q)
+	if err != nil {
+		return model.Post{}, err
+	}
+	post, err := s.repo.RandomPost(ctx, prepared)
+	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, ErrNotFound) {
+		return model.Post{}, ErrNotFound
+	}
+	if err != nil {
+		return model.Post{}, err
+	}
+	return post, nil
+}
+
+func normalizeSourceURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	if utf8.RuneCountInString(raw) > 300 {
+		return "", invalid(sourceURLMessage)
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || !httpURL(parsed) {
+		return "", invalid(sourceURLMessage)
+	}
+	return raw, nil
+}
+
+func httpURL(u *url.URL) bool {
+	if u == nil || u.Host == "" || u.Opaque != "" {
+		return false
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https":
+		return true
+	default:
+		return false
+	}
+}
+
+// prepareSearch normalizes a board query and rewrites alias tags to the
+// canonical name, so grey_hair and gray_hair search the same posts.
+func (s *Service) prepareSearch(ctx context.Context, q model.PostQuery) (model.PostQuery, error) {
+	prepared, err := PrepareQuery(q)
+	if err != nil {
+		return model.PostQuery{}, err
+	}
+	prepared.Tags, err = s.applyAliases(ctx, prepared.Tags)
+	if err != nil {
+		return model.PostQuery{}, err
+	}
+	prepared.Exclude, err = s.applyAliases(ctx, prepared.Exclude)
+	if err != nil {
+		return model.PostQuery{}, err
+	}
+	return prepared, nil
+}
+
+// applyAliases replaces alternate names with the canonical tag and drops
+// duplicates. Tags that are not aliases stay as they are.
+func (s *Service) applyAliases(ctx context.Context, tags []string) ([]string, error) {
+	if len(tags) == 0 {
+		return tags, nil
+	}
+	mapped, err := s.repo.TagAliasTargets(ctx, tags)
+	if err != nil || len(mapped) == 0 {
+		if tags == nil {
+			tags = []string{}
+		}
+		return tags, err
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		if next, ok := mapped[tag]; ok && next != "" {
+			tag = next
+		}
+		if tag == "" || seen[tag] {
+			continue
+		}
+		seen[tag] = true
+		out = append(out, tag)
+	}
+	sort.Strings(out)
+	return out, nil
 }
 
 func equalTags(a, b []string) bool {

@@ -11,6 +11,7 @@ import {
 import { PostCard } from "../components/PostCard";
 import { ThemedSelect } from "../components/ThemedSelect";
 import { RecoveryKeyPanel } from "../components/RecoveryKeyPanel";
+import { SavedSearchList } from "../components/SavedSearches";
 import { ShareProfileButton } from "../components/ShareProfileButton";
 import { shortError, useToasts } from "../components/Toasts";
 import {
@@ -573,6 +574,7 @@ export function MePage() {
               </button>
             </div>
           </div>
+          <SavedSearchList />
         </div>
       )}
 

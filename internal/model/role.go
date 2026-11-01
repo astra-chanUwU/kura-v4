@@ -59,6 +59,11 @@ type PostSnapshot struct {
 	Rating  string   `json:"rating"`
 	Hidden  bool     `json:"hidden"`
 	Deleted bool     `json:"deleted"`
+	// Always marshaled, including when empty, so a new history row records the key.
+	SourceURL string `json:"source_url"`
+	// HasSourceURL is true when the stored JSON object contained "source_url".
+	// Older history rows omit the key; a rollback must not treat that as a clear.
+	HasSourceURL bool `json:"-"`
 }
 
 // RoleSnapshot is the rollback-able state of a user entry.

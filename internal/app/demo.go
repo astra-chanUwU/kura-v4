@@ -494,7 +494,7 @@ func rateDemoPosts(ctx context.Context, env *demoEnv, users []model.User, posts 
 		if !ok {
 			actor = fallback
 		}
-		updated, err := env.board.SetMetaAs(ctx, &actor, post.ID, post.Artist, post.Tags, "nsfw")
+		updated, err := env.board.SetMetaAs(ctx, &actor, post.ID, post.Artist, post.Tags, "nsfw", post.SourceURL)
 		if err != nil {
 			return fmt.Errorf("demo: rate post: %w", err)
 		}
@@ -526,7 +526,7 @@ func editDemoPosts(ctx context.Context, env *demoEnv, users []model.User, posts 
 			continue
 		}
 		actor := users[stats.TagEdits%len(users)]
-		updated, err := env.board.SetMetaAs(ctx, &actor, post.ID, artist, tags, post.Rating)
+		updated, err := env.board.SetMetaAs(ctx, &actor, post.ID, artist, tags, post.Rating, post.SourceURL)
 		if err != nil {
 			return -1, fmt.Errorf("demo: tag edit: %w", err)
 		}

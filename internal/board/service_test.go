@@ -56,6 +56,7 @@ func TestSetMetaAsWritesHistoryOnlyWhenChanged(t *testing.T) {
 	actor := model.User{ID: "u1", Username: "tagger", Role: model.RoleMember}
 	existing := model.Post{ID: "p1", Artist: "old", Tags: []string{"keep"}, Rating: "sfw"}
 	repo := NewMockRepository(t)
+	repo.EXPECT().TagAliasTargets(mock.Anything, []string{"keep"}).Return(map[string]string{}, nil)
 	repo.EXPECT().GetPost(mock.Anything, "p1").Return(existing, nil)
 	repo.EXPECT().ReplacePostMetaAudited(mock.Anything, mock.MatchedBy(func(p model.Post) bool {
 		return p.Artist == "new"
@@ -66,7 +67,7 @@ func TestSetMetaAsWritesHistoryOnlyWhenChanged(t *testing.T) {
 	})).Return(nil)
 	svc := NewService(repo, nil)
 	// Get() may probe dimensions via media (nil media skips it).
-	got, err := svc.SetMetaAs(context.Background(), &actor, "p1", "new", []string{"keep"}, "sfw")
+	got, err := svc.SetMetaAs(context.Background(), &actor, "p1", "new", []string{"keep"}, "sfw", "")
 	require.NoError(t, err)
 	require.Equal(t, "new", got.Artist)
 }

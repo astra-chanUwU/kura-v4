@@ -25,6 +25,7 @@ export const queryKeys = {
       filter.sort ?? "newest",
     ] as const,
   post: (id: string) => ["post", id] as const,
+  related: (id: string) => ["post-related", id] as const,
   favorites: () => ["favorites"] as const,
   myPosts: () => ["my-posts"] as const,
   myLists: () => ["my-lists"] as const,

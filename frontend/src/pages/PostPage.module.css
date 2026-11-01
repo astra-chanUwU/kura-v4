@@ -171,6 +171,14 @@ a.stepButton:focus-visible {
   background: var(--surface-soft);
   font-size: 0.8rem;
 }
+.tag a {
+  color: var(--text);
+  font-size: inherit;
+  text-decoration: none;
+}
+.tag a:hover {
+  color: var(--accent);
+}
 .tag button {
   border: none;
   background: none;

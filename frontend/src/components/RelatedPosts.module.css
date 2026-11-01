@@ -1,0 +1,19 @@
+.strip {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.heading {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.row {
+  display: grid;
+  grid-auto-columns: minmax(8.5rem, 11rem);
+  grid-auto-flow: column;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+}

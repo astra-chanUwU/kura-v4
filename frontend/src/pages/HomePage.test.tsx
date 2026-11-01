@@ -40,6 +40,10 @@ vi.mock("@tanstack/react-router", async () => {
   };
 });
 vi.mock("../hooks/usePrefetchPost", () => ({ usePrefetchPost: () => ({}) }));
+vi.mock("../components/SavedSearches", () => ({
+  SaveCurrentSearchButton: () => null,
+  SavedSearchList: () => null,
+}));
 vi.mock("../hooks/useKura", () => ({
   normalizeTagToken: (raw: string) =>
     raw
@@ -104,6 +108,7 @@ vi.mock("../hooks/useKura", () => ({
     };
   },
   useTagSuggestions: () => ({ suggestions: [], loading: false }),
+  useRandomPost: () => vi.fn(),
   useInvalidate: () => vi.fn(),
   useMyLists: () => ({ data: [] }),
   useToggleFavorite: () => ({ mutate: vi.fn(), isPending: false }),

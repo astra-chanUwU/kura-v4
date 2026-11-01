@@ -1,9 +1,11 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { PostComments } from "../components/PostComments";
 import { HistoryList } from "../components/HistoryList";
 import { IconEye, IconEyeOff, IconTrash } from "../components/icons";
 import { PostActions } from "../components/PostCard";
+import { RelatedPosts } from "../components/RelatedPosts";
 import { shortError, useToasts } from "../components/Toasts";
 import { filterFromSearch, isFilterActive, type BoardSearch } from "../domain/boardFilter";
 import { atLeast } from "../domain/roles";
@@ -69,6 +71,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
   const isAdmin = !!user && atLeast(user.role, "admin");
   const [newTag, setNewTag] = useState("");
   const [artistDraft, setArtistDraft] = useState<string | null>(null);
+  const [sourceDraft, setSourceDraft] = useState<string | null>(null);
   const [tagsDraft, setTagsDraft] = useState<string[] | null>(null);
   const [ratingDraft, setRatingDraft] = useState<string | null>(null);
   const [metaError, setMetaError] = useState("");
@@ -82,6 +85,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
   if (draftPostId !== id) {
     setDraftPostId(id);
     setArtistDraft(null);
+    setSourceDraft(null);
     setTagsDraft(null);
     setRatingDraft(null);
     setNewTag("");
@@ -93,6 +97,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
   const dirty =
     !!post &&
     ((artistDraft !== null && artistDraft.trim() !== post.artist) ||
+      (sourceDraft !== null && sourceDraft.trim() !== post.source_url) ||
       (tagsDraft !== null && JSON.stringify(tagsDraft) !== JSON.stringify(post.tags)) ||
       (ratingDraft !== null && ratingDraft !== post.rating));
 
@@ -133,6 +138,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
   if (error || !post) return <p role="alert">That picture could not be found.</p>;
   const isVideo = post.content_type.startsWith("video/");
   const artist = artistDraft ?? post.artist;
+  const source = sourceDraft ?? post.source_url;
   const tags = tagsDraft ?? post.tags;
   const rating = ratingDraft ?? post.rating;
   const filterLabel = [
@@ -143,6 +149,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
 
   const discardDrafts = () => {
     setArtistDraft(null);
+    setSourceDraft(null);
     setTagsDraft(null);
     setRatingDraft(null);
     setNewTag("");
@@ -153,7 +160,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
     if (!dirty || saving) return;
     setMetaError("");
     setSaving(true);
-    void updatePostMeta(post.id, artist.trim(), tags, rating)
+    void updatePostMeta(post.id, artist.trim(), tags, rating, source.trim())
       .then(() => {
         discardDrafts();
         toasts.push("Saved. One history entry covers all of it.", "success");
@@ -273,6 +280,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
               Full size ↗
             </a>
           </div>
+          <RelatedPosts postId={post.id} search={search} />
         </div>
 
         <div className={styles.details}>
@@ -365,7 +373,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
             <span className={styles.detailLabel}>Size</span>
             <span>{formatBytes(post.size_bytes)}</span>
           </p>
-          {(post.artist || signedIn) && (
+          {(post.artist || post.source_url || signedIn) && (
             <p className={styles.detailRow}>
               <span className={styles.detailLabel}>Artist</span>
               {signedIn ? (
@@ -378,6 +386,19 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
                 />
               ) : (
                 <span>{post.artist || "Unknown"}</span>
+              )}
+              {signedIn && (
+                <>
+                  <span className={styles.detailLabel}>Source</span>
+                  <input
+                    className={styles.artistInput}
+                    value={source}
+                    placeholder="https://"
+                    aria-label="Source link"
+                    inputMode="url"
+                    onChange={(e) => setSourceDraft(e.target.value)}
+                  />
+                </>
               )}
               {post.source_url && (
                 <a href={post.source_url} target="_blank" rel="noreferrer">
@@ -399,12 +420,18 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
                       : styles.tag
                   }
                 >
-                  {tag}
+                  <Link to="/tags/$tag" params={{ tag }}>
+                    {tag}
+                  </Link>
                   {signedIn && (
                     <button
                       type="button"
                       aria-label={`Remove tag ${tag}`}
-                      onClick={() => setTagsDraft(tags.filter((t) => t !== tag))}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setTagsDraft(tags.filter((t) => t !== tag));
+                      }}
                     >
                       ×
                     </button>
@@ -451,8 +478,8 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
               )}
               <span className={styles.muted}>
                 {dirty
-                  ? "Unsaved changes — Save writes tags, artist and rating as one history entry."
-                  : "Tag, artist and rating edits are staged here until you Save."}
+                  ? "Unsaved changes — Save writes tags, artist, rating and source as one history entry."
+                  : "Tag, artist, rating and source edits are staged here until you Save."}
               </span>
             </div>
           )}
@@ -463,6 +490,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
           )}
         </div>
       </div>
+      <PostComments postId={post.id} />
       {signedIn && (
         <section className={styles.historySection} aria-labelledby="post-history-title">
           <h2 id="post-history-title" className={styles.historyTitle}>
@@ -508,7 +536,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
       <ConfirmDialog
         open={pendingNav !== null}
         title="Discard unsaved changes?"
-        message="Your tag, artist and rating edits on this picture have not been saved."
+        message="Your tag, artist, rating and source edits on this picture have not been saved."
         confirmLabel="Discard and leave"
         destructive
         onCancel={() => setPendingNav(null)}

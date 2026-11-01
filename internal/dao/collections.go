@@ -79,7 +79,7 @@ func (d *CollectionsDAO) ListFavorites(ctx context.Context, userID string, inclu
 	}
 	out := make([]model.Post, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, "", "", "", "", "", 0, 0, r.Rating, false, false))
+		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, "", "", "", "", "", "", 0, 0, r.Rating, false, false))
 	}
 	return out, nil
 }
@@ -199,7 +199,7 @@ func (d *CollectionsDAO) ListItems(ctx context.Context, listID string, includeNS
 	}
 	out := make([]model.Post, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, "", "", "", "", "", 0, 0, r.Rating, false, false))
+		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, "", "", "", "", "", "", 0, 0, r.Rating, false, false))
 	}
 	return out, nil
 }

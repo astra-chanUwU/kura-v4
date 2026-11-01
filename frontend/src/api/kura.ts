@@ -89,8 +89,13 @@ export const api = {
   regenerateRecoveryKey: () => sendJSON<Me>("/me/recovery-key", "POST"),
   recoverAccount: (username: string, recovery_key: string, new_password: string) =>
     sendJSON<Me>("/auth/recover", "POST", { username, recovery_key, new_password }),
-  updatePostMeta: (postId: string, artist: string, tags: string[], rating: string) =>
-    sendJSON<Post>(`/posts/${postId}/meta`, "PATCH", { artist, tags, rating }),
+  updatePostMeta: (
+    postId: string,
+    artist: string,
+    tags: string[],
+    rating: string,
+    source_url: string,
+  ) => sendJSON<Post>(`/posts/${postId}/meta`, "PATCH", { artist, tags, rating, source_url }),
   setPreferences: (show_nsfw: boolean, over_18: boolean) =>
     sendJSON<Me>("/me/preferences", "PATCH", { show_nsfw, over_18 }),
   setTagPreferences: (include_tags: string[], exclude_tags: string[]) =>
@@ -142,6 +147,13 @@ export const api = {
     return getJSON<PostNeighbors>(`/posts/${id}/neighbors${query ? `?${query}` : ""}`, signal);
   },
   post: (id: string, signal?: AbortSignal) => getJSON<Post>(`/posts/${id}`, signal),
+  relatedPosts: (id: string, signal?: AbortSignal) =>
+    getJSON<Post[]>(`/posts/${id}/related`, signal),
+  randomPost: (filter: BoardFilter) => {
+    const params = boardParams(filter);
+    const query = params.toString();
+    return getJSON<Post>(`/random-post${query ? `?${query}` : ""}`);
+  },
   favorites: (offset: number, signal?: AbortSignal) =>
     getJSON<SearchPage>(`/me/favorites?limit=40&offset=${offset}`, signal),
   myPosts: (offset: number, signal?: AbortSignal) =>
@@ -164,11 +176,12 @@ export const api = {
     sendJSON<void>(`/lists/${listId}/reorder`, "PUT", { post_ids }),
   moveListItem: (listId: string, postId: string, afterId: string) =>
     sendJSON<void>(`/lists/${listId}/reorder`, "PUT", { post_id: postId, after_id: afterId }),
-  async upload(file: File, tags = "", rating = "sfw"): Promise<Post> {
+  async upload(file: File, tags = "", rating = "sfw", sourceURL = ""): Promise<Post> {
     const form = new FormData();
     form.append("file", file);
     if (tags.trim()) form.append("tags", tags);
     form.append("rating", rating);
+    if (sourceURL.trim()) form.append("source_url", sourceURL.trim());
     const response = await fetch("/api/v1/posts", {
       method: "POST",
       credentials: "same-origin",

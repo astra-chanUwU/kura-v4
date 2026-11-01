@@ -63,8 +63,8 @@ func (q *Queries) CountVisiblePostsByOwner(ctx context.Context, arg CountVisible
 }
 
 const createPost = `-- name: CreatePost :one
-INSERT INTO posts (owner_id, original_name, storage_key, content_type, size_bytes, sha256, artist, source, source_id, thumbnail_key, width, height, rating)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id, owner_id, original_name, storage_key, content_type, size_bytes, created_at, artist, source, source_id, thumbnail_key, width, height, rating, (hidden_at IS NOT NULL)::bool AS hidden, (deleted_at IS NOT NULL)::bool AS deleted
+INSERT INTO posts (owner_id, original_name, storage_key, content_type, size_bytes, sha256, artist, source, source_id, source_url, thumbnail_key, width, height, rating)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id, owner_id, original_name, storage_key, content_type, size_bytes, created_at, artist, source, source_id, source_url, thumbnail_key, width, height, rating, (hidden_at IS NOT NULL)::bool AS hidden, (deleted_at IS NOT NULL)::bool AS deleted
 `
 
 type CreatePostParams struct {
@@ -77,6 +77,7 @@ type CreatePostParams struct {
 	Artist       string
 	Source       string
 	SourceID     string
+	SourceUrl    string
 	ThumbnailKey string
 	Width        int32
 	Height       int32
@@ -94,6 +95,7 @@ type CreatePostRow struct {
 	Artist       string
 	Source       string
 	SourceID     string
+	SourceUrl    string
 	ThumbnailKey string
 	Width        int32
 	Height       int32
@@ -113,6 +115,7 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 		arg.Artist,
 		arg.Source,
 		arg.SourceID,
+		arg.SourceUrl,
 		arg.ThumbnailKey,
 		arg.Width,
 		arg.Height,
@@ -130,6 +133,7 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 		&i.Artist,
 		&i.Source,
 		&i.SourceID,
+		&i.SourceUrl,
 		&i.ThumbnailKey,
 		&i.Width,
 		&i.Height,
@@ -151,7 +155,7 @@ func (q *Queries) DeletePostTags(ctx context.Context, postID uuid.UUID) error {
 
 const getPost = `-- name: GetPost :one
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.id=$1
@@ -168,6 +172,7 @@ type GetPostRow struct {
 	Artist        string
 	Source        string
 	SourceID      string
+	SourceUrl     string
 	ThumbnailKey  string
 	Width         int32
 	Height        int32
@@ -192,6 +197,7 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 		&i.Artist,
 		&i.Source,
 		&i.SourceID,
+		&i.SourceUrl,
 		&i.ThumbnailKey,
 		&i.Width,
 		&i.Height,
@@ -583,17 +589,23 @@ func (q *Queries) SetPostThumbnail(ctx context.Context, arg SetPostThumbnailPara
 	return err
 }
 
-const updatePostArtist = `-- name: UpdatePostArtist :exec
-UPDATE posts SET artist=$2, rating=$3 WHERE id=$1
+const updatePostMeta = `-- name: UpdatePostMeta :exec
+UPDATE posts SET artist=$2, rating=$3, source_url=$4 WHERE id=$1
 `
 
-type UpdatePostArtistParams struct {
-	ID     uuid.UUID
-	Artist string
-	Rating string
+type UpdatePostMetaParams struct {
+	ID        uuid.UUID
+	Artist    string
+	Rating    string
+	SourceUrl string
 }
 
-func (q *Queries) UpdatePostArtist(ctx context.Context, arg UpdatePostArtistParams) error {
-	_, err := q.db.ExecContext(ctx, updatePostArtist, arg.ID, arg.Artist, arg.Rating)
+func (q *Queries) UpdatePostMeta(ctx context.Context, arg UpdatePostMetaParams) error {
+	_, err := q.db.ExecContext(ctx, updatePostMeta,
+		arg.ID,
+		arg.Artist,
+		arg.Rating,
+		arg.SourceUrl,
+	)
 	return err
 }

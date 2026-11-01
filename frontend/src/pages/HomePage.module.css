@@ -542,6 +542,10 @@
 .uploadButton:hover {
   background: var(--surface-soft);
 }
+.uploadButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
 
 /* Tablet: search takes its own row, layout controls wrap under it. */
 @media (max-width: 900px) {

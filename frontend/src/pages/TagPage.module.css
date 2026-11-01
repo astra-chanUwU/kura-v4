@@ -1,0 +1,102 @@
+.page {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 72rem;
+}
+.page h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  overflow-wrap: anywhere;
+}
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 0.9rem;
+  align-items: baseline;
+}
+.category {
+  color: var(--accent);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.muted {
+  color: var(--muted);
+  margin: 0;
+}
+.notice {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface-soft);
+}
+.notice a {
+  color: var(--accent);
+}
+.description {
+  margin: 0;
+  max-width: 42rem;
+  white-space: pre-wrap;
+}
+.section {
+  display: grid;
+  gap: 0.75rem;
+}
+.section h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.aliases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.alias {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.45rem 0.2rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+}
+.alias a {
+  color: var(--text);
+  text-decoration: none;
+}
+.alias button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.form {
+  display: grid;
+  gap: 0.7rem;
+  max-width: 36rem;
+}
+.form label {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.row input {
+  flex: 1 1 12rem;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.75rem;
+}
+.error {
+  color: var(--danger);
+  margin: 0;
+}

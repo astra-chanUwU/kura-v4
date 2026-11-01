@@ -38,6 +38,7 @@ export function UploadDialog({
   const invalidate = useInvalidate();
   const [items, setItems] = useState<Item[]>([]);
   const [tags, setTags] = useState("");
+  const [sourceURL, setSourceURL] = useState("");
   const [rating, setRating] = useState("sfw");
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -109,7 +110,7 @@ export function UploadDialog({
           prev.map((i) => (i.id === item.id ? { ...i, status: "uploading" as const } : i)),
         );
         try {
-          await upload(item.file, tags, rating);
+          await upload(item.file, tags, rating, sourceURL);
           added++;
           setItems((prev) =>
             prev.map((i) => (i.id === item.id ? { ...i, status: "done" as const } : i)),
@@ -309,6 +310,16 @@ export function UploadDialog({
             value={tags}
             onChange={(e) => setTags(e.target.value)}
             placeholder="anime girl white_hair"
+          />
+        </label>
+        <label className={styles.field}>
+          Source link (optional)
+          <input
+            value={sourceURL}
+            onChange={(e) => setSourceURL(e.target.value)}
+            placeholder="https://"
+            aria-label="Source link"
+            inputMode="url"
           />
         </label>
 

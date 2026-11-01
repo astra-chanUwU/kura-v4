@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 
@@ -31,9 +32,11 @@ func (h *Posts) favs(c fiber.Ctx) map[string]bool {
 
 func (h *Posts) RegisterRoutes(api fiber.Router) {
 	api.Get("/search", h.search)
+	api.Get("/random-post", h.random)
 	api.Get("/tags", h.tags)
 	api.Get("/posts", h.list)
 	api.Get("/posts/:id/neighbors", h.neighbors)
+	api.Get("/posts/:id/related", h.related)
 	api.Get("/posts/:id", h.get)
 	api.Post("/posts", h.create)
 	api.Patch("/posts/:id/meta", h.updateMeta)
@@ -130,6 +133,38 @@ func (h *Posts) neighbors(c fiber.Ctx) error {
 	return c.JSON(dto.PostNeighbors{Index: n.Index, Total: n.Total, PrevID: n.PrevID, NextID: n.NextID})
 }
 
+func (h *Posts) related(c fiber.Ctx) error {
+	post, err := h.board.Get(c.Context(), c.Params("id"))
+	if err != nil {
+		return writeError(c, err)
+	}
+	if !canSeePost(c, post) || (post.Rating == "nsfw" && !viewerSeesNSFW(c)) {
+		return writeError(c, board.ErrNotFound)
+	}
+	limit := 12
+	if raw := c.Query("limit"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil {
+			limit = v
+		}
+	}
+	posts, err := h.board.Related(c.Context(), post.ID, viewerSeesNSFW(c), limit)
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.JSON(postsDTO(posts, h.favs(c)))
+}
+
+func (h *Posts) random(c fiber.Ctx) error {
+	post, err := h.board.Random(c.Context(), h.searchQuery(c))
+	if errors.Is(err, board.ErrNotFound) {
+		return fiber.NewError(404, "No picture matches that search.")
+	}
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.JSON(postDTO(post, h.favs(c)))
+}
+
 func (h *Posts) list(c fiber.Ctx) error {
 	limit := int32(40)
 	if v, err := strconv.Atoi(c.Query("limit")); err == nil && v > 0 {
@@ -204,7 +239,7 @@ func (h *Posts) create(c fiber.Ctx) error {
 		tags = append(tags, extra) // board.NormalizeTags splits/dedupes
 	}
 	post, err := h.board.Create(c.Context(), model.Post{OwnerID: &user.ID, OriginalName: fileHeader.Filename, StorageKey: key, ContentType: contentType, SizeBytes: fileHeader.Size,
-		Artist: meta.Artist, Source: meta.Source, SourceID: meta.SourceID, Tags: tags, Rating: rating}, sha)
+		Artist: meta.Artist, Source: meta.Source, SourceID: meta.SourceID, SourceURL: c.FormValue("source_url"), Tags: tags, Rating: rating}, sha)
 	if err != nil {
 		// Content-addressed blobs may be shared with an existing post;
 		// never delete them here.
@@ -224,7 +259,7 @@ func (h *Posts) updateMeta(c fiber.Ctx) error {
 	if err := c.Bind().Body(&in); err != nil {
 		return fiber.NewError(400, "Invalid request.")
 	}
-	post, err := h.board.SetMetaAs(c.Context(), user, c.Params("id"), in.Artist, in.Tags, in.Rating)
+	post, err := h.board.SetMetaAs(c.Context(), user, c.Params("id"), in.Artist, in.Tags, in.Rating, in.SourceURL)
 	if err != nil {
 		return writeError(c, err)
 	}

@@ -60,6 +60,8 @@ func (e *Engine) dispatch(ctx context.Context, args []string) int {
 		return e.history(ctx, args[1:])
 	case "users":
 		return e.users(ctx, args[1:])
+	case "tags":
+		return e.tags(ctx, args[1:])
 	default:
 		return e.usage()
 	}

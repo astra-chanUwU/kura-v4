@@ -88,6 +88,16 @@ type Post struct {
 	HiddenAt     sql.NullTime
 	HiddenBy     uuid.NullUUID
 	DeletedAt    sql.NullTime
+	SourceUrl    string
+}
+
+type PostComment struct {
+	ID        uuid.UUID
+	PostID    uuid.UUID
+	AuthorID  uuid.UUID
+	Body      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type PostTag struct {
@@ -102,6 +112,17 @@ type RecoveryKey struct {
 	CreatedAt time.Time
 }
 
+type SavedSearch struct {
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	Name        string
+	IncludeTags []string
+	ExcludeTags []string
+	Query       string
+	Sort        string
+	CreatedAt   time.Time
+}
+
 type Session struct {
 	TokenHash []byte
 	UserID    uuid.UUID
@@ -112,6 +133,21 @@ type Session struct {
 type SiteSetting struct {
 	Key   string
 	Value string
+}
+
+type TagAlias struct {
+	Alias     string
+	Target    string
+	CreatedBy uuid.NullUUID
+	CreatedAt time.Time
+}
+
+type TagPage struct {
+	Tag         string
+	Category    string
+	Description string
+	UpdatedBy   uuid.NullUUID
+	UpdatedAt   time.Time
 }
 
 type User struct {

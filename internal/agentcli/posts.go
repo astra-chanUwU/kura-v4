@@ -194,7 +194,7 @@ func (e *Engine) postsUpload(ctx context.Context, args []string) int {
 	if !ok {
 		return 1
 	}
-	parsed, code, argsOK := e.postsArgs(args, cmd, 1, "artist", "tags", "rating")
+	parsed, code, argsOK := e.postsArgs(args, cmd, 1, "artist", "tags", "rating", "source-url")
 	if !argsOK {
 		return code
 	}
@@ -254,6 +254,10 @@ func (e *Engine) postsUpload(ctx context.Context, args []string) int {
 	if parsed.Has("tags") {
 		tags = append(tags, parsed.Get("tags"))
 	}
+	sourceURL := ""
+	if parsed.Has("source-url") {
+		sourceURL = parsed.Get("source-url")
+	}
 	post, err := e.deps.Board.Create(ctx, model.Post{
 		OwnerID:      &user.ID,
 		OriginalName: name,
@@ -263,12 +267,13 @@ func (e *Engine) postsUpload(ctx context.Context, args []string) int {
 		Artist:       artist,
 		Source:       meta.Source,
 		SourceID:     meta.SourceID,
+		SourceURL:    sourceURL,
 		Tags:         tags,
 		Rating:       rating,
 	}, sha)
 	if err != nil {
 		// Content-addressed bytes may be shared; do not delete the blob.
-		return e.failErr(cmd, err)
+		return e.failService(cmd, err)
 	}
 	post.OwnerUsername = user.Username
 	e.deps.Board.RecordCreation(ctx, user, post)
@@ -281,11 +286,11 @@ func (e *Engine) postsEdit(ctx context.Context, args []string) int {
 	if !ok {
 		return 1
 	}
-	parsed, code, argsOK := e.postsArgs(args, cmd, 1, "artist", "tags", "rating")
+	parsed, code, argsOK := e.postsArgs(args, cmd, 1, "artist", "tags", "rating", "source-url")
 	if !argsOK {
 		return code
 	}
-	if !parsed.Has("artist") && !parsed.Has("tags") && !parsed.Has("rating") {
+	if !parsed.Has("artist") && !parsed.Has("tags") && !parsed.Has("rating") && !parsed.Has("source-url") {
 		return e.badUsage(cmd, postsCommandUsage(cmd))
 	}
 	if e.deps.Board == nil {
@@ -299,6 +304,7 @@ func (e *Engine) postsEdit(ctx context.Context, args []string) int {
 		return e.fail(cmd, "not_found", "Not found.")
 	}
 	artist, tags, rating := post.Artist, post.Tags, post.Rating
+	sourceURL := post.SourceURL
 	if parsed.Has("artist") {
 		artist = parsed.Get("artist")
 	}
@@ -311,11 +317,22 @@ func (e *Engine) postsEdit(ctx context.Context, args []string) int {
 			return e.fail(cmd, "validation", "Rating must be sfw or nsfw.")
 		}
 	}
-	updated, err := e.deps.Board.SetMetaAs(ctx, &user, parsed.Pos[0], artist, tags, rating)
+	if parsed.Has("source-url") {
+		sourceURL = parsed.Get("source-url")
+	}
+	updated, err := e.deps.Board.SetMetaAs(ctx, &user, parsed.Pos[0], artist, tags, rating, sourceURL)
 	if err != nil {
-		return e.failErr(cmd, err)
+		return e.failService(cmd, err)
 	}
 	return e.ok(cmd, presentPost(updated, e.favs(ctx, user.ID)))
+}
+
+func (e *Engine) failService(cmd string, err error) int {
+	var vErr *board.ValidationError
+	if errors.As(err, &vErr) {
+		return e.fail(cmd, "validation", vErr.Message)
+	}
+	return e.failErr(cmd, err)
 }
 
 func (e *Engine) postsHide(ctx context.Context, args []string) int {

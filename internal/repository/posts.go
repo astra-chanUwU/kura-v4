@@ -14,7 +14,7 @@ type Posts struct {
 
 func NewPosts(d *dao.PostsDAO) *Posts { return &Posts{PostsDAO: d, audit: dao.NewAudit(d.DB())} }
 
-// ReplacePostMeta replaces a post's artist and full tag set atomically.
+// ReplacePostMeta replaces a post's artist, rating, source link, and full tag set atomically.
 func (r *Posts) ReplacePostMeta(ctx context.Context, p model.Post) error {
 	tx, err := r.DB().BeginTx(ctx, nil)
 	if err != nil {
@@ -22,7 +22,7 @@ func (r *Posts) ReplacePostMeta(ctx context.Context, p model.Post) error {
 	}
 	defer tx.Rollback() //nolint:errcheck
 	d := r.WithTx(tx)
-	if err := d.UpdatePostArtist(ctx, p.ID, p.Artist, p.Rating); err != nil {
+	if err := d.UpdatePostMeta(ctx, p.ID, p.Artist, p.Rating, p.SourceURL); err != nil {
 		return err
 	}
 	if err := d.DeletePostTags(ctx, p.ID); err != nil {
@@ -45,7 +45,7 @@ func (r *Posts) ReplacePostMetaAudited(ctx context.Context, p model.Post, entry 
 	}
 	defer tx.Rollback() //nolint:errcheck
 	d := r.WithTx(tx)
-	if err := d.UpdatePostArtist(ctx, p.ID, p.Artist, p.Rating); err != nil {
+	if err := d.UpdatePostMeta(ctx, p.ID, p.Artist, p.Rating, p.SourceURL); err != nil {
 		return err
 	}
 	if err := d.DeletePostTags(ctx, p.ID); err != nil {
@@ -91,7 +91,7 @@ func (r *Posts) ApplyPostSnapshotAudited(ctx context.Context, p model.Post, entr
 	}
 	defer tx.Rollback() //nolint:errcheck
 	d := r.WithTx(tx)
-	if err := d.UpdatePostArtist(ctx, p.ID, p.Artist, p.Rating); err != nil {
+	if err := d.UpdatePostMeta(ctx, p.ID, p.Artist, p.Rating, p.SourceURL); err != nil {
 		return err
 	}
 	if err := d.DeletePostTags(ctx, p.ID); err != nil {

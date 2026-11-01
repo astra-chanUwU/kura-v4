@@ -76,6 +76,7 @@ type Post struct {
 	Artist        string
 	Source        string // e.g. "twitter"
 	SourceID      string // e.g. the tweet id
+	SourceURL     string // member-set http(s) link; empty when unset
 	ThumbnailKey  string
 	Tags          []string
 	Width         int

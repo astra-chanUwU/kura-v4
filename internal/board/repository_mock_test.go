@@ -825,6 +825,152 @@ func (_c *MockRepository_PostNeighbors_Call) RunAndReturn(run func(ctx context.C
 	return _c
 }
 
+// RandomPost provides a mock function for the type MockRepository
+func (_mock *MockRepository) RandomPost(ctx context.Context, q model.PostQuery) (model.Post, error) {
+	ret := _mock.Called(ctx, q)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RandomPost")
+	}
+
+	var r0 model.Post
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, model.PostQuery) (model.Post, error)); ok {
+		return returnFunc(ctx, q)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, model.PostQuery) model.Post); ok {
+		r0 = returnFunc(ctx, q)
+	} else {
+		r0 = ret.Get(0).(model.Post)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, model.PostQuery) error); ok {
+		r1 = returnFunc(ctx, q)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_RandomPost_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RandomPost'
+type MockRepository_RandomPost_Call struct {
+	*mock.Call
+}
+
+// RandomPost is a helper method to define mock.On call
+//   - ctx context.Context
+//   - q model.PostQuery
+func (_e *MockRepository_Expecter) RandomPost(ctx any, q any) *MockRepository_RandomPost_Call {
+	return &MockRepository_RandomPost_Call{Call: _e.mock.On("RandomPost", ctx, q)}
+}
+
+func (_c *MockRepository_RandomPost_Call) Run(run func(ctx context.Context, q model.PostQuery)) *MockRepository_RandomPost_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 model.PostQuery
+		if args[1] != nil {
+			arg1 = args[1].(model.PostQuery)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_RandomPost_Call) Return(post model.Post, err error) *MockRepository_RandomPost_Call {
+	_c.Call.Return(post, err)
+	return _c
+}
+
+func (_c *MockRepository_RandomPost_Call) RunAndReturn(run func(ctx context.Context, q model.PostQuery) (model.Post, error)) *MockRepository_RandomPost_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RelatedPosts provides a mock function for the type MockRepository
+func (_mock *MockRepository) RelatedPosts(ctx context.Context, id string, includeNSFW bool, limit int32) ([]model.Post, error) {
+	ret := _mock.Called(ctx, id, includeNSFW, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RelatedPosts")
+	}
+
+	var r0 []model.Post
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, int32) ([]model.Post, error)); ok {
+		return returnFunc(ctx, id, includeNSFW, limit)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, int32) []model.Post); ok {
+		r0 = returnFunc(ctx, id, includeNSFW, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]model.Post)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool, int32) error); ok {
+		r1 = returnFunc(ctx, id, includeNSFW, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_RelatedPosts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RelatedPosts'
+type MockRepository_RelatedPosts_Call struct {
+	*mock.Call
+}
+
+// RelatedPosts is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id string
+//   - includeNSFW bool
+//   - limit int32
+func (_e *MockRepository_Expecter) RelatedPosts(ctx any, id any, includeNSFW any, limit any) *MockRepository_RelatedPosts_Call {
+	return &MockRepository_RelatedPosts_Call{Call: _e.mock.On("RelatedPosts", ctx, id, includeNSFW, limit)}
+}
+
+func (_c *MockRepository_RelatedPosts_Call) Run(run func(ctx context.Context, id string, includeNSFW bool, limit int32)) *MockRepository_RelatedPosts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		var arg3 int32
+		if args[3] != nil {
+			arg3 = args[3].(int32)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_RelatedPosts_Call) Return(posts []model.Post, err error) *MockRepository_RelatedPosts_Call {
+	_c.Call.Return(posts, err)
+	return _c
+}
+
+func (_c *MockRepository_RelatedPosts_Call) RunAndReturn(run func(ctx context.Context, id string, includeNSFW bool, limit int32) ([]model.Post, error)) *MockRepository_RelatedPosts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ReplacePostMeta provides a mock function for the type MockRepository
 func (_mock *MockRepository) ReplacePostMeta(ctx context.Context, p model.Post) error {
 	ret := _mock.Called(ctx, p)
@@ -1221,6 +1367,74 @@ func (_c *MockRepository_SuggestTags_Call) Return(tagCounts []model.TagCount, er
 }
 
 func (_c *MockRepository_SuggestTags_Call) RunAndReturn(run func(ctx context.Context, prefix string, filter model.PostQuery, limit int32) ([]model.TagCount, error)) *MockRepository_SuggestTags_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// TagAliasTargets provides a mock function for the type MockRepository
+func (_mock *MockRepository) TagAliasTargets(ctx context.Context, tags []string) (map[string]string, error) {
+	ret := _mock.Called(ctx, tags)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TagAliasTargets")
+	}
+
+	var r0 map[string]string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string) (map[string]string, error)); ok {
+		return returnFunc(ctx, tags)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string) map[string]string); ok {
+		r0 = returnFunc(ctx, tags)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]string)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = returnFunc(ctx, tags)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_TagAliasTargets_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TagAliasTargets'
+type MockRepository_TagAliasTargets_Call struct {
+	*mock.Call
+}
+
+// TagAliasTargets is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tags []string
+func (_e *MockRepository_Expecter) TagAliasTargets(ctx any, tags any) *MockRepository_TagAliasTargets_Call {
+	return &MockRepository_TagAliasTargets_Call{Call: _e.mock.On("TagAliasTargets", ctx, tags)}
+}
+
+func (_c *MockRepository_TagAliasTargets_Call) Run(run func(ctx context.Context, tags []string)) *MockRepository_TagAliasTargets_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []string
+		if args[1] != nil {
+			arg1 = args[1].([]string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_TagAliasTargets_Call) Return(stringToString map[string]string, err error) *MockRepository_TagAliasTargets_Call {
+	_c.Call.Return(stringToString, err)
+	return _c
+}
+
+func (_c *MockRepository_TagAliasTargets_Call) RunAndReturn(run func(ctx context.Context, tags []string) (map[string]string, error)) *MockRepository_TagAliasTargets_Call {
 	_c.Call.Return(run)
 	return _c
 }

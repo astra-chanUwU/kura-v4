@@ -18,8 +18,8 @@ type Identity struct {
 }
 
 func presentPost(p model.Post, favs map[string]bool) dto.Post {
-	sourceURL := ""
-	if p.Source == "twitter" && p.Artist != "" && p.SourceID != "" {
+	sourceURL := p.SourceURL
+	if sourceURL == "" && p.Source == "twitter" && p.Artist != "" && p.SourceID != "" {
 		sourceURL = "https://x.com/" + p.Artist + "/status/" + p.SourceID
 	}
 	tags := p.Tags

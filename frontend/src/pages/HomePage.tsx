@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { BoardViewControls } from "../components/BoardViewControls";
 import { PostCard } from "../components/PostCard";
 import { PostRow } from "../components/PostRow";
+import { shortError, useToasts } from "../components/Toasts";
+import { SaveCurrentSearchButton } from "../components/SavedSearches";
 import { UploadDialog } from "../components/UploadDialog";
 import uploadStyles from "../components/UploadDialog.module.css";
 import {
@@ -19,6 +21,7 @@ import {
   useBoard,
   useDebouncedValue,
   useMe,
+  useRandomPost,
   useTagSuggestions,
 } from "../hooks/useKura";
 import { useBoardView } from "../hooks/useBoardView";
@@ -29,6 +32,9 @@ import styles from "./HomePage.module.css";
 export function HomePage() {
   const { signedIn, me, loading: accountLoading } = useMe();
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [randomBusy, setRandomBusy] = useState(false);
+  const toasts = useToasts();
+  const randomPost = useRandomPost();
   const [droppedFiles, setDroppedFiles] = useState<File[]>([]);
   const [uploadNotice, setUploadNotice] = useState("");
   const [pageDragging, setPageDragging] = useState(false);
@@ -315,6 +321,27 @@ export function HomePage() {
     exclude: appliedExcludedTags,
     q: appliedQuery,
     sort: boardSort(urlSearch.sort),
+  };
+  const pickRandom = () => {
+    if (randomBusy) return;
+    setRandomBusy(true);
+    void randomPost(appliedFilter)
+      .then((post) => {
+        void navigate({
+          to: "/posts/$id",
+          params: { id: post.id },
+          search: searchFromFilter(appliedFilter),
+        });
+      })
+      .catch((err: unknown) => {
+        const status = err && typeof err === "object" && "status" in err ? Number(err.status) : 0;
+        if (status === 404) {
+          toasts.push("No picture matches that search.", "error");
+          return;
+        }
+        toasts.push(shortError(err), "error");
+      })
+      .finally(() => setRandomBusy(false));
   };
   const board = useBoard(appliedFilter, !defaultsPending);
   const { posts, loading, error, retry, hasMore, loadingMore, loadMore, total } = board;
@@ -680,6 +707,16 @@ export function HomePage() {
             ))}
           <div className={styles.viewControls}>
             <BoardViewControls view={view} onChange={changeView} />
+            <SaveCurrentSearchButton filter={appliedFilter} />
+            <button
+              type="button"
+              className={styles.uploadButton}
+              onClick={pickRandom}
+              disabled={randomBusy}
+              aria-busy={randomBusy}
+            >
+              Random
+            </button>
             {signedIn && (
               <button
                 type="button"

@@ -10,6 +10,7 @@ import { HiddenPostsPage } from "../pages/HiddenPostsPage";
 import { HistoryPage } from "../pages/HistoryPage";
 import { PostPage } from "../pages/PostPage";
 import { ProfilePage } from "../pages/ProfilePage";
+import { TagPage } from "../pages/TagPage";
 import { RecoverPage } from "../pages/RecoverPage";
 import { StaffLayout } from "../pages/StaffLayout";
 
@@ -92,6 +93,14 @@ const profileRoute = createRoute({
     return <ProfilePage username={username} />;
   },
 });
+const tagRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tags/$tag",
+  component: () => {
+    const { tag } = tagRoute.useParams();
+    return <TagPage name={tag} />;
+  },
+});
 const listRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/lists/$id",
@@ -110,6 +119,7 @@ export const router = createRouter({
     staffRoute.addChildren([staffPeopleRoute, hiddenRoute, historyRoute]),
     postRoute,
     profileRoute,
+    tagRoute,
     listRoute,
   ]),
   scrollRestoration: true,

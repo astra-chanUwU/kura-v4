@@ -13,10 +13,13 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/accounts"
 	"github.com/astra-chanUwU/kura-v4/internal/board"
 	"github.com/astra-chanUwU/kura-v4/internal/collections"
+	"github.com/astra-chanUwU/kura-v4/internal/comments"
 	"github.com/astra-chanUwU/kura-v4/internal/controllers"
 	"github.com/astra-chanUwU/kura-v4/internal/dto"
 	"github.com/astra-chanUwU/kura-v4/internal/moderation"
+	"github.com/astra-chanUwU/kura-v4/internal/searches"
 	"github.com/astra-chanUwU/kura-v4/internal/site"
+	"github.com/astra-chanUwU/kura-v4/internal/tags"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
@@ -28,6 +31,9 @@ type HTTPDeps struct {
 	Board        *board.Service
 	Collections  *collections.Service
 	Moderation   *moderation.Service
+	Comments     *comments.Service
+	Searches     *searches.Service
+	Tags         *tags.Service
 	Ping         func(context.Context) error
 	Assets       fs.FS
 	Log          *slog.Logger
@@ -86,6 +92,15 @@ func NewHTTP(deps HTTPDeps) *fiber.App {
 		posts.RegisterRoutes(api)
 		posts.RegisterMedia(media)
 		controllers.NewCollections(deps.Collections).RegisterRoutes(api)
+		if deps.Comments != nil {
+			controllers.NewComments(deps.Comments).RegisterRoutes(api)
+		}
+		if deps.Searches != nil {
+			controllers.NewSearches(deps.Searches).RegisterRoutes(api)
+		}
+		if deps.Tags != nil {
+			controllers.NewTags(deps.Tags).RegisterRoutes(api)
+		}
 		if deps.Moderation != nil {
 			controllers.NewAdmin(deps.Moderation).RegisterRoutes(api)
 		}

@@ -217,6 +217,13 @@ func (s *Service) rollbackPost(ctx context.Context, actor model.User, entry mode
 	}
 	current := model.SnapshotOf(post)
 	post.Artist, post.Tags, post.Rating, post.Hidden, post.Deleted = before.Artist, before.Tags, before.Rating, before.Hidden, before.Deleted
+	if before.HasSourceURL {
+		post.SourceURL = before.SourceURL
+	} else {
+		// The row predates source links. Leave the current link on the post,
+		// and record it on this rollback so rolling the rollback back does not clear it.
+		before.SourceURL = post.SourceURL
+	}
 	if post.Rating != "sfw" && post.Rating != "nsfw" {
 		post.Rating = "sfw"
 	}

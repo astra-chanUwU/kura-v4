@@ -16,6 +16,7 @@ type Deps struct {
 	Collections Collections
 	Moderation  Moderation
 	Site        Site
+	Tags        Tags
 }
 
 // Options configures one invocation. Tests set SessionPath; the
@@ -37,7 +38,7 @@ type Board interface {
 	Upload(ctx context.Context, r io.Reader) (string, string, error)
 	GetBySHA(ctx context.Context, sha string) (model.Post, error)
 	Create(ctx context.Context, p model.Post, sha string) (model.Post, error)
-	SetMetaAs(ctx context.Context, actor *model.User, id, artist string, tags []string, rating string) (model.Post, error)
+	SetMetaAs(ctx context.Context, actor *model.User, id, artist string, tags []string, rating, sourceURL string) (model.Post, error)
 	Get(ctx context.Context, id string) (model.Post, error)
 	List(ctx context.Context, limit, offset int32, includeNSFW bool) ([]model.Post, error)
 	ListByOwner(ctx context.Context, userID string, includeNSFW bool, limit, offset int) (model.SearchPage, error)
@@ -74,4 +75,12 @@ type Moderation interface {
 // Site is the subset of site.Service the CLI uses.
 type Site interface {
 	Get(ctx context.Context) (model.Site, error)
+}
+
+// Tags is the subset of tags.Service the CLI uses.
+type Tags interface {
+	Get(ctx context.Context, viewer *model.User, tag string) (model.TagPage, error)
+	Update(ctx context.Context, viewer model.User, tag, category, description string) (model.TagPage, error)
+	AddAlias(ctx context.Context, actor model.User, target, alias string) (model.TagPage, error)
+	RemoveAlias(ctx context.Context, actor model.User, target, alias string) (model.TagPage, error)
 }

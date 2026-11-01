@@ -154,6 +154,18 @@ export function usePost(id: string) {
   return useQuery({ queryKey: queryKeys.post(id), queryFn: ({ signal }) => api.post(id, signal) });
 }
 
+export function useRelatedPosts(id: string) {
+  return useQuery({
+    queryKey: queryKeys.related(id),
+    queryFn: ({ signal }) => api.relatedPosts(id, signal),
+    enabled: id !== "",
+  });
+}
+
+export function useRandomPost() {
+  return (filter: BoardFilter) => api.randomPost(filter);
+}
+
 /**
  * Where a post sits in the board sequence for `filter` — the same order
  * and matching the board uses — so the post page can step to the
@@ -383,16 +395,24 @@ export function usePostActions() {
   const client = useQueryClient();
   return {
     addToList: (listId: string, postId: string) => api.addToList(listId, postId),
-    updatePostMeta: (postId: string, artist: string, tags: string[], rating: string) =>
-      api.updatePostMeta(postId, artist, tags, rating).then(() => {
+    updatePostMeta: (
+      postId: string,
+      artist: string,
+      tags: string[],
+      rating: string,
+      sourceURL: string,
+    ) =>
+      api.updatePostMeta(postId, artist, tags, rating, sourceURL).then(() => {
         void client.invalidateQueries({ queryKey: queryKeys.post(postId) });
         void client.invalidateQueries({ queryKey: queryKeys.posts() });
+        void client.invalidateQueries({ queryKey: ["post-related"] });
         invalidateSearch(client);
         void client.invalidateQueries({ queryKey: queryKeys.postHistory(postId) });
       }),
-    upload: (file: File, tags = "", rating = "sfw") =>
-      api.upload(file, tags, rating).then((post) => {
+    upload: (file: File, tags = "", rating = "sfw", sourceURL = "") =>
+      api.upload(file, tags, rating, sourceURL).then((post) => {
         void client.invalidateQueries({ queryKey: queryKeys.posts() });
+        void client.invalidateQueries({ queryKey: ["post-related"] });
         invalidateSearch(client);
         void client.invalidateQueries({ queryKey: queryKeys.myPosts() });
         return post;

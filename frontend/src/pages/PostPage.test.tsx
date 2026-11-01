@@ -65,6 +65,7 @@ vi.mock("@tanstack/react-router", async () => {
 vi.mock("../hooks/usePrefetchPost", () => ({ usePrefetchNeighbors: () => undefined }));
 vi.mock("../components/PostCard", () => ({ PostActions: () => null }));
 vi.mock("../components/HistoryList", () => ({ HistoryList: () => null }));
+vi.mock("../components/PostComments", () => ({ PostComments: () => null }));
 vi.mock("../components/Toasts", () => ({
   useToasts: () => ({ push: vi.fn() }),
   shortError: (e: unknown) => (e instanceof Error ? e.message : "error"),
@@ -92,6 +93,7 @@ vi.mock("../hooks/useKura", () => ({
   }),
   usePost: () => ({ data: post, isPending: false, error: null }),
   usePostNeighbors: () => neighbors.current,
+  useRelatedPosts: () => ({ data: [], isPending: false, isError: false }),
   usePostActions: () => ({ updatePostMeta }),
   usePostHistory: () => ({ data: [], isPending: false, error: null }),
   useStaffActions: () => ({
@@ -106,6 +108,7 @@ describe("PostPage staged editing", () => {
   it("stages tag adds/removes and rating until one Save writes them together", async () => {
     updatePostMeta.mockClear();
     render(<PostPage id="p1" />);
+    expect(screen.getByRole("link", { name: "keep_me" })).toHaveAttribute("href", "/tags/keep_me");
     const save = screen.getByRole("button", { name: "Save changes" });
     expect(save).toBeDisabled();
     expect(screen.getByText(/staged here until you Save/)).toBeInTheDocument();
@@ -122,16 +125,36 @@ describe("PostPage staged editing", () => {
 
     fireEvent.click(save);
     await waitFor(() => expect(updatePostMeta).toHaveBeenCalledTimes(1));
-    expect(updatePostMeta).toHaveBeenCalledWith("p1", "ana", ["extra", "new_tag"], "nsfw");
+    expect(updatePostMeta).toHaveBeenCalledWith("p1", "ana", ["extra", "new_tag"], "nsfw", "");
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled(),
     );
   });
 
+  it("saves a source link with the other staged fields", async () => {
+    updatePostMeta.mockClear();
+    render(<PostPage id="p1" />);
+    fireEvent.change(screen.getByLabelText("Source link"), {
+      target: { value: "  https://example.com/a  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(updatePostMeta).toHaveBeenCalledWith(
+        "p1",
+        "ana",
+        ["keep_me"],
+        "sfw",
+        "https://example.com/a",
+      ),
+    );
+  });
+
   it("Discard drops staged changes without saving", () => {
+    navigate.mockClear();
     render(<PostPage id="p1" />);
     fireEvent.click(screen.getByRole("button", { name: "Remove tag keep_me" }));
     expect(screen.queryByText("keep_me")).not.toBeInTheDocument();
+    expect(navigate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
     expect(screen.getByText("keep_me")).toBeInTheDocument();
     expect(updatePostMeta).not.toHaveBeenCalled();

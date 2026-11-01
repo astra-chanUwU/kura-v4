@@ -186,21 +186,44 @@ func TestPostsEditRatingKeepsArtistAndTags(t *testing.T) {
 	b := &postsBoard{
 		get: func(ctx context.Context, id string) (model.Post, error) {
 			require.Equal(t, "p1", id)
-			return model.Post{ID: "p1", Artist: "mori", Tags: []string{"bird", "cat"}, Rating: "sfw"}, nil
+			return model.Post{ID: "p1", Artist: "mori", Tags: []string{"bird", "cat"}, Rating: "sfw", SourceURL: "https://keep.example/old"}, nil
 		},
-		setMeta: func(ctx context.Context, actor *model.User, id, artist string, tags []string, rating string) (model.Post, error) {
+		setMeta: func(ctx context.Context, actor *model.User, id, artist string, tags []string, rating, sourceURL string) (model.Post, error) {
 			require.NotNil(t, actor)
 			require.Equal(t, "p1", id)
 			require.Equal(t, "mori", artist)
 			require.Equal(t, []string{"bird", "cat"}, tags)
 			require.Equal(t, "nsfw", rating)
-			return model.Post{ID: id, Artist: artist, Tags: tags, Rating: rating}, nil
+			require.Equal(t, "https://keep.example/old", sourceURL)
+			return model.Post{ID: id, Artist: artist, Tags: tags, Rating: rating, SourceURL: sourceURL}, nil
 		},
 	}
 	code, env, _ := postsRun(t, Deps{Accounts: acc, Board: b}, []string{"posts", "edit", "p1", "--rating", "nsfw"}, session)
 	require.Equal(t, 0, code)
 	require.True(t, env.OK)
 	require.Equal(t, "posts.edit", env.Command)
+}
+
+func TestPostsEditSourceURL(t *testing.T) {
+	session, acc := postsSession(t, model.RoleMember)
+	var got string
+	b := &postsBoard{
+		get: func(ctx context.Context, id string) (model.Post, error) {
+			return model.Post{ID: id, Artist: "mori", Tags: []string{"bird"}, Rating: "sfw", SourceURL: "https://keep.example/old"}, nil
+		},
+		setMeta: func(ctx context.Context, actor *model.User, id, artist string, tags []string, rating, sourceURL string) (model.Post, error) {
+			got = sourceURL
+			return model.Post{ID: id, Artist: artist, Tags: tags, Rating: rating, SourceURL: sourceURL}, nil
+		},
+	}
+	code, _, _ := postsRun(t, Deps{Accounts: acc, Board: b}, []string{"posts", "edit", "p1", "--source-url", "https://example.com/a"}, session)
+	require.Equal(t, 0, code)
+	require.Equal(t, "https://example.com/a", got)
+
+	got = ""
+	code, _, _ = postsRun(t, Deps{Accounts: acc, Board: b}, []string{"posts", "edit", "p1", "--rating", "sfw"}, session)
+	require.Equal(t, 0, code)
+	require.Equal(t, "https://keep.example/old", got)
 }
 
 func TestPostsHideRequiresModerator(t *testing.T) {
@@ -317,7 +340,7 @@ type postsBoard struct {
 	upload   func(context.Context, io.Reader) (string, string, error)
 	getBySHA func(context.Context, string) (model.Post, error)
 	create   func(context.Context, model.Post, string) (model.Post, error)
-	setMeta  func(context.Context, *model.User, string, string, []string, string) (model.Post, error)
+	setMeta  func(context.Context, *model.User, string, string, []string, string, string) (model.Post, error)
 	get      func(context.Context, string) (model.Post, error)
 	list     func(context.Context, int32, int32, bool) ([]model.Post, error)
 	search   func(context.Context, model.PostQuery) (model.SearchPage, error)
@@ -345,11 +368,11 @@ func (f *postsBoard) Create(ctx context.Context, p model.Post, sha string) (mode
 	return f.create(ctx, p, sha)
 }
 
-func (f *postsBoard) SetMetaAs(ctx context.Context, actor *model.User, id, artist string, tags []string, rating string) (model.Post, error) {
+func (f *postsBoard) SetMetaAs(ctx context.Context, actor *model.User, id, artist string, tags []string, rating, sourceURL string) (model.Post, error) {
 	if f.setMeta == nil {
 		panic("SetMetaAs")
 	}
-	return f.setMeta(ctx, actor, id, artist, tags, rating)
+	return f.setMeta(ctx, actor, id, artist, tags, rating, sourceURL)
 }
 
 func (f *postsBoard) Get(ctx context.Context, id string) (model.Post, error) {

@@ -20,6 +20,7 @@ func writeError(c fiber.Ctx, err error) error {
 	var vErr *accounts.ValidationError
 	var cErr *collections.ValidationError
 	var mErr *moderation.ValidationError
+	var bErr *board.ValidationError
 	switch {
 	case errors.As(err, &vErr):
 		return fiber.NewError(400, vErr.Message)
@@ -27,6 +28,8 @@ func writeError(c fiber.Ctx, err error) error {
 		return fiber.NewError(400, cErr.Message)
 	case errors.As(err, &mErr):
 		return fiber.NewError(400, mErr.Message)
+	case errors.As(err, &bErr):
+		return fiber.NewError(400, bErr.Message)
 	case errors.Is(err, moderation.ErrForbidden):
 		return fiber.NewError(403, "You don't have permission to do that.")
 	case errors.Is(err, moderation.ErrNotFound):
@@ -96,8 +99,8 @@ func userDTO(u model.User) dto.User {
 }
 
 func postDTO(p model.Post, favs map[string]bool) dto.Post {
-	sourceURL := ""
-	if p.Source == "twitter" && p.Artist != "" && p.SourceID != "" {
+	sourceURL := p.SourceURL
+	if sourceURL == "" && p.Source == "twitter" && p.Artist != "" && p.SourceID != "" {
 		sourceURL = "https://x.com/" + p.Artist + "/status/" + p.SourceID
 	}
 	tags := p.Tags
