@@ -66,6 +66,7 @@ vi.mock("../hooks/useKura", () => ({
     ),
   ],
   useDebouncedValue: (value: unknown) => value,
+  useLoadMore: () => ({ current: null }),
   useMe: () => ({
     me: board.signedIn
       ? {
@@ -125,6 +126,7 @@ const untaggedPost: Post = {
   size_bytes: 1,
   created_at: "2026-01-01T00:00:00Z",
   is_favorite: false,
+  favorite_count: 0,
   media_url: "/media/p1.jpg",
   thumbnail_url: "/media/p1-thumb.jpg",
   artist: "",

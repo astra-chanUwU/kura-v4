@@ -114,6 +114,12 @@ func TestCanSee(t *testing.T) {
 	require.False(t, CanSee(mod, post))
 	mod.ShowNSFW = true
 	require.True(t, CanSee(mod, post))
+
+	deleted := model.Post{ID: "p", Rating: "sfw", OwnerID: &owner, Deleted: true}
+	require.False(t, CanSee(nil, deleted))
+	require.False(t, CanSee(member, deleted))
+	require.True(t, CanSee(ownerUser, deleted))
+	require.True(t, CanSee(mod, deleted))
 }
 
 func TestSchemaAndUsage(t *testing.T) {

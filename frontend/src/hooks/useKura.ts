@@ -270,7 +270,6 @@ export function useProfile(username: string) {
 export function useInvalidate() {
   const client = useQueryClient();
   return () => {
-    void client.invalidateQueries({ queryKey: queryKeys.posts() });
     invalidateSearch(client);
     void client.invalidateQueries({ queryKey: queryKeys.favorites() });
     void client.invalidateQueries({ queryKey: queryKeys.myPosts() });
@@ -285,28 +284,31 @@ export function useToggleFavorite() {
   return useMutation({
     mutationFn: ({ postId, favorite }: { postId: string; favorite: boolean }) =>
       favorite ? api.favorite(postId) : api.unfavorite(postId),
-    // Patch every cache that shows this post right away — the board
-    // (["posts"], plural) and the detail view (["post", id], singular)
-    // are different keys, so invalidating only the board left the
-    // detail view stale until reload, and repeat clicks kept sending
-    // the same favorite/unfavorite instead of toggling.
+    // Patch every cache that shows this post right away. The board
+    // (["board", …]) and the detail view (["post", id]) are different
+    // keys, so invalidating only the board left the detail view stale
+    // until reload, and repeat clicks kept sending the same
+    // favorite/unfavorite instead of toggling.
     onMutate: async ({ postId, favorite }) => {
       const touched: [QueryKey, unknown][] = [];
       const patch = (key: QueryKey, data: unknown) => {
         touched.push([key, client.getQueryData(key)]);
         client.setQueryData(key, data);
       };
-      const patchPost = (p: Post) => (p.id === postId ? { ...p, is_favorite: favorite } : p);
+      const patchPost = (p: Post): Post => {
+        if (p.id !== postId) return p;
+        const flipped = p.is_favorite !== favorite;
+        return {
+          ...p,
+          is_favorite: favorite,
+          favorite_count: flipped
+            ? Math.max(0, p.favorite_count + (favorite ? 1 : -1))
+            : p.favorite_count,
+        };
+      };
       await client.cancelQueries({ queryKey: queryKeys.post(postId) });
       const single = client.getQueryData<Post>(queryKeys.post(postId));
       if (single) patch(queryKeys.post(postId), patchPost(single));
-      const board = client.getQueryData<InfiniteData<Post[]>>(queryKeys.posts());
-      if (board) {
-        patch(queryKeys.posts(), {
-          ...board,
-          pages: board.pages.map((page) => page.map(patchPost)),
-        });
-      }
       for (const [key, data] of client.getQueriesData<InfiniteData<SearchPage>>({
         queryKey: ["board"],
       })) {
@@ -363,7 +365,6 @@ export function useAuthActions() {
     // viewers update in the same render, with no stale in-between.
     purgeUserCaches();
     client.setQueryData(queryKeys.me(), me);
-    void client.invalidateQueries({ queryKey: queryKeys.posts() });
     invalidateSearch(client);
     void client.invalidateQueries({ queryKey: ["list"] });
     return me;
@@ -394,7 +395,11 @@ export function useAuthActions() {
 export function usePostActions() {
   const client = useQueryClient();
   return {
-    addToList: (listId: string, postId: string) => api.addToList(listId, postId),
+    addToList: (listId: string, postId: string) =>
+      api.addToList(listId, postId).then(() => {
+        void client.invalidateQueries({ queryKey: queryKeys.myLists() });
+        void client.invalidateQueries({ queryKey: queryKeys.list(listId) });
+      }),
     updatePostMeta: (
       postId: string,
       artist: string,
@@ -404,14 +409,12 @@ export function usePostActions() {
     ) =>
       api.updatePostMeta(postId, artist, tags, rating, sourceURL).then(() => {
         void client.invalidateQueries({ queryKey: queryKeys.post(postId) });
-        void client.invalidateQueries({ queryKey: queryKeys.posts() });
         void client.invalidateQueries({ queryKey: ["post-related"] });
         invalidateSearch(client);
         void client.invalidateQueries({ queryKey: queryKeys.postHistory(postId) });
       }),
     upload: (file: File, tags = "", rating = "sfw", sourceURL = "") =>
       api.upload(file, tags, rating, sourceURL).then((post) => {
-        void client.invalidateQueries({ queryKey: queryKeys.posts() });
         void client.invalidateQueries({ queryKey: ["post-related"] });
         invalidateSearch(client);
         void client.invalidateQueries({ queryKey: queryKeys.myPosts() });
@@ -528,7 +531,6 @@ export function useStaffActions() {
   const client = useQueryClient();
   const refreshPost = (postId: string) => {
     void client.invalidateQueries({ queryKey: queryKeys.post(postId) });
-    void client.invalidateQueries({ queryKey: queryKeys.posts() });
     invalidateSearch(client);
     void client.invalidateQueries({ queryKey: queryKeys.postHistory(postId) });
     void client.invalidateQueries({ queryKey: ["hidden-posts"] });

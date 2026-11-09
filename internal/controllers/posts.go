@@ -126,7 +126,14 @@ func (h *Posts) tags(c fiber.Ctx) error {
 }
 
 func (h *Posts) neighbors(c fiber.Ctx) error {
-	n, err := h.board.Neighbors(c.Context(), c.Params("id"), h.searchQuery(c))
+	post, err := h.board.Get(c.Context(), c.Params("id"))
+	if err != nil {
+		return writeError(c, err)
+	}
+	if !canReadPost(c, post) {
+		return writeError(c, board.ErrNotFound)
+	}
+	n, err := h.board.Neighbors(c.Context(), post.ID, h.searchQuery(c))
 	if err != nil {
 		return writeError(c, err)
 	}
@@ -138,7 +145,7 @@ func (h *Posts) related(c fiber.Ctx) error {
 	if err != nil {
 		return writeError(c, err)
 	}
-	if !canSeePost(c, post) || (post.Rating == "nsfw" && !viewerSeesNSFW(c)) {
+	if !canReadPost(c, post) {
 		return writeError(c, board.ErrNotFound)
 	}
 	limit := 12
@@ -147,7 +154,7 @@ func (h *Posts) related(c fiber.Ctx) error {
 			limit = v
 		}
 	}
-	posts, err := h.board.Related(c.Context(), post.ID, viewerSeesNSFW(c), limit)
+	posts, err := h.board.Related(c.Context(), post.ID, viewerSeesNSFW(c), viewerExcludeTags(c), limit)
 	if err != nil {
 		return writeError(c, err)
 	}
@@ -186,7 +193,7 @@ func (h *Posts) get(c fiber.Ctx) error {
 	if err != nil {
 		return writeError(c, err)
 	}
-	if !canSeePost(c, post) || (post.Rating == "nsfw" && !viewerSeesNSFW(c)) {
+	if !canReadPost(c, post) {
 		return writeError(c, board.ErrNotFound)
 	}
 	return c.JSON(postDTO(post, h.favs(c)))
@@ -223,11 +230,16 @@ func (h *Posts) create(c fiber.Ctx) error {
 	// of returning the old post as if the upload had added it, and
 	// include that post so the client can show the existing entry.
 	if existing, err := h.board.GetBySHA(c.Context(), sha); err == nil {
-		return c.Status(409).JSON(fiber.Map{
+		// The blob is content-addressed and already belongs to this post.
+		// Include the post only when this viewer could open it directly.
+		body := fiber.Map{
 			"code":    "duplicate_post",
 			"message": "Already on the board.",
-			"post":    postDTO(existing, h.favs(c)),
-		})
+		}
+		if canReadPost(c, existing) {
+			body["post"] = postDTO(existing, h.favs(c))
+		}
+		return c.Status(409).JSON(body)
 	}
 	rating := c.FormValue("rating")
 	if rating != "" && rating != "sfw" && rating != "nsfw" {
@@ -259,6 +271,13 @@ func (h *Posts) updateMeta(c fiber.Ctx) error {
 	if err := c.Bind().Body(&in); err != nil {
 		return fiber.NewError(400, "Invalid request.")
 	}
+	existing, err := h.board.Get(c.Context(), c.Params("id"))
+	if err != nil {
+		return writeError(c, err)
+	}
+	if !canReadPost(c, existing) {
+		return writeError(c, board.ErrNotFound)
+	}
 	post, err := h.board.SetMetaAs(c.Context(), user, c.Params("id"), in.Artist, in.Tags, in.Rating, in.SourceURL)
 	if err != nil {
 		return writeError(c, err)
@@ -268,7 +287,7 @@ func (h *Posts) updateMeta(c fiber.Ctx) error {
 
 func (h *Posts) thumbnail(c fiber.Ctx) error {
 	post, err := h.board.Get(c.Context(), c.Params("id"))
-	if err != nil || !canSeePost(c, post) || (post.Rating == "nsfw" && !viewerSeesNSFW(c)) {
+	if err != nil || !canReadPost(c, post) {
 		return fiber.ErrNotFound
 	}
 	file, contentType, err := h.board.Thumbnail(c.Context(), post)
@@ -282,7 +301,7 @@ func (h *Posts) thumbnail(c fiber.Ctx) error {
 
 func (h *Posts) media(c fiber.Ctx) error {
 	post, err := h.board.Get(c.Context(), c.Params("id"))
-	if err != nil || !canSeePost(c, post) || (post.Rating == "nsfw" && !viewerSeesNSFW(c)) {
+	if err != nil || !canReadPost(c, post) {
 		return fiber.ErrNotFound
 	}
 	file, err := h.board.OpenMedia(c.Context(), post)

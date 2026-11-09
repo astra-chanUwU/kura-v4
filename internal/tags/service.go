@@ -34,8 +34,8 @@ func invalid(msg string) error { return &ValidationError{Message: msg} }
 type Repository interface {
 	GetPage(ctx context.Context, tag string) (model.TagWiki, bool, error)
 	UpsertPage(ctx context.Context, tag, category, description, userID string) error
-	CountPosts(ctx context.Context, tag string, includeNSFW bool) (int64, error)
-	RecentPosts(ctx context.Context, tag string, includeNSFW bool) ([]model.Post, error)
+	CountPosts(ctx context.Context, tag string, includeNSFW bool, exclude []string) (int64, error)
+	RecentPosts(ctx context.Context, tag string, includeNSFW bool, exclude []string) ([]model.Post, error)
 	AliasTarget(ctx context.Context, alias string) (string, bool, error)
 	AliasesOf(ctx context.Context, target string) ([]string, error)
 	IsAliasTarget(ctx context.Context, tag string) (bool, error)
@@ -162,7 +162,8 @@ func (s *Service) page(ctx context.Context, viewer *model.User, tag string) (mod
 		return model.TagPage{}, err
 	}
 	includeNSFW := viewer != nil && viewer.ShowNSFW
-	count, err := s.repo.CountPosts(ctx, canonical, includeNSFW)
+	exclude := viewerExclude(viewer)
+	count, err := s.repo.CountPosts(ctx, canonical, includeNSFW, exclude)
 	if err != nil {
 		return model.TagPage{}, err
 	}
@@ -176,7 +177,7 @@ func (s *Service) page(ctx context.Context, viewer *model.User, tag string) (mod
 	if !found && count == 0 && !isAlias && len(aliases) == 0 {
 		return model.TagPage{}, ErrNotFound
 	}
-	posts, err := s.repo.RecentPosts(ctx, canonical, includeNSFW)
+	posts, err := s.repo.RecentPosts(ctx, canonical, includeNSFW, exclude)
 	if err != nil {
 		return model.TagPage{}, err
 	}
@@ -196,6 +197,15 @@ func (s *Service) page(ctx context.Context, viewer *model.User, tag string) (mod
 		page.UpdatedAt = wiki.UpdatedAt
 	}
 	return page, nil
+}
+
+// viewerExclude is the signed-in user's saved blacklist. A nil viewer
+// and a nil tag list both become an empty slice.
+func viewerExclude(viewer *model.User) []string {
+	if viewer == nil || len(viewer.DefaultExcludeTags) == 0 {
+		return []string{}
+	}
+	return viewer.DefaultExcludeTags
 }
 
 func oneTag(raw string) (string, error) {

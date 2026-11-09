@@ -39,7 +39,7 @@ func writeError(c fiber.Ctx, err error) error {
 	case errors.Is(err, accounts.ErrUsernameTaken):
 		return fiber.NewError(409, "That username is taken. Try another one.")
 	case errors.Is(err, board.ErrBadSort):
-		return fiber.NewError(400, "Sort must be newest or oldest.")
+		return fiber.NewError(400, "Sort must be newest, oldest, or favorites.")
 	case errors.Is(err, board.ErrBadCursor):
 		return fiber.NewError(400, "That page cursor is not a post in this library.")
 	case errors.Is(err, accounts.ErrAdultConfirmationRequired):
@@ -62,6 +62,16 @@ func writeError(c fiber.Ctx, err error) error {
 func viewerSeesNSFW(c fiber.Ctx) bool {
 	u := currentUser(c)
 	return u != nil && u.ShowNSFW
+}
+
+// viewerExcludeTags is the signed-in user's saved blacklist. Signed-out
+// viewers and accounts with no saved tags get an empty slice, never nil.
+func viewerExcludeTags(c fiber.Ctx) []string {
+	u := currentUser(c)
+	if u == nil || len(u.DefaultExcludeTags) == 0 {
+		return []string{}
+	}
+	return u.DefaultExcludeTags
 }
 
 func currentUser(c fiber.Ctx) *model.User {
@@ -109,7 +119,7 @@ func postDTO(p model.Post, favs map[string]bool) dto.Post {
 	}
 	return dto.Post{ID: p.ID, OwnerUsername: p.OwnerUsername, ContentType: p.ContentType, SizeBytes: p.SizeBytes,
 		CreatedAt: p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), IsFavorite: favs[p.ID], MediaURL: "/media/posts/" + p.ID,
-		ThumbnailURL: "/media/posts/" + p.ID + "/thumb", Artist: p.Artist, SourceURL: sourceURL, Tags: tags, Width: p.Width, Height: p.Height, Rating: p.Rating, Hidden: p.Hidden, Deleted: p.Deleted}
+		ThumbnailURL: "/media/posts/" + p.ID + "/thumb", Artist: p.Artist, SourceURL: sourceURL, Tags: tags, Width: p.Width, Height: p.Height, Rating: p.Rating, Hidden: p.Hidden, Deleted: p.Deleted, FavoriteCount: p.FavoriteCount}
 }
 
 func postsDTO(posts []model.Post, favs map[string]bool) []dto.Post {
@@ -174,10 +184,10 @@ func securityDTO(sec model.AccountSecurity) dto.Security {
 	return out
 }
 
-// canSeePost reports whether the viewer may see a post at all: hidden
-// posts are staff/owner-only; NSFW gating is applied separately.
+// canSeePost reports whether the viewer may see a post at all. Hidden and
+// deleted posts are staff or owner only. NSFW gating is applied separately.
 func canSeePost(c fiber.Ctx, p model.Post) bool {
-	if !p.Hidden {
+	if !p.Hidden && !p.Deleted {
 		return true
 	}
 	u := currentUser(c)
@@ -188,4 +198,13 @@ func canSeePost(c fiber.Ctx, p model.Post) bool {
 		return true
 	}
 	return p.OwnerID != nil && *p.OwnerID == u.ID
+}
+
+// canReadPost is canSeePost plus the viewer's NSFW opt-in. A miss is the
+// same as a missing post: callers answer 404.
+func canReadPost(c fiber.Ctx, p model.Post) bool {
+	if !canSeePost(c, p) {
+		return false
+	}
+	return p.Rating != "nsfw" || viewerSeesNSFW(c)
 }

@@ -55,7 +55,7 @@ type Collections interface {
 	FavoriteIDs(ctx context.Context, userID string) (map[string]bool, error)
 	CreateList(ctx context.Context, ownerID, title, desc, vis string) (model.List, error)
 	MyLists(ctx context.Context, ownerID string) ([]model.List, error)
-	GetList(ctx context.Context, viewerID *string, id string, includeNSFW bool, limit, offset int) (model.ListDetail, error)
+	GetList(ctx context.Context, viewerID *string, id string, includeNSFW bool, exclude []string, limit, offset int) (model.ListDetail, error)
 	AddItem(ctx context.Context, ownerID, listID, postID string) error
 	RemoveItem(ctx context.Context, ownerID, listID, postID string) error
 }

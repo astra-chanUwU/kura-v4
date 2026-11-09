@@ -29,13 +29,12 @@ type Repository interface {
 	ListsByOwner(ctx context.Context, ownerID string, publicOnly bool) ([]model.List, error)
 	UpdateList(ctx context.Context, id, ownerID, title, desc, vis string) (model.List, error)
 	DeleteList(ctx context.Context, id, ownerID string) (int64, error)
-	ListItems(ctx context.Context, listID string, includeNSFW bool, limit, offset int32) ([]model.Post, error)
-	CountListItems(ctx context.Context, listID string, includeNSFW bool) (int64, error)
+	ListItems(ctx context.Context, listID string, includeNSFW, includeHidden bool, exclude []string, limit, offset int32) ([]model.Post, error)
+	CountListItems(ctx context.Context, listID string, includeNSFW, includeHidden bool, exclude []string) (int64, error)
 	ListItemIDs(ctx context.Context, listID string) ([]string, error)
 	NextPosition(ctx context.Context, listID string) (int32, error)
 	AddItem(ctx context.Context, listID, postID string, pos int32) error
 	RemoveItem(ctx context.Context, listID, postID string) error
-	TouchList(ctx context.Context, listID string) error
 	Reorder(ctx context.Context, listID string, postIDs []string) error
 }
 
@@ -107,7 +106,7 @@ func (s *Service) PublicLists(ctx context.Context, ownerID string) ([]model.List
 }
 
 // GetList enforces visibility: private lists are only visible to their owner.
-func (s *Service) GetList(ctx context.Context, viewerID *string, id string, includeNSFW bool, limit, offset int) (model.ListDetail, error) {
+func (s *Service) GetList(ctx context.Context, viewerID *string, id string, includeNSFW bool, exclude []string, limit, offset int) (model.ListDetail, error) {
 	list, err := s.repo.GetList(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.ListDetail{}, ErrNotFound
@@ -118,14 +117,23 @@ func (s *Service) GetList(ctx context.Context, viewerID *string, id string, incl
 	if list.Visibility != "public" && (viewerID == nil || *viewerID != list.OwnerID) {
 		return model.ListDetail{}, ErrNotFound // do not leak that a private list exists
 	}
+	// The owner still sees posts they filed that were later hidden. Everyone
+	// else gets the public board's rule: hidden posts are not in the list.
+	ownerView := viewerID != nil && *viewerID == list.OwnerID
+	if exclude == nil {
+		exclude = []string{}
+	}
 	lim, off := model.PageBounds(limit, offset)
-	total, err := s.repo.CountListItems(ctx, id, includeNSFW)
+	total, err := s.repo.CountListItems(ctx, id, includeNSFW, ownerView, exclude)
 	if err != nil {
 		return model.ListDetail{}, err
 	}
-	items, err := s.repo.ListItems(ctx, id, includeNSFW, lim, off)
+	items, err := s.repo.ListItems(ctx, id, includeNSFW, ownerView, exclude, lim, off)
 	if items == nil {
 		items = []model.Post{}
+	}
+	if !ownerView {
+		list.ItemCount = total
 	}
 	return model.ListDetail{List: list, Items: items, Total: total}, err
 }
@@ -178,20 +186,14 @@ func (s *Service) AddItem(ctx context.Context, ownerID, listID, postID string) e
 	if err != nil {
 		return err
 	}
-	if err := s.repo.AddItem(ctx, listID, postID, pos); err != nil {
-		return err
-	}
-	return s.repo.TouchList(ctx, listID)
+	return s.repo.AddItem(ctx, listID, postID, pos)
 }
 
 func (s *Service) RemoveItem(ctx context.Context, ownerID, listID, postID string) error {
 	if _, err := s.ownedList(ctx, ownerID, listID); err != nil {
 		return err
 	}
-	if err := s.repo.RemoveItem(ctx, listID, postID); err != nil {
-		return err
-	}
-	return s.repo.TouchList(ctx, listID)
+	return s.repo.RemoveItem(ctx, listID, postID)
 }
 
 func (s *Service) Reorder(ctx context.Context, ownerID, listID string, postIDs []string) error {

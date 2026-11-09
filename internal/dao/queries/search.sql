@@ -11,7 +11,7 @@ FROM board_match_ids(
 
 -- name: SearchPosts :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-    p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating,
+    p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count,
     (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
     COALESCE(u.username, '')::text AS owner_username,
     COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
@@ -34,6 +34,10 @@ WHERE p.id IN (
         WHEN sqlc.arg(sort)::text = 'oldest' THEN
           p.created_at > sqlc.narg(after_at)::timestamptz
           OR (p.created_at = sqlc.narg(after_at)::timestamptz AND p.id < sqlc.narg(after_id)::uuid)
+        WHEN sqlc.arg(sort)::text = 'favorites' THEN
+          p.favorite_count < sqlc.arg(after_favorites)::int
+          OR (p.favorite_count = sqlc.arg(after_favorites)::int AND p.created_at < sqlc.narg(after_at)::timestamptz)
+          OR (p.favorite_count = sqlc.arg(after_favorites)::int AND p.created_at = sqlc.narg(after_at)::timestamptz AND p.id < sqlc.narg(after_id)::uuid)
         ELSE
           p.created_at < sqlc.narg(after_at)::timestamptz
           OR (p.created_at = sqlc.narg(after_at)::timestamptz AND p.id < sqlc.narg(after_id)::uuid)
@@ -41,8 +45,10 @@ WHERE p.id IN (
     )
   )
 ORDER BY
+    CASE WHEN sqlc.arg(sort)::text = 'favorites' THEN p.favorite_count END DESC NULLS LAST,
+    CASE WHEN sqlc.arg(sort)::text = 'favorites' THEN p.created_at END DESC NULLS LAST,
     CASE WHEN sqlc.arg(sort)::text = 'oldest' THEN p.created_at END ASC NULLS LAST,
-    CASE WHEN sqlc.arg(sort)::text <> 'oldest' THEN p.created_at END DESC NULLS LAST,
+    CASE WHEN sqlc.arg(sort)::text = 'newest' THEN p.created_at END DESC NULLS LAST,
     p.id DESC
 LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
 
@@ -77,7 +83,7 @@ LIMIT sqlc.arg(row_limit);
 -- earlier, and the neighbors are the single closest rows, so the pager
 -- does not number every match.
 WITH matched AS MATERIALIZED (
-    SELECT p.id, p.created_at
+    SELECT p.id, p.created_at, p.favorite_count
     FROM board_match_ids(
         sqlc.arg(tags)::text[],
         sqlc.arg(exclude)::text[],
@@ -89,7 +95,7 @@ WITH matched AS MATERIALIZED (
     JOIN posts p ON p.id = m.id
 ),
 cur AS (
-    SELECT id, created_at FROM matched WHERE id = sqlc.arg(post_id)::uuid
+    SELECT id, created_at, favorite_count FROM matched WHERE id = sqlc.arg(post_id)::uuid
 )
 SELECT
     CASE
@@ -101,6 +107,10 @@ SELECT
             WHERE CASE
                 WHEN sqlc.arg(sort)::text = 'oldest' THEN
                     p.created_at < c.created_at OR (p.created_at = c.created_at AND p.id > c.id)
+                WHEN sqlc.arg(sort)::text = 'favorites' THEN
+                    p.favorite_count > c.favorite_count
+                    OR (p.favorite_count = c.favorite_count AND p.created_at > c.created_at)
+                    OR (p.favorite_count = c.favorite_count AND p.created_at = c.created_at AND p.id > c.id)
                 ELSE
                     p.created_at > c.created_at OR (p.created_at = c.created_at AND p.id > c.id)
             END
@@ -114,12 +124,18 @@ SELECT
         WHERE CASE
             WHEN sqlc.arg(sort)::text = 'oldest' THEN
                 p.created_at < c.created_at OR (p.created_at = c.created_at AND p.id > c.id)
+            WHEN sqlc.arg(sort)::text = 'favorites' THEN
+                p.favorite_count > c.favorite_count
+                OR (p.favorite_count = c.favorite_count AND p.created_at > c.created_at)
+                OR (p.favorite_count = c.favorite_count AND p.created_at = c.created_at AND p.id > c.id)
             ELSE
                 p.created_at > c.created_at OR (p.created_at = c.created_at AND p.id > c.id)
         END
         ORDER BY
+            CASE WHEN sqlc.arg(sort)::text = 'favorites' THEN p.favorite_count END ASC NULLS LAST,
+            CASE WHEN sqlc.arg(sort)::text = 'favorites' THEN p.created_at END ASC NULLS LAST,
             CASE WHEN sqlc.arg(sort)::text = 'oldest' THEN p.created_at END DESC NULLS LAST,
-            CASE WHEN sqlc.arg(sort)::text <> 'oldest' THEN p.created_at END ASC NULLS LAST,
+            CASE WHEN sqlc.arg(sort)::text = 'newest' THEN p.created_at END ASC NULLS LAST,
             p.id ASC
         LIMIT 1
     ), '') AS prev_id,
@@ -130,12 +146,18 @@ SELECT
         WHERE CASE
             WHEN sqlc.arg(sort)::text = 'oldest' THEN
                 p.created_at > c.created_at OR (p.created_at = c.created_at AND p.id < c.id)
+            WHEN sqlc.arg(sort)::text = 'favorites' THEN
+                p.favorite_count < c.favorite_count
+                OR (p.favorite_count = c.favorite_count AND p.created_at < c.created_at)
+                OR (p.favorite_count = c.favorite_count AND p.created_at = c.created_at AND p.id < c.id)
             ELSE
                 p.created_at < c.created_at OR (p.created_at = c.created_at AND p.id < c.id)
         END
         ORDER BY
+            CASE WHEN sqlc.arg(sort)::text = 'favorites' THEN p.favorite_count END DESC NULLS LAST,
+            CASE WHEN sqlc.arg(sort)::text = 'favorites' THEN p.created_at END DESC NULLS LAST,
             CASE WHEN sqlc.arg(sort)::text = 'oldest' THEN p.created_at END ASC NULLS LAST,
-            CASE WHEN sqlc.arg(sort)::text <> 'oldest' THEN p.created_at END DESC NULLS LAST,
+            CASE WHEN sqlc.arg(sort)::text = 'newest' THEN p.created_at END DESC NULLS LAST,
             p.id DESC
         LIMIT 1
     ), '') AS next_id;

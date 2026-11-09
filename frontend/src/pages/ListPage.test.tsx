@@ -16,6 +16,7 @@ const makePost = (id: string): Post => ({
   size_bytes: 1,
   created_at: "2026-01-01T00:00:00Z",
   is_favorite: false,
+  favorite_count: 0,
   media_url: `/media/${id}.jpg`,
   thumbnail_url: `/media/${id}-thumb.jpg`,
   artist: "",

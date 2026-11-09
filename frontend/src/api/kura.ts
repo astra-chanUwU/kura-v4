@@ -32,7 +32,7 @@ function boardParams(filter: BoardFilter): URLSearchParams {
   if (filter.tags.length > 0) params.set("tags", filter.tags.join(","));
   if (filter.exclude.length > 0) params.set("exclude", filter.exclude.join(","));
   if (filter.q.trim() !== "") params.set("q", filter.q.trim());
-  if (filter.sort === "oldest") params.set("sort", "oldest");
+  if (filter.sort === "oldest" || filter.sort === "favorites") params.set("sort", filter.sort);
   return params;
 }
 

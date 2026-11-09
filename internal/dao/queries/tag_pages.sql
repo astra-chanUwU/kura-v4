@@ -20,11 +20,16 @@ FROM post_tags t
 JOIN posts p ON p.id = t.post_id
 WHERE t.tag = sqlc.arg(tag)
   AND p.hidden_at IS NULL
-  AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw');
+  AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw')
+  AND NOT EXISTS (
+    SELECT 1 FROM post_tags blocked
+    WHERE blocked.post_id = p.id
+      AND blocked.tag = ANY(sqlc.arg(exclude)::text[])
+  );
 
 -- name: ListRecentPostsForTag :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, p.width, p.height, p.rating,
+  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count,
   (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username, '')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
@@ -33,6 +38,11 @@ JOIN post_tags mine ON mine.post_id = p.id AND mine.tag = sqlc.arg(tag)
 LEFT JOIN users u ON u.id = p.owner_id
 WHERE p.hidden_at IS NULL
   AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw')
+  AND NOT EXISTS (
+    SELECT 1 FROM post_tags blocked
+    WHERE blocked.post_id = p.id
+      AND blocked.tag = ANY(sqlc.arg(exclude)::text[])
+  )
 ORDER BY p.created_at DESC, p.id DESC
 LIMIT 24;
 
@@ -67,3 +77,10 @@ VALUES (sqlc.arg(alias), sqlc.arg(target), sqlc.arg(created_by));
 -- name: DeleteTagAlias :execrows
 DELETE FROM tag_aliases
 WHERE alias = sqlc.arg(alias) AND target = sqlc.arg(target);
+
+-- name: EnsureArtistCategory :exec
+INSERT INTO tag_pages (tag, category)
+VALUES (sqlc.arg(tag), 'artist')
+ON CONFLICT (tag) DO UPDATE
+SET category = 'artist', updated_at = now()
+WHERE tag_pages.category = 'general' AND tag_pages.description = '';

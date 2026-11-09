@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
-import { searchFromFilter } from "../domain/boardFilter";
+import { boardSort, searchFromFilter, type BoardSort } from "../domain/boardFilter";
 import {
   useCreateSavedSearch,
   useDeleteSavedSearch,
@@ -15,7 +15,7 @@ import styles from "./SavedSearches.module.css";
 export function SaveCurrentSearchButton({
   filter,
 }: {
-  filter: { tags: string[]; exclude: string[]; q: string; sort?: "newest" | "oldest" };
+  filter: { tags: string[]; exclude: string[]; q: string; sort?: BoardSort };
 }) {
   const { signedIn } = useMe();
   const toasts = useToasts();
@@ -41,7 +41,7 @@ export function SaveCurrentSearchButton({
         include_tags: filter.tags,
         exclude_tags: filter.exclude,
         q: filter.q.trim(),
-        sort: filter.sort === "oldest" ? "oldest" : "newest",
+        sort: boardSort(filter.sort),
       },
       {
         onSuccess: () => {
@@ -92,6 +92,7 @@ function describeSearch(search: SavedSearch): string {
   if (search.exclude_tags.length > 0) parts.push(`exclude ${search.exclude_tags.join(", ")}`);
   if (search.q.trim() !== "") parts.push(`“${search.q.trim()}”`);
   if (search.sort === "oldest") parts.push("oldest");
+  if (search.sort === "favorites") parts.push("Favorites");
   return parts.join(" · ");
 }
 
@@ -131,7 +132,7 @@ export function SavedSearchList() {
                   tags: search.include_tags,
                   exclude: search.exclude_tags,
                   q: search.q,
-                  sort: search.sort === "oldest" ? "oldest" : "newest",
+                  sort: boardSort(search.sort),
                 })}
                 className={styles.link}
               >

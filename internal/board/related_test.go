@@ -22,12 +22,25 @@ func TestRelatedLimitClamp(t *testing.T) {
 		{in: 24, want: 24},
 		{in: 100, want: 24},
 	} {
-		posts, err := svc.Related(context.Background(), "p1", true, tc.in)
+		posts, err := svc.Related(context.Background(), "p1", true, []string{}, tc.in)
 		require.NoError(t, err)
 		require.Empty(t, posts)
 		require.Equal(t, tc.want, repo.relatedLimit)
 		require.True(t, repo.relatedNSFW)
+		require.NotNil(t, repo.relatedExclude)
+		require.Empty(t, repo.relatedExclude)
 	}
+}
+
+func TestRelatedPassesExclude(t *testing.T) {
+	repo := &fakeRepo{}
+	exclude := []string{"spoilers", "gore"}
+	posts, err := NewService(repo, nil).Related(context.Background(), "p1", false, exclude, 5)
+	require.NoError(t, err)
+	require.Empty(t, posts)
+	require.Equal(t, exclude, repo.relatedExclude)
+	require.False(t, repo.relatedNSFW)
+	require.Equal(t, int32(5), repo.relatedLimit)
 }
 
 func TestSearchRewritesAliasToCanonicalTag(t *testing.T) {

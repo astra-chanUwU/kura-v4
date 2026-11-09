@@ -31,7 +31,7 @@ func presentPost(p model.Post, favs map[string]bool) dto.Post {
 		CreatedAt: p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), IsFavorite: favs[p.ID],
 		MediaURL: "/media/posts/" + p.ID, ThumbnailURL: "/media/posts/" + p.ID + "/thumb",
 		Artist: p.Artist, SourceURL: sourceURL, Tags: tags, Width: p.Width, Height: p.Height,
-		Rating: p.Rating, Hidden: p.Hidden, Deleted: p.Deleted,
+		Rating: p.Rating, Hidden: p.Hidden, Deleted: p.Deleted, FavoriteCount: p.FavoriteCount,
 	}
 }
 

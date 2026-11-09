@@ -4,7 +4,7 @@ export interface SavedSearch {
   include_tags: string[];
   exclude_tags: string[];
   q: string;
-  sort: "newest" | "oldest";
+  sort: "newest" | "oldest" | "favorites";
   created_at: string;
 }
 
@@ -13,5 +13,5 @@ export interface CreateSavedSearch {
   include_tags: string[];
   exclude_tags: string[];
   q: string;
-  sort: "newest" | "oldest";
+  sort: "newest" | "oldest" | "favorites";
 }

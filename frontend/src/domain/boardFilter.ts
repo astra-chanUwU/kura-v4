@@ -1,8 +1,8 @@
 import Fuse from "fuse.js";
 import type { Post } from "../types/api";
 
-/** Newest is the board's default order. Oldest reverses it. */
-export type BoardSort = "newest" | "oldest";
+/** Newest is the board's default order. Oldest reverses it. Favorites orders by favorite count. */
+export type BoardSort = "newest" | "oldest" | "favorites";
 
 /** The board's applied filter: required tags, excluded tags, free text, order. */
 export interface BoardFilter {
@@ -96,7 +96,9 @@ const nonEmptyString = (value: unknown): string | undefined =>
 
 /** Router validateSearch for every route that carries the board filter. */
 export function boardSort(value: unknown): BoardSort {
-  return value === "oldest" ? "oldest" : "newest";
+  if (value === "favorites") return "favorites";
+  if (value === "oldest") return "oldest";
+  return "newest";
 }
 
 export function validateBoardSearch(search: Record<string, unknown>): BoardSearch {
@@ -106,6 +108,7 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardSearc
     q: nonEmptyString(search.q),
   };
   if (search.sort === "oldest") out.sort = "oldest";
+  if (search.sort === "favorites") out.sort = "favorites";
   return out;
 }
 
@@ -126,6 +129,7 @@ export function searchFromFilter(filter: BoardFilter): BoardSearch {
     q: q !== "" ? q : undefined,
   };
   if (filter.sort === "oldest") out.sort = "oldest";
+  if (filter.sort === "favorites") out.sort = "favorites";
   return out;
 }
 

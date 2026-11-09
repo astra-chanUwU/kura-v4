@@ -11,6 +11,7 @@ const post: Post = {
   size_bytes: 10,
   created_at: "2026-11-01T00:00:00Z",
   is_favorite: false,
+  favorite_count: 0,
   media_url: "/media/posts/p1",
   thumbnail_url: "/media/posts/p1/thumb",
   artist: "ana",

@@ -14,21 +14,34 @@ func TestPrivateListHiddenFromOthers(t *testing.T) {
 	repo.EXPECT().GetList(mock.Anything, "l1").Return(model.List{ID: "l1", OwnerID: "owner", Visibility: "private"}, nil)
 	svc := NewService(repo)
 	other := "someone-else"
-	_, err := svc.GetList(context.Background(), &other, "l1", false, 0, 0)
+	_, err := svc.GetList(context.Background(), &other, "l1", false, []string{}, 0, 0)
 	require.ErrorIs(t, err, ErrNotFound)
-	_, err = svc.GetList(context.Background(), nil, "l1", false, 0, 0)
+	_, err = svc.GetList(context.Background(), nil, "l1", false, []string{}, 0, 0)
 	require.ErrorIs(t, err, ErrNotFound)
 }
 
 func TestPublicListVisibleAnonymously(t *testing.T) {
 	repo := NewMockRepository(t)
-	repo.EXPECT().GetList(mock.Anything, "l1").Return(model.List{ID: "l1", OwnerID: "owner", Visibility: "public"}, nil)
-	repo.EXPECT().CountListItems(mock.Anything, "l1", false).Return(int64(1), nil)
-	repo.EXPECT().ListItems(mock.Anything, "l1", false, int32(40), int32(0)).Return([]model.Post{{ID: "p1"}}, nil)
+	repo.EXPECT().GetList(mock.Anything, "l1").Return(model.List{ID: "l1", OwnerID: "owner", Visibility: "public", ItemCount: 4}, nil)
+	repo.EXPECT().CountListItems(mock.Anything, "l1", false, false, []string{}).Return(int64(1), nil)
+	repo.EXPECT().ListItems(mock.Anything, "l1", false, false, []string{}, int32(40), int32(0)).Return([]model.Post{{ID: "p1"}}, nil)
 	svc := NewService(repo)
-	detail, err := svc.GetList(context.Background(), nil, "l1", false, 0, 0)
+	detail, err := svc.GetList(context.Background(), nil, "l1", false, nil, 0, 0)
 	require.NoError(t, err)
 	require.Len(t, detail.Items, 1)
+	require.Equal(t, int64(1), detail.List.ItemCount)
+}
+
+func TestOwnerListKeepsHiddenItems(t *testing.T) {
+	repo := NewMockRepository(t)
+	repo.EXPECT().GetList(mock.Anything, "l1").Return(model.List{ID: "l1", OwnerID: "owner", Visibility: "public", ItemCount: 2}, nil)
+	repo.EXPECT().CountListItems(mock.Anything, "l1", false, true, []string{}).Return(int64(2), nil)
+	repo.EXPECT().ListItems(mock.Anything, "l1", false, true, []string{}, int32(40), int32(0)).Return([]model.Post{{ID: "p1"}, {ID: "hidden"}}, nil)
+	owner := "owner"
+	detail, err := NewService(repo).GetList(context.Background(), &owner, "l1", false, []string{}, 0, 0)
+	require.NoError(t, err)
+	require.Len(t, detail.Items, 2)
+	require.Equal(t, int64(2), detail.List.ItemCount)
 }
 
 func TestCreateListDefaultsToPrivate(t *testing.T) {

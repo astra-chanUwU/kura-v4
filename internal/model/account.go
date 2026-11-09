@@ -84,6 +84,7 @@ type Post struct {
 	Rating        string // sfw | nsfw
 	Hidden        bool   // hidden by a moderator/admin; restorable via history
 	Deleted       bool   // soft-deleted by an admin (hidden, and flagged deleted)
+	FavoriteCount int64  // public number of favorites
 }
 
 type List struct {

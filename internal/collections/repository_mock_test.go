@@ -252,8 +252,8 @@ func (_c *MockRepository_CountFavorites_Call) RunAndReturn(run func(ctx context.
 }
 
 // CountListItems provides a mock function for the type MockRepository
-func (_mock *MockRepository) CountListItems(ctx context.Context, listID string, includeNSFW bool) (int64, error) {
-	ret := _mock.Called(ctx, listID, includeNSFW)
+func (_mock *MockRepository) CountListItems(ctx context.Context, listID string, includeNSFW bool, includeHidden bool, exclude []string) (int64, error) {
+	ret := _mock.Called(ctx, listID, includeNSFW, includeHidden, exclude)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CountListItems")
@@ -261,16 +261,16 @@ func (_mock *MockRepository) CountListItems(ctx context.Context, listID string, 
 
 	var r0 int64
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) (int64, error)); ok {
-		return returnFunc(ctx, listID, includeNSFW)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, bool, []string) (int64, error)); ok {
+		return returnFunc(ctx, listID, includeNSFW, includeHidden, exclude)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) int64); ok {
-		r0 = returnFunc(ctx, listID, includeNSFW)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, bool, []string) int64); ok {
+		r0 = returnFunc(ctx, listID, includeNSFW, includeHidden, exclude)
 	} else {
 		r0 = ret.Get(0).(int64)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
-		r1 = returnFunc(ctx, listID, includeNSFW)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool, bool, []string) error); ok {
+		r1 = returnFunc(ctx, listID, includeNSFW, includeHidden, exclude)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -286,11 +286,13 @@ type MockRepository_CountListItems_Call struct {
 //   - ctx context.Context
 //   - listID string
 //   - includeNSFW bool
-func (_e *MockRepository_Expecter) CountListItems(ctx any, listID any, includeNSFW any) *MockRepository_CountListItems_Call {
-	return &MockRepository_CountListItems_Call{Call: _e.mock.On("CountListItems", ctx, listID, includeNSFW)}
+//   - includeHidden bool
+//   - exclude []string
+func (_e *MockRepository_Expecter) CountListItems(ctx any, listID any, includeNSFW any, includeHidden any, exclude any) *MockRepository_CountListItems_Call {
+	return &MockRepository_CountListItems_Call{Call: _e.mock.On("CountListItems", ctx, listID, includeNSFW, includeHidden, exclude)}
 }
 
-func (_c *MockRepository_CountListItems_Call) Run(run func(ctx context.Context, listID string, includeNSFW bool)) *MockRepository_CountListItems_Call {
+func (_c *MockRepository_CountListItems_Call) Run(run func(ctx context.Context, listID string, includeNSFW bool, includeHidden bool, exclude []string)) *MockRepository_CountListItems_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -304,10 +306,20 @@ func (_c *MockRepository_CountListItems_Call) Run(run func(ctx context.Context, 
 		if args[2] != nil {
 			arg2 = args[2].(bool)
 		}
+		var arg3 bool
+		if args[3] != nil {
+			arg3 = args[3].(bool)
+		}
+		var arg4 []string
+		if args[4] != nil {
+			arg4 = args[4].([]string)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -318,7 +330,7 @@ func (_c *MockRepository_CountListItems_Call) Return(n int64, err error) *MockRe
 	return _c
 }
 
-func (_c *MockRepository_CountListItems_Call) RunAndReturn(run func(ctx context.Context, listID string, includeNSFW bool) (int64, error)) *MockRepository_CountListItems_Call {
+func (_c *MockRepository_CountListItems_Call) RunAndReturn(run func(ctx context.Context, listID string, includeNSFW bool, includeHidden bool, exclude []string) (int64, error)) *MockRepository_CountListItems_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -768,8 +780,8 @@ func (_c *MockRepository_ListItemIDs_Call) RunAndReturn(run func(ctx context.Con
 }
 
 // ListItems provides a mock function for the type MockRepository
-func (_mock *MockRepository) ListItems(ctx context.Context, listID string, includeNSFW bool, limit int32, offset int32) ([]model.Post, error) {
-	ret := _mock.Called(ctx, listID, includeNSFW, limit, offset)
+func (_mock *MockRepository) ListItems(ctx context.Context, listID string, includeNSFW bool, includeHidden bool, exclude []string, limit int32, offset int32) ([]model.Post, error) {
+	ret := _mock.Called(ctx, listID, includeNSFW, includeHidden, exclude, limit, offset)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListItems")
@@ -777,18 +789,18 @@ func (_mock *MockRepository) ListItems(ctx context.Context, listID string, inclu
 
 	var r0 []model.Post
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, int32, int32) ([]model.Post, error)); ok {
-		return returnFunc(ctx, listID, includeNSFW, limit, offset)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, bool, []string, int32, int32) ([]model.Post, error)); ok {
+		return returnFunc(ctx, listID, includeNSFW, includeHidden, exclude, limit, offset)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, int32, int32) []model.Post); ok {
-		r0 = returnFunc(ctx, listID, includeNSFW, limit, offset)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, bool, []string, int32, int32) []model.Post); ok {
+		r0 = returnFunc(ctx, listID, includeNSFW, includeHidden, exclude, limit, offset)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]model.Post)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool, int32, int32) error); ok {
-		r1 = returnFunc(ctx, listID, includeNSFW, limit, offset)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool, bool, []string, int32, int32) error); ok {
+		r1 = returnFunc(ctx, listID, includeNSFW, includeHidden, exclude, limit, offset)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -804,13 +816,15 @@ type MockRepository_ListItems_Call struct {
 //   - ctx context.Context
 //   - listID string
 //   - includeNSFW bool
+//   - includeHidden bool
+//   - exclude []string
 //   - limit int32
 //   - offset int32
-func (_e *MockRepository_Expecter) ListItems(ctx any, listID any, includeNSFW any, limit any, offset any) *MockRepository_ListItems_Call {
-	return &MockRepository_ListItems_Call{Call: _e.mock.On("ListItems", ctx, listID, includeNSFW, limit, offset)}
+func (_e *MockRepository_Expecter) ListItems(ctx any, listID any, includeNSFW any, includeHidden any, exclude any, limit any, offset any) *MockRepository_ListItems_Call {
+	return &MockRepository_ListItems_Call{Call: _e.mock.On("ListItems", ctx, listID, includeNSFW, includeHidden, exclude, limit, offset)}
 }
 
-func (_c *MockRepository_ListItems_Call) Run(run func(ctx context.Context, listID string, includeNSFW bool, limit int32, offset int32)) *MockRepository_ListItems_Call {
+func (_c *MockRepository_ListItems_Call) Run(run func(ctx context.Context, listID string, includeNSFW bool, includeHidden bool, exclude []string, limit int32, offset int32)) *MockRepository_ListItems_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -824,13 +838,21 @@ func (_c *MockRepository_ListItems_Call) Run(run func(ctx context.Context, listI
 		if args[2] != nil {
 			arg2 = args[2].(bool)
 		}
-		var arg3 int32
+		var arg3 bool
 		if args[3] != nil {
-			arg3 = args[3].(int32)
+			arg3 = args[3].(bool)
 		}
-		var arg4 int32
+		var arg4 []string
 		if args[4] != nil {
-			arg4 = args[4].(int32)
+			arg4 = args[4].([]string)
+		}
+		var arg5 int32
+		if args[5] != nil {
+			arg5 = args[5].(int32)
+		}
+		var arg6 int32
+		if args[6] != nil {
+			arg6 = args[6].(int32)
 		}
 		run(
 			arg0,
@@ -838,6 +860,8 @@ func (_c *MockRepository_ListItems_Call) Run(run func(ctx context.Context, listI
 			arg2,
 			arg3,
 			arg4,
+			arg5,
+			arg6,
 		)
 	})
 	return _c
@@ -848,7 +872,7 @@ func (_c *MockRepository_ListItems_Call) Return(posts []model.Post, err error) *
 	return _c
 }
 
-func (_c *MockRepository_ListItems_Call) RunAndReturn(run func(ctx context.Context, listID string, includeNSFW bool, limit int32, offset int32) ([]model.Post, error)) *MockRepository_ListItems_Call {
+func (_c *MockRepository_ListItems_Call) RunAndReturn(run func(ctx context.Context, listID string, includeNSFW bool, includeHidden bool, exclude []string, limit int32, offset int32) ([]model.Post, error)) *MockRepository_ListItems_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1178,63 +1202,6 @@ func (_c *MockRepository_Reorder_Call) Return(err error) *MockRepository_Reorder
 }
 
 func (_c *MockRepository_Reorder_Call) RunAndReturn(run func(ctx context.Context, listID string, postIDs []string) error) *MockRepository_Reorder_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// TouchList provides a mock function for the type MockRepository
-func (_mock *MockRepository) TouchList(ctx context.Context, listID string) error {
-	ret := _mock.Called(ctx, listID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for TouchList")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = returnFunc(ctx, listID)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockRepository_TouchList_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TouchList'
-type MockRepository_TouchList_Call struct {
-	*mock.Call
-}
-
-// TouchList is a helper method to define mock.On call
-//   - ctx context.Context
-//   - listID string
-func (_e *MockRepository_Expecter) TouchList(ctx any, listID any) *MockRepository_TouchList_Call {
-	return &MockRepository_TouchList_Call{Call: _e.mock.On("TouchList", ctx, listID)}
-}
-
-func (_c *MockRepository_TouchList_Call) Run(run func(ctx context.Context, listID string)) *MockRepository_TouchList_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *MockRepository_TouchList_Call) Return(err error) *MockRepository_TouchList_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockRepository_TouchList_Call) RunAndReturn(run func(ctx context.Context, listID string) error) *MockRepository_TouchList_Call {
 	_c.Call.Return(run)
 	return _c
 }

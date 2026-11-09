@@ -70,25 +70,26 @@ type PasswordCredential struct {
 }
 
 type Post struct {
-	ID           uuid.UUID
-	OwnerID      uuid.NullUUID
-	OriginalName string
-	StorageKey   string
-	ContentType  string
-	SizeBytes    int64
-	Sha256       string
-	CreatedAt    time.Time
-	Artist       string
-	Source       string
-	SourceID     string
-	ThumbnailKey string
-	Width        int32
-	Height       int32
-	Rating       string
-	HiddenAt     sql.NullTime
-	HiddenBy     uuid.NullUUID
-	DeletedAt    sql.NullTime
-	SourceUrl    string
+	ID            uuid.UUID
+	OwnerID       uuid.NullUUID
+	OriginalName  string
+	StorageKey    string
+	ContentType   string
+	SizeBytes     int64
+	Sha256        string
+	CreatedAt     time.Time
+	Artist        string
+	Source        string
+	SourceID      string
+	ThumbnailKey  string
+	Width         int32
+	Height        int32
+	Rating        string
+	HiddenAt      sql.NullTime
+	HiddenBy      uuid.NullUUID
+	DeletedAt     sql.NullTime
+	SourceUrl     string
+	FavoriteCount int32
 }
 
 type PostComment struct {

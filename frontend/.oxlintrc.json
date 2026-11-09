@@ -68,6 +68,15 @@
           }
         ]
       }
+    },
+    {
+      "files": [
+        "src/components/**/*.test.tsx",
+        "src/pages/**/*.test.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
     }
   ]
 }

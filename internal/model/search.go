@@ -5,21 +5,23 @@ import "time"
 // PostQuery is a board search. Tags are required together (AND).
 // Exclude drops any post carrying one of those tags. Q matches the
 // artist credit or a tag, including a close misspelling. Artist is an
-// extra artist substring, used by the agent. Sort is newest or oldest.
+// extra artist substring, used by the agent. Sort is newest, oldest, or favorites.
 // AfterID continues a page from that post instead of skipping rows.
+// AfterFavorites is that post's favorite_count when Sort is favorites.
 type PostQuery struct {
-	Tags        []string
-	Exclude     []string
-	Q           string
-	QLike       string
-	Artist      string
-	ArtistLike  string
-	Sort        string
-	Limit       int32
-	Offset      int32
-	AfterID     string
-	AfterAt     time.Time
-	IncludeNSFW bool
+	Tags           []string
+	Exclude        []string
+	Q              string
+	QLike          string
+	Artist         string
+	ArtistLike     string
+	Sort           string
+	Limit          int32
+	Offset         int32
+	AfterID        string
+	AfterAt        time.Time
+	AfterFavorites int32
+	IncludeNSFW    bool
 }
 
 // PageBounds clamps a list page the same way on every route.

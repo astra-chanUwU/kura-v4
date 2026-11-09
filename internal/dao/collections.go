@@ -79,7 +79,7 @@ func (d *CollectionsDAO) ListFavorites(ctx context.Context, userID string, inclu
 	}
 	out := make([]model.Post, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, "", "", "", "", "", "", 0, 0, r.Rating, false, false))
+		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.SourceUrl, r.ThumbnailKey, r.TagsCsv, r.Width, r.Height, r.Rating, r.Hidden, r.Deleted, r.FavoriteCount))
 	}
 	return out, nil
 }
@@ -164,12 +164,15 @@ func (d *CollectionsDAO) DeleteList(ctx context.Context, id, ownerID string) (in
 	}
 	return d.q.DeleteList(ctx, sqlcgen.DeleteListParams{ID: uid, OwnerID: o})
 }
-func (d *CollectionsDAO) CountListItems(ctx context.Context, listID string, includeNSFW bool) (int64, error) {
+func (d *CollectionsDAO) CountListItems(ctx context.Context, listID string, includeNSFW, includeHidden bool, exclude []string) (int64, error) {
 	uid, err := uuid.Parse(listID)
 	if err != nil {
 		return 0, err
 	}
-	return d.q.CountListItems(ctx, sqlcgen.CountListItemsParams{ListID: uid, IncludeNsfw: includeNSFW})
+	if exclude == nil {
+		exclude = []string{}
+	}
+	return d.q.CountListItems(ctx, sqlcgen.CountListItemsParams{ListID: uid, IncludeNsfw: includeNSFW, IncludeHidden: includeHidden, Exclude: exclude})
 }
 
 func (d *CollectionsDAO) ListItemIDs(ctx context.Context, listID string) ([]string, error) {
@@ -188,18 +191,21 @@ func (d *CollectionsDAO) ListItemIDs(ctx context.Context, listID string) ([]stri
 	return out, nil
 }
 
-func (d *CollectionsDAO) ListItems(ctx context.Context, listID string, includeNSFW bool, limit, offset int32) ([]model.Post, error) {
+func (d *CollectionsDAO) ListItems(ctx context.Context, listID string, includeNSFW, includeHidden bool, limit, offset int32, exclude []string) ([]model.Post, error) {
 	uid, err := uuid.Parse(listID)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := d.q.ListItems(ctx, sqlcgen.ListItemsParams{ListID: uid, IncludeNsfw: includeNSFW, RowLimit: limit, RowOffset: offset})
+	if exclude == nil {
+		exclude = []string{}
+	}
+	rows, err := d.q.ListItems(ctx, sqlcgen.ListItemsParams{ListID: uid, IncludeNsfw: includeNSFW, IncludeHidden: includeHidden, RowLimit: limit, RowOffset: offset, Exclude: exclude})
 	if err != nil {
 		return nil, err
 	}
 	out := make([]model.Post, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, "", "", "", "", "", "", 0, 0, r.Rating, false, false))
+		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.SourceUrl, r.ThumbnailKey, r.TagsCsv, r.Width, r.Height, r.Rating, r.Hidden, r.Deleted, r.FavoriteCount))
 	}
 	return out, nil
 }

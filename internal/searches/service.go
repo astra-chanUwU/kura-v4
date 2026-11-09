@@ -133,8 +133,10 @@ func normalizeSort(sort string) (string, error) {
 		return "newest", nil
 	case "oldest":
 		return "oldest", nil
+	case "favorites":
+		return "favorites", nil
 	default:
-		return "", &ValidationError{Message: "Sort must be newest or oldest."}
+		return "", &ValidationError{Message: "Sort must be newest, oldest, or favorites."}
 	}
 }
 

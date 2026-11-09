@@ -14,6 +14,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/dao"
 	"github.com/astra-chanUwU/kura-v4/internal/db"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
+	"github.com/astra-chanUwU/kura-v4/internal/repository"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -160,6 +161,25 @@ func TestPostgresContracts(t *testing.T) {
 	require.Equal(t, -1, outside.Index)
 	require.Equal(t, int64(1), outside.Total)
 
+	favs := dao.NewCollections(conn)
+	var fanA, fanB string
+	require.NoError(t, conn.QueryRowContext(ctx, `INSERT INTO users (username, display_name) VALUES ('fana', 'Fan A') RETURNING id`).Scan(&fanA))
+	require.NoError(t, conn.QueryRowContext(ctx, `INSERT INTO users (username, display_name) VALUES ('fanb', 'Fan B') RETURNING id`).Scan(&fanB))
+	require.NoError(t, favs.AddFavorite(ctx, fanA, cute.ID))
+	require.NoError(t, favs.AddFavorite(ctx, fanB, cute.ID))
+	require.NoError(t, favs.AddFavorite(ctx, fanA, gif.ID))
+	byFav, err := postsDAO.SearchPosts(ctx, model.PostQuery{
+		Tags: []string{"yuri"}, Exclude: []string{}, Sort: "favorites", IncludeNSFW: true, Limit: 40,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{cute.ID, gif.ID}, idsOf(byFav), "higher favorite_count sorts first")
+	kept, err := postsDAO.RelatedPosts(ctx, cute.ID, true, nil, 8)
+	require.NoError(t, err)
+	require.Equal(t, []string{gif.ID}, idsOf(kept))
+	blocked, err := postsDAO.RelatedPosts(ctx, cute.ID, true, []string{"gif"}, 8)
+	require.NoError(t, err)
+	require.Empty(t, blocked, "exclude drops a post carrying that tag")
+
 	var ownerID string
 	require.NoError(t, conn.QueryRowContext(ctx, `INSERT INTO users (username, display_name) VALUES ('pager', 'Pager') RETURNING id`).Scan(&ownerID))
 	_, err = conn.ExecContext(ctx, `UPDATE posts SET owner_id = $1 WHERE id = $2 OR id = $3`, ownerID, cute.ID, nsfw.ID)
@@ -180,21 +200,35 @@ func TestPostgresContracts(t *testing.T) {
 	favPage, err := collectionsDAO.ListFavorites(ctx, ownerID, false, 40, 0)
 	require.NoError(t, err)
 	require.Equal(t, []string{cute.ID}, idsOf(favPage))
+	require.Equal(t, "Serraphyll", favPage[0].Artist)
+	require.Equal(t, []string{"cute", "yuri"}, favPage[0].Tags)
 
 	list, err := collectionsDAO.CreateList(ctx, ownerID, "Shelf", "", "public")
 	require.NoError(t, err)
 	require.NoError(t, collectionsDAO.AddItem(ctx, list.ID, cute.ID, 0))
 	require.NoError(t, collectionsDAO.AddItem(ctx, list.ID, gif.ID, 1))
 	require.NoError(t, collectionsDAO.AddItem(ctx, list.ID, nsfw.ID, 2))
-	itemTotal, err := collectionsDAO.CountListItems(ctx, list.ID, false)
+	itemTotal, err := collectionsDAO.CountListItems(ctx, list.ID, false, true, nil)
 	require.NoError(t, err)
 	require.Equal(t, int64(2), itemTotal)
-	itemPage, err := collectionsDAO.ListItems(ctx, list.ID, false, 1, 0)
+	itemPage, err := collectionsDAO.ListItems(ctx, list.ID, false, true, 1, 0, nil)
 	require.NoError(t, err)
 	require.Equal(t, []string{cute.ID}, idsOf(itemPage))
+	require.Equal(t, "Serraphyll", itemPage[0].Artist)
+	require.Equal(t, []string{"cute", "yuri"}, itemPage[0].Tags)
 	itemIDs, err := collectionsDAO.ListItemIDs(ctx, list.ID)
 	require.NoError(t, err)
 	require.Equal(t, []string{cute.ID, gif.ID, nsfw.ID}, itemIDs)
+	require.NoError(t, collectionsDAO.AddItem(ctx, list.ID, hidden.ID, 3))
+	publicTotal, err := collectionsDAO.CountListItems(ctx, list.ID, true, false, nil)
+	require.NoError(t, err)
+	require.Equal(t, int64(3), publicTotal, "a public list omits hidden posts")
+	ownerTotal, err := collectionsDAO.CountListItems(ctx, list.ID, true, true, nil)
+	require.NoError(t, err)
+	require.Equal(t, int64(4), ownerTotal)
+	publicPage, err := collectionsDAO.ListItems(ctx, list.ID, true, false, 10, 0, nil)
+	require.NoError(t, err)
+	require.Equal(t, []string{cute.ID, gif.ID, nsfw.ID}, idsOf(publicPage))
 
 	hiddenCount, deletedCount, err := postsDAO.CountRemovedPosts(ctx)
 	require.NoError(t, err)
@@ -203,6 +237,16 @@ func TestPostgresContracts(t *testing.T) {
 	hiddenPage, err := postsDAO.ListHiddenPosts(ctx, "hidden", 40, 0)
 	require.NoError(t, err)
 	require.Equal(t, []string{hidden.ID}, idsOf(hiddenPage))
+
+	tagged, err := repository.NewPosts(postsDAO).CreatePost(ctx, model.Post{
+		OriginalName: "tagged.jpg", StorageKey: "tagged.jpg", ContentType: "image/jpeg", SizeBytes: 1,
+		Artist: "Ada", Rating: "sfw", Tags: []string{"yuri", "cute"},
+	}, "tagged-sha")
+	require.NoError(t, err)
+	stored, err := postsDAO.GetPost(ctx, tagged.ID)
+	require.NoError(t, err)
+	require.Equal(t, "Ada", stored.Artist)
+	require.Equal(t, []string{"cute", "yuri"}, stored.Tags)
 
 	require.NoError(t, goose.DownToContext(ctx, conn, "migrations", 0))
 	require.NoError(t, db.Migrate(ctx, conn), "fresh schema can be rebuilt after rollback")

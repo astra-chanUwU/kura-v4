@@ -14,8 +14,11 @@ WHERE f.user_id = sqlc.arg(user_id)
   AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw');
 
 -- name: ListFavorites :many
-SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at, p.rating,
-  COALESCE(u.username,'')::text AS owner_username
+SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
+  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count,
+  (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  COALESCE(u.username,'')::text AS owner_username,
+  COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM favorites f JOIN posts p ON p.id=f.post_id LEFT JOIN users u ON u.id=p.owner_id
 WHERE f.user_id = sqlc.arg(user_id)
   AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw')
@@ -41,7 +44,7 @@ FROM lists l LEFT JOIN users u ON u.id=l.owner_id WHERE l.owner_id=$1 ORDER BY l
 -- name: ListPublicListsByOwner :many
 SELECT l.id, l.owner_id, l.title, l.description, l.visibility, l.created_at, l.updated_at,
   COALESCE(u.username,'')::text AS owner_username, COALESCE(u.display_name,'')::text AS owner_display_name,
-  (SELECT count(*) FROM list_items i WHERE i.list_id=l.id)::bigint AS item_count
+  (SELECT count(*) FROM list_items i JOIN posts p ON p.id=i.post_id WHERE i.list_id=l.id AND p.hidden_at IS NULL)::bigint AS item_count
 FROM lists l LEFT JOIN users u ON u.id=l.owner_id WHERE l.owner_id=$1 AND l.visibility='public' ORDER BY l.updated_at DESC;
 
 -- name: UpdateList :one
@@ -55,17 +58,32 @@ DELETE FROM lists WHERE id=$1 AND owner_id=$2;
 SELECT count(*)::bigint AS total
 FROM list_items i JOIN posts p ON p.id = i.post_id
 WHERE i.list_id = sqlc.arg(list_id)
-  AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw');
+  AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw')
+  AND (sqlc.arg(include_hidden)::bool OR p.hidden_at IS NULL)
+  AND NOT EXISTS (
+    SELECT 1 FROM post_tags blocked
+    WHERE blocked.post_id = p.id
+      AND blocked.tag = ANY(sqlc.arg(exclude)::text[])
+  );
 
 -- name: ListItemIDs :many
 SELECT post_id FROM list_items WHERE list_id = $1 ORDER BY position, post_id;
 
 -- name: ListItems :many
-SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at, p.rating,
-  COALESCE(u.username,'')::text AS owner_username
+SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
+  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count,
+  (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  COALESCE(u.username,'')::text AS owner_username,
+  COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM list_items i JOIN posts p ON p.id=i.post_id LEFT JOIN users u ON u.id=p.owner_id
 WHERE i.list_id = sqlc.arg(list_id)
   AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw')
+  AND (sqlc.arg(include_hidden)::bool OR p.hidden_at IS NULL)
+  AND NOT EXISTS (
+    SELECT 1 FROM post_tags blocked
+    WHERE blocked.post_id = p.id
+      AND blocked.tag = ANY(sqlc.arg(exclude)::text[])
+  )
 ORDER BY i.position
 LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
 

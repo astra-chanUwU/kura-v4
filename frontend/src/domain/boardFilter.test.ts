@@ -17,6 +17,7 @@ const post = (id: string, tags: string[], artist = ""): Post => ({
   size_bytes: 0,
   created_at: "2026-10-27T00:00:00Z",
   is_favorite: false,
+  favorite_count: 0,
   media_url: `/media/posts/${id}`,
   thumbnail_url: `/media/posts/${id}/thumb`,
   artist,
@@ -56,15 +57,24 @@ describe("board filter URL round trip", () => {
     });
   });
 
-  it("keeps oldest and drops any other sort", () => {
+  it("keeps oldest and favorites, and drops any other sort", () => {
     expect(validateBoardSearch({ sort: "oldest" })).toEqual({
       tags: undefined,
       exclude: undefined,
       q: undefined,
       sort: "oldest",
     });
+    expect(validateBoardSearch({ sort: "favorites" })).toEqual({
+      tags: undefined,
+      exclude: undefined,
+      q: undefined,
+      sort: "favorites",
+    });
     expect(validateBoardSearch({ sort: "score" }).sort).toBeUndefined();
     expect(searchFromFilter({ tags: [], exclude: [], q: "", sort: "oldest" }).sort).toBe("oldest");
+    expect(searchFromFilter({ tags: [], exclude: [], q: "", sort: "favorites" }).sort).toBe(
+      "favorites",
+    );
   });
 
   it("omits empty parts when writing the URL", () => {

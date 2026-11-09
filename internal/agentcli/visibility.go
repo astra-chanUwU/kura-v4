@@ -7,14 +7,14 @@ func SeesNSFW(actor *model.User) bool {
 	return actor != nil && actor.ShowNSFW
 }
 
-// CanSee matches the HTTP post gate. Hidden posts are staff or owner only.
-// NSFW posts additionally require an opt-in. A miss is reported as not
-// found so a hidden post is not confirmed to exist.
+// CanSee matches the HTTP post gate. Hidden and deleted posts are staff or
+// owner only. NSFW posts additionally require an opt-in. A miss is reported
+// as not found so a removed post is not confirmed to exist.
 func CanSee(actor *model.User, p model.Post) bool {
 	if p.Rating == "nsfw" && !SeesNSFW(actor) {
 		return false
 	}
-	if !p.Hidden {
+	if !p.Hidden && !p.Deleted {
 		return true
 	}
 	if actor == nil {

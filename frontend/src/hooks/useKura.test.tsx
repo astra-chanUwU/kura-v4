@@ -25,6 +25,7 @@ const post: Post = {
   size_bytes: 10,
   created_at: "2026-01-01T00:00:00Z",
   is_favorite: false,
+  favorite_count: 0,
   media_url: "/media/posts/p1",
   thumbnail_url: "/media/posts/p1/thumb",
   artist: "",
@@ -92,5 +93,6 @@ describe("useToggleFavorite", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(api.favorite).toHaveBeenCalledWith("p1");
     expect(client.getQueryData<Post>(["post", "p1"])?.is_favorite).toBe(true);
+    expect(client.getQueryData<Post>(["post", "p1"])?.favorite_count).toBe(1);
   });
 });

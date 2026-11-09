@@ -184,6 +184,7 @@ type stubCollections struct {
 	getCalled bool
 	viewerID  *string
 	getID     string
+	exclude   []string
 
 	addCalled bool
 	addOwner  string
@@ -217,7 +218,7 @@ func (s *stubCollections) Favorites(_ context.Context, _ string, includeNSFW boo
 }
 
 func (s *stubCollections) FavoriteIDs(context.Context, string) (map[string]bool, error) {
-	panic("FavoriteIDs")
+	return map[string]bool{}, nil
 }
 
 func (s *stubCollections) CreateList(_ context.Context, ownerID, title, desc, vis string) (model.List, error) {
@@ -233,10 +234,15 @@ func (s *stubCollections) MyLists(context.Context, string) ([]model.List, error)
 	panic("MyLists")
 }
 
-func (s *stubCollections) GetList(_ context.Context, viewerID *string, id string, _ bool, _, _ int) (model.ListDetail, error) {
+func (s *stubCollections) GetList(_ context.Context, viewerID *string, id string, _ bool, exclude []string, _, _ int) (model.ListDetail, error) {
 	s.getCalled = true
 	s.viewerID = viewerID
 	s.getID = id
+	if exclude == nil {
+		s.exclude = []string{}
+	} else {
+		s.exclude = append([]string{}, exclude...)
+	}
 	return model.ListDetail{List: model.List{ID: id}, Items: []model.Post{}}, nil
 }
 
@@ -250,4 +256,23 @@ func (s *stubCollections) AddItem(_ context.Context, ownerID, listID, postID str
 
 func (s *stubCollections) RemoveItem(context.Context, string, string, string) error {
 	panic("RemoveItem")
+}
+
+func TestListsGetPassesExcludeTags(t *testing.T) {
+	user := model.User{ID: "user-1", Username: "ada", Role: model.RoleMember, DefaultExcludeTags: []string{"gore"}}
+	accounts, opt := signedIn(t, user)
+	cols := &stubCollections{}
+	code, env := execAgent(t, Deps{Accounts: accounts, Collections: cols}, []string{"lists", "get", "list-1"}, opt)
+	require.Equal(t, 0, code)
+	require.True(t, env.OK)
+	require.Equal(t, []string{"gore"}, cols.exclude)
+	require.NotNil(t, cols.viewerID)
+	require.Equal(t, "user-1", *cols.viewerID)
+
+	anon := model.User{}
+	accounts.user = anon
+	code, env = execAgent(t, Deps{Accounts: accounts, Collections: cols}, []string{"lists", "get", "list-1"}, opt)
+	require.Equal(t, 0, code)
+	require.NotNil(t, cols.exclude)
+	require.Empty(t, cols.exclude)
 }

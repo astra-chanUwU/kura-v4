@@ -15,7 +15,7 @@ import (
 
 const randomPost = `-- name: RandomPost :one
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, p.width, p.height, p.rating,
+  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count,
   (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
@@ -60,6 +60,7 @@ type RandomPostRow struct {
 	Width         int32
 	Height        int32
 	Rating        string
+	FavoriteCount int32
 	Hidden        bool
 	Deleted       bool
 	OwnerUsername string
@@ -92,6 +93,7 @@ func (q *Queries) RandomPost(ctx context.Context, arg RandomPostParams) (RandomP
 		&i.Width,
 		&i.Height,
 		&i.Rating,
+		&i.FavoriteCount,
 		&i.Hidden,
 		&i.Deleted,
 		&i.OwnerUsername,
@@ -104,12 +106,12 @@ const relatedPosts = `-- name: RelatedPosts :many
 WITH scored AS (
     SELECT t.post_id, count(DISTINCT t.tag)::int AS shared
     FROM post_tags t
-    WHERE t.tag IN (SELECT tag FROM post_tags WHERE post_id = $3::uuid)
-      AND t.post_id <> $3::uuid
+    WHERE t.tag IN (SELECT tag FROM post_tags WHERE post_id = $4::uuid)
+      AND t.post_id <> $4::uuid
     GROUP BY t.post_id
 )
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating,
+  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count,
   (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
@@ -118,12 +120,18 @@ JOIN posts p ON p.id = s.post_id
 LEFT JOIN users u ON u.id = p.owner_id
 WHERE p.hidden_at IS NULL
   AND ($1::bool OR p.rating = 'sfw')
+  AND NOT EXISTS (
+    SELECT 1 FROM post_tags blocked
+    WHERE blocked.post_id = p.id
+      AND blocked.tag = ANY($2::text[])
+  )
 ORDER BY s.shared DESC, p.created_at DESC, p.id DESC
-LIMIT $2
+LIMIT $3
 `
 
 type RelatedPostsParams struct {
 	IncludeNsfw bool
+	Exclude     []string
 	RowLimit    int32
 	PostID      uuid.UUID
 }
@@ -143,6 +151,7 @@ type RelatedPostsRow struct {
 	Width         int32
 	Height        int32
 	Rating        string
+	FavoriteCount int32
 	Hidden        bool
 	Deleted       bool
 	OwnerUsername string
@@ -152,7 +161,12 @@ type RelatedPostsRow struct {
 // Posts that share at least one tag with the anchor, excluding the anchor.
 // Column list matches GetPost without source_url.
 func (q *Queries) RelatedPosts(ctx context.Context, arg RelatedPostsParams) ([]RelatedPostsRow, error) {
-	rows, err := q.db.QueryContext(ctx, relatedPosts, arg.IncludeNsfw, arg.RowLimit, arg.PostID)
+	rows, err := q.db.QueryContext(ctx, relatedPosts,
+		arg.IncludeNsfw,
+		pq.Array(arg.Exclude),
+		arg.RowLimit,
+		arg.PostID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -175,6 +189,7 @@ func (q *Queries) RelatedPosts(ctx context.Context, arg RelatedPostsParams) ([]R
 			&i.Width,
 			&i.Height,
 			&i.Rating,
+			&i.FavoriteCount,
 			&i.Hidden,
 			&i.Deleted,
 			&i.OwnerUsername,

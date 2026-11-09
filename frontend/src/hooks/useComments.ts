@@ -1,15 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createComment, deleteComment, listComments, updateComment } from "../api/comments";
+import { queryKeys } from "../api/queryKeys";
 import { useMe } from "./useKura";
-
-function commentsKey(postId: string) {
-  return ["comments", postId] as const;
-}
 
 export function useComments(postId: string) {
   const { signedIn } = useMe();
   const query = useQuery({
-    queryKey: commentsKey(postId),
+    queryKey: queryKeys.comments(postId),
     queryFn: ({ signal }) => listComments(postId, signal),
   });
   return {
@@ -25,7 +22,7 @@ export function useComments(postId: string) {
 export function useCommentActions() {
   const client = useQueryClient();
   const invalidate = (postId: string) => {
-    void client.invalidateQueries({ queryKey: ["comments", postId] });
+    void client.invalidateQueries({ queryKey: queryKeys.comments(postId) });
   };
   const create = useMutation({
     mutationFn: ({ postId, body }: { postId: string; body: string }) => createComment(postId, body),

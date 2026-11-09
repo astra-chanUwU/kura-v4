@@ -165,10 +165,14 @@ func (e *Engine) listsGet(ctx context.Context, args []string) int {
 		return e.failErr(command, err)
 	}
 	var viewer *string
+	exclude := []string{}
 	if user != nil {
 		viewer = &user.ID
+		if len(user.DefaultExcludeTags) > 0 {
+			exclude = user.DefaultExcludeTags
+		}
 	}
-	detail, err := e.deps.Collections.GetList(ctx, viewer, parsed.Pos[0], SeesNSFW(user), limit, offset)
+	detail, err := e.deps.Collections.GetList(ctx, viewer, parsed.Pos[0], SeesNSFW(user), exclude, limit, offset)
 	if err != nil {
 		return e.failErr(command, err)
 	}

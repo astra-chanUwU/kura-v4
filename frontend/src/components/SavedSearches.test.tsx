@@ -71,6 +71,15 @@ const saved: SavedSearch[] = [
     sort: "newest",
     created_at: "2026-11-01T01:00:00Z",
   },
+  {
+    id: "s3",
+    name: "Loved",
+    include_tags: ["smile"],
+    exclude_tags: [],
+    q: "",
+    sort: "favorites",
+    created_at: "2026-11-01T02:00:00Z",
+  },
 ];
 
 beforeEach(() => {
@@ -153,5 +162,9 @@ describe("SavedSearchList", () => {
     expect(newest).toHaveAttribute("data-exclude", "");
     expect(newest).toHaveAttribute("data-q", "");
     expect(newest).toHaveAttribute("data-sort", "");
+
+    const favorites = screen.getByRole("link", { name: /Loved/ });
+    expect(favorites).toHaveAttribute("data-sort", "favorites");
+    expect(favorites).toHaveTextContent("Favorites");
   });
 });

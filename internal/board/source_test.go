@@ -79,17 +79,19 @@ func TestSetMetaHistoryIncludesSourceURL(t *testing.T) {
 }
 
 type fakeRepo struct {
-	post         model.Post
-	meta         []model.Post
-	audited      []model.ChangeEntry
-	created      []model.Post
-	relatedLimit int32
-	relatedNSFW  bool
-	related      []model.Post
-	randomErr    error
-	random       model.Post
-	aliases      map[string]string
-	lastQuery    model.PostQuery
+	post           model.Post
+	meta           []model.Post
+	audited        []model.ChangeEntry
+	created        []model.Post
+	artistPages    []string
+	relatedLimit   int32
+	relatedNSFW    bool
+	relatedExclude []string
+	related        []model.Post
+	randomErr      error
+	random         model.Post
+	aliases        map[string]string
+	lastQuery      model.PostQuery
 }
 
 func (f *fakeRepo) CreatePost(_ context.Context, p model.Post, _ string) (model.Post, error) {
@@ -151,13 +153,22 @@ func (f *fakeRepo) CountVisiblePostsByOwner(context.Context, string, bool) (int6
 func (f *fakeRepo) ListPostsByOwner(context.Context, string, bool, int32, int32) ([]model.Post, error) {
 	return nil, nil
 }
-func (f *fakeRepo) RelatedPosts(_ context.Context, _ string, includeNSFW bool, limit int32) ([]model.Post, error) {
+func (f *fakeRepo) RelatedPosts(_ context.Context, _ string, includeNSFW bool, exclude []string, limit int32) ([]model.Post, error) {
 	f.relatedLimit = limit
 	f.relatedNSFW = includeNSFW
+	if exclude == nil {
+		f.relatedExclude = []string{}
+	} else {
+		f.relatedExclude = append([]string{}, exclude...)
+	}
 	if f.related == nil {
 		return []model.Post{}, nil
 	}
 	return f.related, nil
+}
+func (f *fakeRepo) EnsureArtistPage(_ context.Context, tag string) error {
+	f.artistPages = append(f.artistPages, tag)
+	return nil
 }
 func (f *fakeRepo) TagAliasTargets(_ context.Context, tags []string) (map[string]string, error) {
 	out := map[string]string{}
@@ -176,4 +187,40 @@ func (f *fakeRepo) RandomPost(context.Context, model.PostQuery) (model.Post, err
 		return model.Post{}, sql.ErrNoRows
 	}
 	return f.random, nil
+}
+
+func TestSetMetaStoresArtistTag(t *testing.T) {
+	repo := &fakeRepo{post: model.Post{ID: "p1", Rating: "nsfw", Tags: []string{"cat"}}}
+	svc := NewService(repo, nil)
+	got, err := svc.SetMeta(context.Background(), "p1", "Ada Lovelace", []string{"cat"}, "", "")
+	require.NoError(t, err)
+	require.Equal(t, "Ada Lovelace", got.Artist)
+	require.Equal(t, []string{"ada_lovelace", "cat"}, got.Tags)
+	require.Equal(t, "nsfw", got.Rating)
+	require.Equal(t, []string{"ada_lovelace"}, repo.artistPages)
+
+	got, err = svc.SetMeta(context.Background(), "p1", "Bea", []string{"cat"}, "", "")
+	require.NoError(t, err)
+	require.Equal(t, "Bea", got.Artist)
+	require.Equal(t, []string{"bea", "cat"}, got.Tags)
+	require.Equal(t, "nsfw", got.Rating)
+	require.Equal(t, []string{"ada_lovelace", "bea"}, repo.artistPages)
+}
+
+func TestSetMetaArtistAliasStoresCanonicalTag(t *testing.T) {
+	repo := &fakeRepo{
+		aliases: map[string]string{"ada_lovelace": "ada"},
+		post:    model.Post{ID: "p1", Artist: "Ada Lovelace", Rating: "sfw", Tags: []string{"ada", "cat"}},
+	}
+	svc := NewService(repo, nil)
+	got, err := svc.SetMeta(context.Background(), "p1", "Ada Lovelace", []string{"cat"}, "sfw", "")
+	require.NoError(t, err)
+	require.Equal(t, "Ada Lovelace", got.Artist)
+	require.Equal(t, []string{"ada", "cat"}, got.Tags)
+	require.Equal(t, []string{"ada"}, repo.artistPages)
+
+	got, err = svc.SetMeta(context.Background(), "p1", "", []string{"cat", "ada"}, "sfw", "")
+	require.NoError(t, err)
+	require.Equal(t, "", got.Artist)
+	require.Equal(t, []string{"cat"}, got.Tags)
 }

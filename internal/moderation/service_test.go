@@ -95,10 +95,13 @@ func TestRollbackPostRestoresBeforeAndNeedsModerator(t *testing.T) {
 	repo2 := NewMockRepository(t)
 	repo2.EXPECT().GetHistory(mock.Anything, "h1").Return(entry, nil)
 	repo2.EXPECT().GetPost(mock.Anything, "p1").Return(current, nil)
+	repo2.EXPECT().EnsureArtistPage(mock.Anything, "good").Return(nil)
 	repo2.EXPECT().ApplyPostSnapshot(mock.Anything, mock.MatchedBy(func(p model.Post) bool {
-		return p.Artist == "good" && len(p.Tags) == 1 && p.Tags[0] == "keep" && p.Rating == "sfw"
+		return p.Artist == "good" && len(p.Tags) == 2 && p.Tags[0] == "good" && p.Tags[1] == "keep" && p.Rating == "sfw"
 	}), mock.MatchedBy(func(e model.ChangeEntry) bool {
-		return e.Action == "rollback" && e.RollbackOf != nil && *e.RollbackOf == "h1"
+		after, err := e.PostAfter()
+		return err == nil && e.Action == "rollback" && e.RollbackOf != nil && *e.RollbackOf == "h1" &&
+			len(after.Tags) == 2 && after.Tags[0] == "good" && after.Tags[1] == "keep"
 	})).Return(nil)
 	rb, err := NewService(repo2).Rollback(context.Background(), moderator, "h1")
 	require.NoError(t, err)
@@ -153,6 +156,7 @@ func TestAdminDeleteMarksDeletedAndRollbackRestoresIt(t *testing.T) {
 	repo2 := NewMockRepository(t)
 	repo2.EXPECT().GetHistory(mock.Anything, "h-del").Return(entry, nil)
 	repo2.EXPECT().GetPost(mock.Anything, "p1").Return(model.Post{ID: "p1", Artist: "a", Tags: []string{"x"}, Rating: "sfw", Hidden: true, Deleted: true}, nil)
+	repo2.EXPECT().EnsureArtistPage(mock.Anything, "a").Return(nil)
 	repo2.EXPECT().ApplyPostSnapshot(mock.Anything, mock.MatchedBy(func(p model.Post) bool {
 		return !p.Hidden && !p.Deleted
 	}), mock.Anything).Return(nil)

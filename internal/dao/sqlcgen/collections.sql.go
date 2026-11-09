@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 const addFavorite = `-- name: AddFavorite :exec
@@ -65,15 +66,28 @@ SELECT count(*)::bigint AS total
 FROM list_items i JOIN posts p ON p.id = i.post_id
 WHERE i.list_id = $1
   AND ($2::bool OR p.rating = 'sfw')
+  AND ($3::bool OR p.hidden_at IS NULL)
+  AND NOT EXISTS (
+    SELECT 1 FROM post_tags blocked
+    WHERE blocked.post_id = p.id
+      AND blocked.tag = ANY($4::text[])
+  )
 `
 
 type CountListItemsParams struct {
-	ListID      uuid.UUID
-	IncludeNsfw bool
+	ListID        uuid.UUID
+	IncludeNsfw   bool
+	IncludeHidden bool
+	Exclude       []string
 }
 
 func (q *Queries) CountListItems(ctx context.Context, arg CountListItemsParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countListItems, arg.ListID, arg.IncludeNsfw)
+	row := q.db.QueryRowContext(ctx, countListItems,
+		arg.ListID,
+		arg.IncludeNsfw,
+		arg.IncludeHidden,
+		pq.Array(arg.Exclude),
+	)
 	var total int64
 	err := row.Scan(&total)
 	return total, err
@@ -194,8 +208,11 @@ func (q *Queries) ListFavoritePostIDs(ctx context.Context, userID uuid.UUID) ([]
 }
 
 const listFavorites = `-- name: ListFavorites :many
-SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at, p.rating,
-  COALESCE(u.username,'')::text AS owner_username
+SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
+  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count,
+  (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  COALESCE(u.username,'')::text AS owner_username,
+  COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM favorites f JOIN posts p ON p.id=f.post_id LEFT JOIN users u ON u.id=p.owner_id
 WHERE f.user_id = $1
   AND ($2::bool OR p.rating = 'sfw')
@@ -218,8 +235,19 @@ type ListFavoritesRow struct {
 	ContentType   string
 	SizeBytes     int64
 	CreatedAt     time.Time
+	Artist        string
+	Source        string
+	SourceID      string
+	SourceUrl     string
+	ThumbnailKey  string
+	Width         int32
+	Height        int32
 	Rating        string
+	FavoriteCount int32
+	Hidden        bool
+	Deleted       bool
 	OwnerUsername string
+	TagsCsv       string
 }
 
 func (q *Queries) ListFavorites(ctx context.Context, arg ListFavoritesParams) ([]ListFavoritesRow, error) {
@@ -244,8 +272,19 @@ func (q *Queries) ListFavorites(ctx context.Context, arg ListFavoritesParams) ([
 			&i.ContentType,
 			&i.SizeBytes,
 			&i.CreatedAt,
+			&i.Artist,
+			&i.Source,
+			&i.SourceID,
+			&i.SourceUrl,
+			&i.ThumbnailKey,
+			&i.Width,
+			&i.Height,
 			&i.Rating,
+			&i.FavoriteCount,
+			&i.Hidden,
+			&i.Deleted,
 			&i.OwnerUsername,
+			&i.TagsCsv,
 		); err != nil {
 			return nil, err
 		}
@@ -288,20 +327,31 @@ func (q *Queries) ListItemIDs(ctx context.Context, listID uuid.UUID) ([]uuid.UUI
 }
 
 const listItems = `-- name: ListItems :many
-SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at, p.rating,
-  COALESCE(u.username,'')::text AS owner_username
+SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
+  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count,
+  (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  COALESCE(u.username,'')::text AS owner_username,
+  COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM list_items i JOIN posts p ON p.id=i.post_id LEFT JOIN users u ON u.id=p.owner_id
 WHERE i.list_id = $1
   AND ($2::bool OR p.rating = 'sfw')
+  AND ($3::bool OR p.hidden_at IS NULL)
+  AND NOT EXISTS (
+    SELECT 1 FROM post_tags blocked
+    WHERE blocked.post_id = p.id
+      AND blocked.tag = ANY($4::text[])
+  )
 ORDER BY i.position
-LIMIT $4 OFFSET $3
+LIMIT $6 OFFSET $5
 `
 
 type ListItemsParams struct {
-	ListID      uuid.UUID
-	IncludeNsfw bool
-	RowOffset   int32
-	RowLimit    int32
+	ListID        uuid.UUID
+	IncludeNsfw   bool
+	IncludeHidden bool
+	Exclude       []string
+	RowOffset     int32
+	RowLimit      int32
 }
 
 type ListItemsRow struct {
@@ -312,14 +362,27 @@ type ListItemsRow struct {
 	ContentType   string
 	SizeBytes     int64
 	CreatedAt     time.Time
+	Artist        string
+	Source        string
+	SourceID      string
+	SourceUrl     string
+	ThumbnailKey  string
+	Width         int32
+	Height        int32
 	Rating        string
+	FavoriteCount int32
+	Hidden        bool
+	Deleted       bool
 	OwnerUsername string
+	TagsCsv       string
 }
 
 func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListItemsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listItems,
 		arg.ListID,
 		arg.IncludeNsfw,
+		arg.IncludeHidden,
+		pq.Array(arg.Exclude),
 		arg.RowOffset,
 		arg.RowLimit,
 	)
@@ -338,8 +401,19 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListIte
 			&i.ContentType,
 			&i.SizeBytes,
 			&i.CreatedAt,
+			&i.Artist,
+			&i.Source,
+			&i.SourceID,
+			&i.SourceUrl,
+			&i.ThumbnailKey,
+			&i.Width,
+			&i.Height,
 			&i.Rating,
+			&i.FavoriteCount,
+			&i.Hidden,
+			&i.Deleted,
 			&i.OwnerUsername,
+			&i.TagsCsv,
 		); err != nil {
 			return nil, err
 		}
@@ -411,7 +485,7 @@ func (q *Queries) ListListsByOwner(ctx context.Context, ownerID uuid.UUID) ([]Li
 const listPublicListsByOwner = `-- name: ListPublicListsByOwner :many
 SELECT l.id, l.owner_id, l.title, l.description, l.visibility, l.created_at, l.updated_at,
   COALESCE(u.username,'')::text AS owner_username, COALESCE(u.display_name,'')::text AS owner_display_name,
-  (SELECT count(*) FROM list_items i WHERE i.list_id=l.id)::bigint AS item_count
+  (SELECT count(*) FROM list_items i JOIN posts p ON p.id=i.post_id WHERE i.list_id=l.id AND p.hidden_at IS NULL)::bigint AS item_count
 FROM lists l LEFT JOIN users u ON u.id=l.owner_id WHERE l.owner_id=$1 AND l.visibility='public' ORDER BY l.updated_at DESC
 `
 

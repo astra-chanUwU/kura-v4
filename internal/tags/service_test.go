@@ -10,11 +10,12 @@ import (
 )
 
 type fakeRepo struct {
-	pages   map[string]model.TagWiki
-	aliases map[string]string
-	counts  map[string]int64
-	posts   map[string][]model.Post
-	moved   []string
+	pages       map[string]model.TagWiki
+	aliases     map[string]string
+	counts      map[string]int64
+	posts       map[string][]model.Post
+	moved       []string
+	lastExclude []string
 }
 
 func (f *fakeRepo) GetPage(_ context.Context, tag string) (model.TagWiki, bool, error) {
@@ -28,10 +29,12 @@ func (f *fakeRepo) UpsertPage(_ context.Context, tag, category, description, use
 	f.pages[tag] = model.TagWiki{Tag: tag, Category: category, Description: description, UpdatedByUsername: userID, UpdatedAt: time.Unix(10, 0).UTC()}
 	return nil
 }
-func (f *fakeRepo) CountPosts(_ context.Context, tag string, _ bool) (int64, error) {
+func (f *fakeRepo) CountPosts(_ context.Context, tag string, _ bool, exclude []string) (int64, error) {
+	f.lastExclude = exclude
 	return f.counts[tag], nil
 }
-func (f *fakeRepo) RecentPosts(_ context.Context, tag string, _ bool) ([]model.Post, error) {
+func (f *fakeRepo) RecentPosts(_ context.Context, tag string, _ bool, exclude []string) ([]model.Post, error) {
+	f.lastExclude = exclude
 	return f.posts[tag], nil
 }
 func (f *fakeRepo) AliasTarget(_ context.Context, alias string) (string, bool, error) {
@@ -172,6 +175,24 @@ func TestRemoveAlias(t *testing.T) {
 	require.Empty(t, page.Aliases)
 	_, err = NewService(repo).RemoveAlias(context.Background(), mod, "gray_hair", "grey_hair")
 	require.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestGetPassesViewerExcludeTags(t *testing.T) {
+	repo := &fakeRepo{counts: map[string]int64{"cat": 2}, posts: map[string][]model.Post{"cat": {{ID: "p1"}}}}
+	viewer := &model.User{DefaultExcludeTags: []string{"gore"}}
+	_, err := NewService(repo).Get(context.Background(), viewer, "cat")
+	require.NoError(t, err)
+	require.Equal(t, []string{"gore"}, repo.lastExclude)
+
+	_, err = NewService(repo).Get(context.Background(), nil, "cat")
+	require.NoError(t, err)
+	require.NotNil(t, repo.lastExclude)
+	require.Empty(t, repo.lastExclude)
+
+	_, err = NewService(repo).Get(context.Background(), &model.User{}, "cat")
+	require.NoError(t, err)
+	require.NotNil(t, repo.lastExclude)
+	require.Empty(t, repo.lastExclude)
 }
 
 func stringsOf(n int) string {

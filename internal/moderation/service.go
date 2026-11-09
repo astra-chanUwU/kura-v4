@@ -25,6 +25,7 @@ type Repository interface {
 	CountSuperAdmins(ctx context.Context) (int64, error)
 	ApplyUserRole(ctx context.Context, userID string, role model.Role, entry model.ChangeEntry) (model.User, error)
 	ApplyPostSnapshot(ctx context.Context, p model.Post, entry model.ChangeEntry) error
+	EnsureArtistPage(ctx context.Context, tag string) error
 	SetPostHidden(ctx context.Context, postID string, hidden, deleted bool, actorID string, entry model.ChangeEntry) error
 	ListHiddenPosts(ctx context.Context, kind string, limit, offset int32) ([]model.Post, error)
 	CountRemovedPosts(ctx context.Context) (int64, int64, error)
@@ -227,10 +228,17 @@ func (s *Service) rollbackPost(ctx context.Context, actor model.User, entry mode
 	if post.Rating != "sfw" && post.Rating != "nsfw" {
 		post.Rating = "sfw"
 	}
+	post.Tags = model.ApplyArtistTag("", post.Tags, post.Artist)
+	before.Tags = post.Tags
 	rb := model.ChangeEntry{EntityType: "post", EntityID: post.ID, ActorID: &actor.ID, ActorUsername: actor.Username,
 		Action: "rollback", Before: model.MarshalPostSnapshot(current), After: model.MarshalPostSnapshot(before), RollbackOf: &entry.ID}
 	if err := s.repo.ApplyPostSnapshot(ctx, post, rb); err != nil {
 		return model.ChangeEntry{}, err
+	}
+	if token := model.ArtistToken(post.Artist); token != "" && tagPresent(post.Tags, token) {
+		if err := s.repo.EnsureArtistPage(ctx, token); err != nil {
+			return model.ChangeEntry{}, err
+		}
 	}
 	return rb, nil
 }
@@ -305,4 +313,13 @@ func (s *Service) ListHiddenPosts(ctx context.Context, actor model.User, kind st
 		total = deleted
 	}
 	return model.HiddenPage{Total: total, Hidden: hidden, Deleted: deleted, Posts: posts}, nil
+}
+
+func tagPresent(tags []string, want string) bool {
+	for _, tag := range tags {
+		if tag == want {
+			return true
+		}
+	}
+	return false
 }

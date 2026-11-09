@@ -1,14 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../api/client";
 import { addTagAlias, getTagPage, removeTagAlias, updateTagPage } from "../api/tagPages";
-
-function tagKey(name: string) {
-  return ["tag-page", name] as const;
-}
+import { queryKeys } from "../api/queryKeys";
 
 export function useTagPage(name: string) {
   const query = useQuery({
-    queryKey: tagKey(name),
+    queryKey: queryKeys.tagPage(name),
     queryFn: ({ signal }) => getTagPage(name, signal),
     retry: false,
   });
@@ -21,7 +18,7 @@ export function useTagPage(name: string) {
 export function useTagPageActions(name: string) {
   const client = useQueryClient();
   const refresh = async () => {
-    await client.invalidateQueries({ queryKey: ["tag-page"] });
+    await client.invalidateQueries({ queryKey: queryKeys.tagPages() });
   };
   const update = useMutation({
     mutationFn: (input: { category: string; description: string }) =>

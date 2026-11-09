@@ -14,6 +14,31 @@ type Posts struct {
 
 func NewPosts(d *dao.PostsDAO) *Posts { return &Posts{PostsDAO: d, audit: dao.NewAudit(d.DB())} }
 
+// CreatePost stores a post and its tags together. A failed tag write rolls
+// the post back, so a successful create never lands on the board without the
+// tags the member sent.
+func (r *Posts) CreatePost(ctx context.Context, p model.Post, sha string) (model.Post, error) {
+	tx, err := r.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return model.Post{}, err
+	}
+	defer tx.Rollback() //nolint:errcheck
+	d := r.WithTx(tx)
+	created, err := d.CreatePost(ctx, p, sha)
+	if err != nil {
+		return model.Post{}, err
+	}
+	for _, tag := range p.Tags {
+		if err := d.InsertPostTag(ctx, created.ID, tag); err != nil {
+			return model.Post{}, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return model.Post{}, err
+	}
+	return created, nil
+}
+
 // ReplacePostMeta replaces a post's artist, rating, source link, and full tag set atomically.
 func (r *Posts) ReplacePostMeta(ctx context.Context, p model.Post) error {
 	tx, err := r.DB().BeginTx(ctx, nil)
@@ -113,4 +138,12 @@ func (r *Posts) ApplyPostSnapshotAudited(ctx context.Context, p model.Post, entr
 		return err
 	}
 	return tx.Commit()
+}
+
+// EnsureArtistPage writes the artist wiki row for the tag stored on the post.
+// A moderator alias is applied by the service before save, and
+// EnsureArtistCategory is called with that stored tag. This does not guess
+// a different name when the credit token was rewritten.
+func (r *Posts) EnsureArtistPage(ctx context.Context, tag string) error {
+	return dao.NewTagPages(r.DB()).EnsureArtistCategory(ctx, tag)
 }

@@ -43,8 +43,11 @@ type Repository interface {
 	CountPostsByOwner(ctx context.Context, ownerID string) (int64, error)
 	CountVisiblePostsByOwner(ctx context.Context, ownerID string, includeNSFW bool) (int64, error)
 	ListPostsByOwner(ctx context.Context, ownerID string, includeNSFW bool, limit, offset int32) ([]model.Post, error)
-	RelatedPosts(ctx context.Context, id string, includeNSFW bool, limit int32) ([]model.Post, error)
+	RelatedPosts(ctx context.Context, id string, includeNSFW bool, exclude []string, limit int32) ([]model.Post, error)
 	RandomPost(ctx context.Context, q model.PostQuery) (model.Post, error)
+	// EnsureArtistPage records the artist wiki row for a tag already stored
+	// on the post. The service resolves moderator aliases before save.
+	EnsureArtistPage(ctx context.Context, tag string) error
 	// TagAliasTargets maps an alternate tag name to the canonical tag.
 	// Missing names are omitted. An empty input returns an empty map.
 	TagAliasTargets(ctx context.Context, tags []string) (map[string]string, error)
@@ -91,24 +94,24 @@ func (s *Service) Create(ctx context.Context, p model.Post, sha string) (model.P
 	if err != nil {
 		return model.Post{}, err
 	}
-	if p.Rating != "nsfw" {
-		p.Rating = "sfw"
+	p.Rating = model.NormalizeRating(p.Rating)
+	var artistTag string
+	p.Tags, artistTag, err = s.attachArtist(ctx, "", p.Tags, p.Artist)
+	if err != nil {
+		return model.Post{}, err
 	}
 	if (p.Width <= 0 || p.Height <= 0) && s.media != nil && p.StorageKey != "" {
 		if w, h, err := s.probeDimensions(ctx, p); err == nil {
 			p.Width, p.Height = w, h
 		}
 	}
+	// CreatePost stores the row and its tags in one transaction.
 	created, err := s.repo.CreatePost(ctx, p, sha)
 	if err != nil {
 		return model.Post{}, err
 	}
-	if len(p.Tags) > 0 || p.Artist != "" {
-		meta := created
-		meta.Tags = p.Tags
-		if err := s.repo.ReplacePostMeta(ctx, meta); err == nil {
-			created.Tags = p.Tags
-		}
+	if err := s.ensureArtistPage(ctx, artistTag); err != nil {
+		return model.Post{}, err
 	}
 	return created, nil
 }
@@ -167,6 +170,7 @@ func (s *Service) Search(ctx context.Context, q model.PostQuery) (model.SearchPa
 		}
 		prepared.AfterID = post.ID
 		prepared.AfterAt = post.CreatedAt
+		prepared.AfterFavorites = int32(post.FavoriteCount)
 		prepared.Offset = 0
 	}
 	total, err := s.repo.CountBoardMatches(ctx, prepared)
@@ -238,15 +242,21 @@ func (s *Service) setMeta(ctx context.Context, actor *model.User, id, artist str
 	}
 	before := model.SnapshotOf(post)
 	if rating == "sfw" || rating == "nsfw" {
-		post.Rating = rating
+		post.Rating = model.NormalizeRating(rating)
 	}
 	artist = strings.TrimSpace(artist)
 	if len([]rune(artist)) > 80 {
 		artist = string([]rune(artist)[:80])
 	}
+	previousArtist := post.Artist
 	post.Artist = artist
 	post.SourceURL = sourceURL
 	post.Tags, err = s.applyAliases(ctx, NormalizeTags(tags))
+	if err != nil {
+		return model.Post{}, err
+	}
+	var artistTag string
+	post.Tags, artistTag, err = s.attachArtist(ctx, previousArtist, post.Tags, post.Artist)
 	if err != nil {
 		return model.Post{}, err
 	}
@@ -258,9 +268,15 @@ func (s *Service) setMeta(ctx context.Context, actor *model.User, id, artist str
 		if err := s.repo.ReplacePostMetaAudited(ctx, post, entry); err != nil {
 			return model.Post{}, err
 		}
+		if err := s.ensureArtistPage(ctx, artistTag); err != nil {
+			return model.Post{}, err
+		}
 		return post, nil
 	}
 	if err := s.repo.ReplacePostMeta(ctx, post); err != nil {
+		return model.Post{}, err
+	}
+	if err := s.ensureArtistPage(ctx, artistTag); err != nil {
 		return model.Post{}, err
 	}
 	return post, nil
@@ -269,11 +285,14 @@ func (s *Service) setMeta(ctx context.Context, actor *model.User, id, artist str
 // Related lists visible posts that share a tag with id, most overlap first.
 // No shared tags is an empty slice. The caller has already checked that
 // the viewer may see the anchor.
-func (s *Service) Related(ctx context.Context, id string, includeNSFW bool, limit int) ([]model.Post, error) {
+func (s *Service) Related(ctx context.Context, id string, includeNSFW bool, exclude []string, limit int) ([]model.Post, error) {
 	if strings.TrimSpace(id) == "" {
 		return nil, ErrNotFound
 	}
-	posts, err := s.repo.RelatedPosts(ctx, id, includeNSFW, clampRelated(limit))
+	if exclude == nil {
+		exclude = []string{}
+	}
+	posts, err := s.repo.RelatedPosts(ctx, id, includeNSFW, exclude, clampRelated(limit))
 	if posts == nil {
 		posts = []model.Post{}
 	}
@@ -378,6 +397,116 @@ func (s *Service) applyAliases(ctx context.Context, tags []string) ([]string, er
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+// attachArtist stores the artist credit as a tag after alias resolution.
+// A moderator alias is rewritten to its canonical tag here, before save.
+// previousArtist's token, and that token's canonical alias when it differs,
+// leave the set. The returned tag is the one stored, or "" when the credit
+// has no token. A blank artist only removes the previous tag.
+func (s *Service) attachArtist(ctx context.Context, previousArtist string, tags []string, artist string) ([]string, string, error) {
+	prevToken := model.ArtistToken(previousArtist)
+	nextToken := model.ArtistToken(artist)
+	mapped, err := s.artistAliases(ctx, prevToken, nextToken)
+	if err != nil {
+		return nil, "", err
+	}
+	prevCanonical := aliasOrToken(prevToken, mapped)
+	nextCanonical := aliasOrToken(nextToken, mapped)
+	out := model.ApplyArtistTag(previousArtist, tags, artist)
+	if nextCanonical != "" && nextCanonical != nextToken {
+		out = exchangeTag(out, nextToken, nextCanonical)
+	}
+	if prevCanonical != "" && prevCanonical != prevToken && prevCanonical != nextCanonical {
+		out = dropTag(out, prevCanonical)
+	}
+	if nextCanonical != "" && !tagPresent(out, nextCanonical) {
+		out = append(out, nextCanonical)
+		sort.Strings(out)
+	}
+	if out == nil {
+		out = []string{}
+	}
+	return out, nextCanonical, nil
+}
+
+func (s *Service) artistAliases(ctx context.Context, tokens ...string) (map[string]string, error) {
+	lookup := make([]string, 0, len(tokens))
+	seen := map[string]bool{}
+	for _, token := range tokens {
+		if token == "" || seen[token] {
+			continue
+		}
+		seen[token] = true
+		lookup = append(lookup, token)
+	}
+	if len(lookup) == 0 {
+		return map[string]string{}, nil
+	}
+	return s.repo.TagAliasTargets(ctx, lookup)
+}
+
+func aliasOrToken(token string, mapped map[string]string) string {
+	if token == "" {
+		return ""
+	}
+	if next, ok := mapped[token]; ok && next != "" {
+		return next
+	}
+	return token
+}
+
+func exchangeTag(tags []string, raw, canonical string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(tags)+1)
+	for _, tag := range tags {
+		if tag == "" || tag == raw || seen[tag] {
+			continue
+		}
+		seen[tag] = true
+		out = append(out, tag)
+	}
+	if canonical != "" && !seen[canonical] {
+		out = append(out, canonical)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func dropTag(tags []string, drop string) []string {
+	if drop == "" {
+		if tags == nil {
+			return []string{}
+		}
+		return tags
+	}
+	out := make([]string, 0, len(tags))
+	seen := map[string]bool{}
+	for _, tag := range tags {
+		if tag == "" || tag == drop || seen[tag] {
+			continue
+		}
+		seen[tag] = true
+		out = append(out, tag)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func tagPresent(tags []string, want string) bool {
+	for _, tag := range tags {
+		if tag == want {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) ensureArtistPage(ctx context.Context, tag string) error {
+	if tag == "" {
+		return nil
+	}
+	return s.repo.EnsureArtistPage(ctx, tag)
 }
 
 func equalTags(a, b []string) bool {

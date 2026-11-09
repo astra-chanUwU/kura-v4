@@ -64,7 +64,7 @@ func (q *Queries) CountVisiblePostsByOwner(ctx context.Context, arg CountVisible
 
 const createPost = `-- name: CreatePost :one
 INSERT INTO posts (owner_id, original_name, storage_key, content_type, size_bytes, sha256, artist, source, source_id, source_url, thumbnail_key, width, height, rating)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id, owner_id, original_name, storage_key, content_type, size_bytes, created_at, artist, source, source_id, source_url, thumbnail_key, width, height, rating, (hidden_at IS NOT NULL)::bool AS hidden, (deleted_at IS NOT NULL)::bool AS deleted
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id, owner_id, original_name, storage_key, content_type, size_bytes, created_at, artist, source, source_id, source_url, thumbnail_key, width, height, rating, favorite_count, (hidden_at IS NOT NULL)::bool AS hidden, (deleted_at IS NOT NULL)::bool AS deleted
 `
 
 type CreatePostParams struct {
@@ -85,23 +85,24 @@ type CreatePostParams struct {
 }
 
 type CreatePostRow struct {
-	ID           uuid.UUID
-	OwnerID      uuid.NullUUID
-	OriginalName string
-	StorageKey   string
-	ContentType  string
-	SizeBytes    int64
-	CreatedAt    time.Time
-	Artist       string
-	Source       string
-	SourceID     string
-	SourceUrl    string
-	ThumbnailKey string
-	Width        int32
-	Height       int32
-	Rating       string
-	Hidden       bool
-	Deleted      bool
+	ID            uuid.UUID
+	OwnerID       uuid.NullUUID
+	OriginalName  string
+	StorageKey    string
+	ContentType   string
+	SizeBytes     int64
+	CreatedAt     time.Time
+	Artist        string
+	Source        string
+	SourceID      string
+	SourceUrl     string
+	ThumbnailKey  string
+	Width         int32
+	Height        int32
+	Rating        string
+	FavoriteCount int32
+	Hidden        bool
+	Deleted       bool
 }
 
 func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreatePostRow, error) {
@@ -138,6 +139,7 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (CreateP
 		&i.Width,
 		&i.Height,
 		&i.Rating,
+		&i.FavoriteCount,
 		&i.Hidden,
 		&i.Deleted,
 	)
@@ -155,7 +157,7 @@ func (q *Queries) DeletePostTags(ctx context.Context, postID uuid.UUID) error {
 
 const getPost = `-- name: GetPost :one
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.id=$1
@@ -177,6 +179,7 @@ type GetPostRow struct {
 	Width         int32
 	Height        int32
 	Rating        string
+	FavoriteCount int32
 	Hidden        bool
 	Deleted       bool
 	OwnerUsername string
@@ -202,6 +205,7 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 		&i.Width,
 		&i.Height,
 		&i.Rating,
+		&i.FavoriteCount,
 		&i.Hidden,
 		&i.Deleted,
 		&i.OwnerUsername,
@@ -212,7 +216,7 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 
 const getPostBySHA = `-- name: GetPostBySHA :one
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.sha256=$1 AND $1<>''
@@ -233,6 +237,7 @@ type GetPostBySHARow struct {
 	Width         int32
 	Height        int32
 	Rating        string
+	FavoriteCount int32
 	Hidden        bool
 	Deleted       bool
 	OwnerUsername string
@@ -257,6 +262,7 @@ func (q *Queries) GetPostBySHA(ctx context.Context, sha256 string) (GetPostBySHA
 		&i.Width,
 		&i.Height,
 		&i.Rating,
+		&i.FavoriteCount,
 		&i.Hidden,
 		&i.Deleted,
 		&i.OwnerUsername,
@@ -281,7 +287,7 @@ func (q *Queries) InsertPostTag(ctx context.Context, arg InsertPostTagParams) er
 
 const listHiddenPosts = `-- name: ListHiddenPosts :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM posts p LEFT JOIN users u ON u.id=p.owner_id
@@ -316,6 +322,7 @@ type ListHiddenPostsRow struct {
 	Width         int32
 	Height        int32
 	Rating        string
+	FavoriteCount int32
 	Hidden        bool
 	Deleted       bool
 	OwnerUsername string
@@ -346,6 +353,7 @@ func (q *Queries) ListHiddenPosts(ctx context.Context, arg ListHiddenPostsParams
 			&i.Width,
 			&i.Height,
 			&i.Rating,
+			&i.FavoriteCount,
 			&i.Hidden,
 			&i.Deleted,
 			&i.OwnerUsername,
@@ -366,7 +374,7 @@ func (q *Queries) ListHiddenPosts(ctx context.Context, arg ListHiddenPostsParams
 
 const listPosts = `-- name: ListPosts :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.hidden_at IS NULL AND ($3::bool OR p.rating='sfw') ORDER BY p.created_at DESC, p.id DESC LIMIT $1 OFFSET $2
@@ -393,6 +401,7 @@ type ListPostsRow struct {
 	Width         int32
 	Height        int32
 	Rating        string
+	FavoriteCount int32
 	Hidden        bool
 	Deleted       bool
 	OwnerUsername string
@@ -423,6 +432,7 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 			&i.Width,
 			&i.Height,
 			&i.Rating,
+			&i.FavoriteCount,
 			&i.Hidden,
 			&i.Deleted,
 			&i.OwnerUsername,
@@ -443,7 +453,7 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 
 const listPostsByOwner = `-- name: ListPostsByOwner :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM posts p LEFT JOIN users u ON u.id=p.owner_id
@@ -475,6 +485,7 @@ type ListPostsByOwnerRow struct {
 	Width         int32
 	Height        int32
 	Rating        string
+	FavoriteCount int32
 	Hidden        bool
 	Deleted       bool
 	OwnerUsername string
@@ -510,6 +521,7 @@ func (q *Queries) ListPostsByOwner(ctx context.Context, arg ListPostsByOwnerPara
 			&i.Width,
 			&i.Height,
 			&i.Rating,
+			&i.FavoriteCount,
 			&i.Hidden,
 			&i.Deleted,
 			&i.OwnerUsername,

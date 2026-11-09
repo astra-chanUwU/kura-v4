@@ -51,7 +51,7 @@ func (q *Queries) CountBoardMatches(ctx context.Context, arg CountBoardMatchesPa
 
 const postNeighbors = `-- name: PostNeighbors :one
 WITH matched AS MATERIALIZED (
-    SELECT p.id, p.created_at
+    SELECT p.id, p.created_at, p.favorite_count
     FROM board_match_ids(
         $2::text[],
         $3::text[],
@@ -63,7 +63,7 @@ WITH matched AS MATERIALIZED (
     JOIN posts p ON p.id = m.id
 ),
 cur AS (
-    SELECT id, created_at FROM matched WHERE id = $8::uuid
+    SELECT id, created_at, favorite_count FROM matched WHERE id = $8::uuid
 )
 SELECT
     CASE
@@ -75,6 +75,10 @@ SELECT
             WHERE CASE
                 WHEN $1::text = 'oldest' THEN
                     p.created_at < c.created_at OR (p.created_at = c.created_at AND p.id > c.id)
+                WHEN $1::text = 'favorites' THEN
+                    p.favorite_count > c.favorite_count
+                    OR (p.favorite_count = c.favorite_count AND p.created_at > c.created_at)
+                    OR (p.favorite_count = c.favorite_count AND p.created_at = c.created_at AND p.id > c.id)
                 ELSE
                     p.created_at > c.created_at OR (p.created_at = c.created_at AND p.id > c.id)
             END
@@ -88,12 +92,18 @@ SELECT
         WHERE CASE
             WHEN $1::text = 'oldest' THEN
                 p.created_at < c.created_at OR (p.created_at = c.created_at AND p.id > c.id)
+            WHEN $1::text = 'favorites' THEN
+                p.favorite_count > c.favorite_count
+                OR (p.favorite_count = c.favorite_count AND p.created_at > c.created_at)
+                OR (p.favorite_count = c.favorite_count AND p.created_at = c.created_at AND p.id > c.id)
             ELSE
                 p.created_at > c.created_at OR (p.created_at = c.created_at AND p.id > c.id)
         END
         ORDER BY
+            CASE WHEN $1::text = 'favorites' THEN p.favorite_count END ASC NULLS LAST,
+            CASE WHEN $1::text = 'favorites' THEN p.created_at END ASC NULLS LAST,
             CASE WHEN $1::text = 'oldest' THEN p.created_at END DESC NULLS LAST,
-            CASE WHEN $1::text <> 'oldest' THEN p.created_at END ASC NULLS LAST,
+            CASE WHEN $1::text = 'newest' THEN p.created_at END ASC NULLS LAST,
             p.id ASC
         LIMIT 1
     ), '') AS prev_id,
@@ -104,12 +114,18 @@ SELECT
         WHERE CASE
             WHEN $1::text = 'oldest' THEN
                 p.created_at > c.created_at OR (p.created_at = c.created_at AND p.id < c.id)
+            WHEN $1::text = 'favorites' THEN
+                p.favorite_count < c.favorite_count
+                OR (p.favorite_count = c.favorite_count AND p.created_at < c.created_at)
+                OR (p.favorite_count = c.favorite_count AND p.created_at = c.created_at AND p.id < c.id)
             ELSE
                 p.created_at < c.created_at OR (p.created_at = c.created_at AND p.id < c.id)
         END
         ORDER BY
+            CASE WHEN $1::text = 'favorites' THEN p.favorite_count END DESC NULLS LAST,
+            CASE WHEN $1::text = 'favorites' THEN p.created_at END DESC NULLS LAST,
             CASE WHEN $1::text = 'oldest' THEN p.created_at END ASC NULLS LAST,
-            CASE WHEN $1::text <> 'oldest' THEN p.created_at END DESC NULLS LAST,
+            CASE WHEN $1::text = 'newest' THEN p.created_at END DESC NULLS LAST,
             p.id DESC
         LIMIT 1
     ), '') AS next_id
@@ -159,7 +175,7 @@ func (q *Queries) PostNeighbors(ctx context.Context, arg PostNeighborsParams) (P
 
 const searchPosts = `-- name: SearchPosts :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-    p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating,
+    p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count,
     (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
     COALESCE(u.username, '')::text AS owner_username,
     COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
@@ -182,6 +198,10 @@ WHERE p.id IN (
         WHEN $8::text = 'oldest' THEN
           p.created_at > $9::timestamptz
           OR (p.created_at = $9::timestamptz AND p.id < $7::uuid)
+        WHEN $8::text = 'favorites' THEN
+          p.favorite_count < $10::int
+          OR (p.favorite_count = $10::int AND p.created_at < $9::timestamptz)
+          OR (p.favorite_count = $10::int AND p.created_at = $9::timestamptz AND p.id < $7::uuid)
         ELSE
           p.created_at < $9::timestamptz
           OR (p.created_at = $9::timestamptz AND p.id < $7::uuid)
@@ -189,24 +209,27 @@ WHERE p.id IN (
     )
   )
 ORDER BY
+    CASE WHEN $8::text = 'favorites' THEN p.favorite_count END DESC NULLS LAST,
+    CASE WHEN $8::text = 'favorites' THEN p.created_at END DESC NULLS LAST,
     CASE WHEN $8::text = 'oldest' THEN p.created_at END ASC NULLS LAST,
-    CASE WHEN $8::text <> 'oldest' THEN p.created_at END DESC NULLS LAST,
+    CASE WHEN $8::text = 'newest' THEN p.created_at END DESC NULLS LAST,
     p.id DESC
-LIMIT $11 OFFSET $10
+LIMIT $12 OFFSET $11
 `
 
 type SearchPostsParams struct {
-	Tags        []string
-	Exclude     []string
-	Q           string
-	QLike       string
-	ArtistLike  string
-	IncludeNsfw bool
-	AfterID     uuid.NullUUID
-	Sort        string
-	AfterAt     sql.NullTime
-	RowOffset   int32
-	RowLimit    int32
+	Tags           []string
+	Exclude        []string
+	Q              string
+	QLike          string
+	ArtistLike     string
+	IncludeNsfw    bool
+	AfterID        uuid.NullUUID
+	Sort           string
+	AfterAt        sql.NullTime
+	AfterFavorites int32
+	RowOffset      int32
+	RowLimit       int32
 }
 
 type SearchPostsRow struct {
@@ -224,6 +247,7 @@ type SearchPostsRow struct {
 	Width         int32
 	Height        int32
 	Rating        string
+	FavoriteCount int32
 	Hidden        bool
 	Deleted       bool
 	OwnerUsername string
@@ -241,6 +265,7 @@ func (q *Queries) SearchPosts(ctx context.Context, arg SearchPostsParams) ([]Sea
 		arg.AfterID,
 		arg.Sort,
 		arg.AfterAt,
+		arg.AfterFavorites,
 		arg.RowOffset,
 		arg.RowLimit,
 	)
@@ -266,6 +291,7 @@ func (q *Queries) SearchPosts(ctx context.Context, arg SearchPostsParams) ([]Sea
 			&i.Width,
 			&i.Height,
 			&i.Rating,
+			&i.FavoriteCount,
 			&i.Hidden,
 			&i.Deleted,
 			&i.OwnerUsername,

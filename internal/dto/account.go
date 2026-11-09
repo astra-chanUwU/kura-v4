@@ -41,6 +41,7 @@ type Post struct {
 	Deleted       bool     `json:"deleted"`
 	SourceURL     string   `json:"source_url"`
 	Tags          []string `json:"tags"`
+	FavoriteCount int64    `json:"favorite_count"`
 }
 
 // SearchPage is one page of a board search and the full match count.

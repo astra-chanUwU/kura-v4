@@ -129,8 +129,8 @@ func (e *Engine) postsSearch(ctx context.Context, args []string) int {
 		return e.badUsage(cmd, err.Error())
 	}
 	sort := parsed.Get("sort")
-	if parsed.Has("sort") && sort != "newest" && sort != "oldest" {
-		return e.badUsage(cmd, "Sort must be newest or oldest.")
+	if parsed.Has("sort") && sort != "newest" && sort != "oldest" && sort != "favorites" {
+		return e.badUsage(cmd, "Sort must be newest, oldest, or favorites.")
 	}
 	if e.deps.Board == nil {
 		return e.fail(cmd, "internal", "Something went wrong. Please try again.")
@@ -231,9 +231,12 @@ func (e *Engine) postsUpload(ctx context.Context, args []string) int {
 	existing, err := e.deps.Board.GetBySHA(ctx, sha)
 	if err == nil {
 		// The blob is content-addressed and may already be this post's original.
-		return e.failData(cmd, "duplicate_post", "Already on the board.", map[string]any{
-			"post": presentPost(existing, e.favs(ctx, user.ID)),
-		})
+		// Include the post only when this account could open it directly.
+		var data any
+		if CanSee(&user, existing) {
+			data = map[string]any{"post": presentPost(existing, e.favs(ctx, user.ID))}
+		}
+		return e.failData(cmd, "duplicate_post", "Already on the board.", data)
 	}
 	if !errors.Is(err, board.ErrNotFound) {
 		return e.failErr(cmd, err)

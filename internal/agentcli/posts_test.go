@@ -70,6 +70,11 @@ func TestPostsSearchPassesTheQuery(t *testing.T) {
 	require.Equal(t, float64(2), data["total"])
 	require.Contains(t, raw, "p1")
 
+	code, env, _ = postsRun(t, Deps{Accounts: acc, Board: b}, []string{"posts", "search", "--sort", "favorites", "--q", "yuri"}, session)
+	require.Equal(t, 0, code)
+	require.True(t, env.OK)
+	require.Equal(t, "favorites", got.Sort)
+
 	code, env, _ = postsRun(t, Deps{Accounts: acc, Board: b}, []string{"posts", "search", "--sort", "score", "--q", "yuri"}, session)
 	require.Equal(t, 2, code)
 	require.False(t, env.OK)

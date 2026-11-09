@@ -7,8 +7,8 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/model"
 )
 
-// ErrBadSort is returned when a search sort is not newest or oldest.
-var ErrBadSort = errString("sort must be newest or oldest")
+// ErrBadSort is returned when a search sort is not newest, oldest, or favorites.
+var ErrBadSort = errString("sort must be newest, oldest, or favorites")
 
 // ErrBadCursor is returned when a search page continues from a post
 // that is not in this library.
@@ -47,7 +47,7 @@ func PrepareQuery(q model.PostQuery) (model.PostQuery, error) {
 	if q.Sort == "" {
 		q.Sort = "newest"
 	}
-	if q.Sort != "newest" && q.Sort != "oldest" {
+	if q.Sort != "newest" && q.Sort != "oldest" && q.Sort != "favorites" {
 		return model.PostQuery{}, ErrBadSort
 	}
 	if q.Limit <= 0 {

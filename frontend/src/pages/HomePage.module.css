@@ -480,6 +480,9 @@
 
 .sortGroup {
   display: inline-flex;
+  flex-wrap: wrap;
+  row-gap: inherit;
+  max-width: 100%;
   border: 1px solid var(--border-strong);
   border-radius: 0.45rem;
   overflow: hidden;

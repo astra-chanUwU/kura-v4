@@ -30,6 +30,7 @@ export interface Post {
   size_bytes: number;
   created_at: string;
   is_favorite: boolean;
+  favorite_count: number;
   media_url: string;
   thumbnail_url: string;
   artist: string;

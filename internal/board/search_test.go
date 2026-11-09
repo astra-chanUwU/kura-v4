@@ -35,4 +35,8 @@ func TestPrepareQuery(t *testing.T) {
 
 	_, err = PrepareQuery(model.PostQuery{Sort: "score"})
 	require.ErrorIs(t, err, ErrBadSort)
+
+	q, err = PrepareQuery(model.PostQuery{Sort: "favorites"})
+	require.NoError(t, err)
+	require.Equal(t, "favorites", q.Sort)
 }

@@ -20,15 +20,21 @@ JOIN posts p ON p.id = t.post_id
 WHERE t.tag = $1
   AND p.hidden_at IS NULL
   AND ($2::bool OR p.rating = 'sfw')
+  AND NOT EXISTS (
+    SELECT 1 FROM post_tags blocked
+    WHERE blocked.post_id = p.id
+      AND blocked.tag = ANY($3::text[])
+  )
 `
 
 type CountVisiblePostsForTagParams struct {
 	Tag         string
 	IncludeNsfw bool
+	Exclude     []string
 }
 
 func (q *Queries) CountVisiblePostsForTag(ctx context.Context, arg CountVisiblePostsForTagParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countVisiblePostsForTag, arg.Tag, arg.IncludeNsfw)
+	row := q.db.QueryRowContext(ctx, countVisiblePostsForTag, arg.Tag, arg.IncludeNsfw, pq.Array(arg.Exclude))
 	var total int64
 	err := row.Scan(&total)
 	return total, err
@@ -68,6 +74,19 @@ func (q *Queries) DeleteTagAlias(ctx context.Context, arg DeleteTagAliasParams) 
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const ensureArtistCategory = `-- name: EnsureArtistCategory :exec
+INSERT INTO tag_pages (tag, category)
+VALUES ($1, 'artist')
+ON CONFLICT (tag) DO UPDATE
+SET category = 'artist', updated_at = now()
+WHERE tag_pages.category = 'general' AND tag_pages.description = ''
+`
+
+func (q *Queries) EnsureArtistCategory(ctx context.Context, tag string) error {
+	_, err := q.db.ExecContext(ctx, ensureArtistCategory, tag)
+	return err
 }
 
 const getTagAlias = `-- name: GetTagAlias :one
@@ -155,7 +174,7 @@ func (q *Queries) ListAliasesOfTarget(ctx context.Context, target string) ([]str
 
 const listRecentPostsForTag = `-- name: ListRecentPostsForTag :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, p.width, p.height, p.rating,
+  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count,
   (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username, '')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
@@ -164,6 +183,11 @@ JOIN post_tags mine ON mine.post_id = p.id AND mine.tag = $1
 LEFT JOIN users u ON u.id = p.owner_id
 WHERE p.hidden_at IS NULL
   AND ($2::bool OR p.rating = 'sfw')
+  AND NOT EXISTS (
+    SELECT 1 FROM post_tags blocked
+    WHERE blocked.post_id = p.id
+      AND blocked.tag = ANY($3::text[])
+  )
 ORDER BY p.created_at DESC, p.id DESC
 LIMIT 24
 `
@@ -171,6 +195,7 @@ LIMIT 24
 type ListRecentPostsForTagParams struct {
 	Tag         string
 	IncludeNsfw bool
+	Exclude     []string
 }
 
 type ListRecentPostsForTagRow struct {
@@ -189,6 +214,7 @@ type ListRecentPostsForTagRow struct {
 	Width         int32
 	Height        int32
 	Rating        string
+	FavoriteCount int32
 	Hidden        bool
 	Deleted       bool
 	OwnerUsername string
@@ -196,7 +222,7 @@ type ListRecentPostsForTagRow struct {
 }
 
 func (q *Queries) ListRecentPostsForTag(ctx context.Context, arg ListRecentPostsForTagParams) ([]ListRecentPostsForTagRow, error) {
-	rows, err := q.db.QueryContext(ctx, listRecentPostsForTag, arg.Tag, arg.IncludeNsfw)
+	rows, err := q.db.QueryContext(ctx, listRecentPostsForTag, arg.Tag, arg.IncludeNsfw, pq.Array(arg.Exclude))
 	if err != nil {
 		return nil, err
 	}
@@ -220,6 +246,7 @@ func (q *Queries) ListRecentPostsForTag(ctx context.Context, arg ListRecentPosts
 			&i.Width,
 			&i.Height,
 			&i.Rating,
+			&i.FavoriteCount,
 			&i.Hidden,
 			&i.Deleted,
 			&i.OwnerUsername,

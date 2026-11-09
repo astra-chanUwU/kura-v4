@@ -36,10 +36,10 @@ func TestSearchCursorIgnoresOffset(t *testing.T) {
 	repo := NewMockRepository(t)
 	id := "11111111-1111-1111-1111-111111111111"
 	when := model.Post{ID: id}.CreatedAt
-	repo.EXPECT().GetPost(mock.Anything, id).Return(model.Post{ID: id, CreatedAt: when}, nil)
+	repo.EXPECT().GetPost(mock.Anything, id).Return(model.Post{ID: id, CreatedAt: when, FavoriteCount: 7}, nil)
 	repo.EXPECT().CountBoardMatches(mock.Anything, mock.Anything).Return(int64(1), nil)
 	repo.EXPECT().SearchPosts(mock.Anything, mock.MatchedBy(func(q model.PostQuery) bool {
-		return q.AfterID == id && q.Offset == 0 && q.AfterAt.Equal(when)
+		return q.AfterID == id && q.Offset == 0 && q.AfterAt.Equal(when) && q.AfterFavorites == 7
 	})).Return([]model.Post{{ID: "next"}}, nil)
 	got, err := NewService(repo, nil).Search(context.Background(), model.PostQuery{AfterID: id, Offset: 50})
 	require.NoError(t, err)
@@ -56,10 +56,11 @@ func TestSetMetaAsWritesHistoryOnlyWhenChanged(t *testing.T) {
 	actor := model.User{ID: "u1", Username: "tagger", Role: model.RoleMember}
 	existing := model.Post{ID: "p1", Artist: "old", Tags: []string{"keep"}, Rating: "sfw"}
 	repo := NewMockRepository(t)
-	repo.EXPECT().TagAliasTargets(mock.Anything, []string{"keep"}).Return(map[string]string{}, nil)
+	repo.EXPECT().TagAliasTargets(mock.Anything, mock.Anything).Return(map[string]string{}, nil).Times(2)
 	repo.EXPECT().GetPost(mock.Anything, "p1").Return(existing, nil)
+	repo.EXPECT().EnsureArtistPage(mock.Anything, "new").Return(nil)
 	repo.EXPECT().ReplacePostMetaAudited(mock.Anything, mock.MatchedBy(func(p model.Post) bool {
-		return p.Artist == "new"
+		return p.Artist == "new" && len(p.Tags) == 2 && p.Tags[0] == "keep" && p.Tags[1] == "new"
 	}), mock.MatchedBy(func(e model.ChangeEntry) bool {
 		b, _ := e.PostBefore()
 		a, _ := e.PostAfter()

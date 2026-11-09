@@ -114,7 +114,7 @@ func TestCreateNormalizesTags(t *testing.T) {
 func TestCreateRejectsBadSort(t *testing.T) {
 	repo := newFakeRepo()
 	_, err := NewService(repo).Create(context.Background(), "u", model.SavedSearch{Name: "Ok", Sort: "popular"})
-	require.Equal(t, "Sort must be newest or oldest.", validationMessage(t, err))
+	require.Equal(t, "Sort must be newest, oldest, or favorites.", validationMessage(t, err))
 	require.Empty(t, repo.items["u"])
 }
 
@@ -122,6 +122,10 @@ func TestCreateStoresOldest(t *testing.T) {
 	got, err := NewService(newFakeRepo()).Create(context.Background(), "u", model.SavedSearch{Name: "Old", Sort: "oldest"})
 	require.NoError(t, err)
 	require.Equal(t, "oldest", got.Sort)
+
+	got, err = NewService(newFakeRepo()).Create(context.Background(), "u", model.SavedSearch{Name: "Hot", Sort: "favorites"})
+	require.NoError(t, err)
+	require.Equal(t, "favorites", got.Sort)
 	require.Equal(t, []string{}, got.IncludeTags)
 	require.Equal(t, []string{}, got.ExcludeTags)
 }

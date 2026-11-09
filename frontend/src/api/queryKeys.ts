@@ -1,7 +1,6 @@
 export const queryKeys = {
   site: () => ["site"] as const,
   me: () => ["me"] as const,
-  posts: () => ["posts"] as const,
   board: (filter: { tags: string[]; exclude: string[]; q: string; sort?: string }) =>
     [
       "board",
@@ -25,6 +24,10 @@ export const queryKeys = {
       filter.sort ?? "newest",
     ] as const,
   post: (id: string) => ["post", id] as const,
+  comments: (postId: string) => ["comments", postId] as const,
+  savedSearches: () => ["saved-searches"] as const,
+  tagPage: (name: string) => ["tag-page", name] as const,
+  tagPages: () => ["tag-page"] as const,
   related: (id: string) => ["post-related", id] as const,
   favorites: () => ["favorites"] as const,
   myPosts: () => ["my-posts"] as const,

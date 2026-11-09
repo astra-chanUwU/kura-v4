@@ -323,6 +323,63 @@ func (_c *MockRepository_CreatePost_Call) RunAndReturn(run func(ctx context.Cont
 	return _c
 }
 
+// EnsureArtistPage provides a mock function for the type MockRepository
+func (_mock *MockRepository) EnsureArtistPage(ctx context.Context, tag string) error {
+	ret := _mock.Called(ctx, tag)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EnsureArtistPage")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, tag)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_EnsureArtistPage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnsureArtistPage'
+type MockRepository_EnsureArtistPage_Call struct {
+	*mock.Call
+}
+
+// EnsureArtistPage is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tag string
+func (_e *MockRepository_Expecter) EnsureArtistPage(ctx any, tag any) *MockRepository_EnsureArtistPage_Call {
+	return &MockRepository_EnsureArtistPage_Call{Call: _e.mock.On("EnsureArtistPage", ctx, tag)}
+}
+
+func (_c *MockRepository_EnsureArtistPage_Call) Run(run func(ctx context.Context, tag string)) *MockRepository_EnsureArtistPage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_EnsureArtistPage_Call) Return(err error) *MockRepository_EnsureArtistPage_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_EnsureArtistPage_Call) RunAndReturn(run func(ctx context.Context, tag string) error) *MockRepository_EnsureArtistPage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ExistsBySHA provides a mock function for the type MockRepository
 func (_mock *MockRepository) ExistsBySHA(ctx context.Context, sha string) (bool, error) {
 	ret := _mock.Called(ctx, sha)
@@ -892,8 +949,8 @@ func (_c *MockRepository_RandomPost_Call) RunAndReturn(run func(ctx context.Cont
 }
 
 // RelatedPosts provides a mock function for the type MockRepository
-func (_mock *MockRepository) RelatedPosts(ctx context.Context, id string, includeNSFW bool, limit int32) ([]model.Post, error) {
-	ret := _mock.Called(ctx, id, includeNSFW, limit)
+func (_mock *MockRepository) RelatedPosts(ctx context.Context, id string, includeNSFW bool, exclude []string, limit int32) ([]model.Post, error) {
+	ret := _mock.Called(ctx, id, includeNSFW, exclude, limit)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RelatedPosts")
@@ -901,18 +958,18 @@ func (_mock *MockRepository) RelatedPosts(ctx context.Context, id string, includ
 
 	var r0 []model.Post
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, int32) ([]model.Post, error)); ok {
-		return returnFunc(ctx, id, includeNSFW, limit)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, []string, int32) ([]model.Post, error)); ok {
+		return returnFunc(ctx, id, includeNSFW, exclude, limit)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, int32) []model.Post); ok {
-		r0 = returnFunc(ctx, id, includeNSFW, limit)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, []string, int32) []model.Post); ok {
+		r0 = returnFunc(ctx, id, includeNSFW, exclude, limit)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]model.Post)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool, int32) error); ok {
-		r1 = returnFunc(ctx, id, includeNSFW, limit)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool, []string, int32) error); ok {
+		r1 = returnFunc(ctx, id, includeNSFW, exclude, limit)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -928,12 +985,13 @@ type MockRepository_RelatedPosts_Call struct {
 //   - ctx context.Context
 //   - id string
 //   - includeNSFW bool
+//   - exclude []string
 //   - limit int32
-func (_e *MockRepository_Expecter) RelatedPosts(ctx any, id any, includeNSFW any, limit any) *MockRepository_RelatedPosts_Call {
-	return &MockRepository_RelatedPosts_Call{Call: _e.mock.On("RelatedPosts", ctx, id, includeNSFW, limit)}
+func (_e *MockRepository_Expecter) RelatedPosts(ctx any, id any, includeNSFW any, exclude any, limit any) *MockRepository_RelatedPosts_Call {
+	return &MockRepository_RelatedPosts_Call{Call: _e.mock.On("RelatedPosts", ctx, id, includeNSFW, exclude, limit)}
 }
 
-func (_c *MockRepository_RelatedPosts_Call) Run(run func(ctx context.Context, id string, includeNSFW bool, limit int32)) *MockRepository_RelatedPosts_Call {
+func (_c *MockRepository_RelatedPosts_Call) Run(run func(ctx context.Context, id string, includeNSFW bool, exclude []string, limit int32)) *MockRepository_RelatedPosts_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -947,15 +1005,20 @@ func (_c *MockRepository_RelatedPosts_Call) Run(run func(ctx context.Context, id
 		if args[2] != nil {
 			arg2 = args[2].(bool)
 		}
-		var arg3 int32
+		var arg3 []string
 		if args[3] != nil {
-			arg3 = args[3].(int32)
+			arg3 = args[3].([]string)
+		}
+		var arg4 int32
+		if args[4] != nil {
+			arg4 = args[4].(int32)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -966,7 +1029,7 @@ func (_c *MockRepository_RelatedPosts_Call) Return(posts []model.Post, err error
 	return _c
 }
 
-func (_c *MockRepository_RelatedPosts_Call) RunAndReturn(run func(ctx context.Context, id string, includeNSFW bool, limit int32) ([]model.Post, error)) *MockRepository_RelatedPosts_Call {
+func (_c *MockRepository_RelatedPosts_Call) RunAndReturn(run func(ctx context.Context, id string, includeNSFW bool, exclude []string, limit int32) ([]model.Post, error)) *MockRepository_RelatedPosts_Call {
 	_c.Call.Return(run)
 	return _c
 }

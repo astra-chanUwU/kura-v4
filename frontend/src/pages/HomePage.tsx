@@ -13,6 +13,7 @@ import {
   sameTagSet,
   searchFromFilter,
   splitTagInput,
+  type BoardSort,
 } from "../domain/boardFilter";
 import { boardMemoryFor, writeBoardMemory } from "../domain/boardMemory";
 import {
@@ -20,6 +21,7 @@ import {
   tagTokens,
   useBoard,
   useDebouncedValue,
+  useLoadMore,
   useMe,
   useRandomPost,
   useTagSuggestions,
@@ -28,6 +30,11 @@ import { useBoardView } from "../hooks/useBoardView";
 import { useSite } from "../hooks/useSite";
 import { useViewportTags } from "../hooks/useViewportTags";
 import styles from "./HomePage.module.css";
+
+function sortToken(sort: string | undefined): "" | "oldest" | "favorites" {
+  if (sort === "oldest" || sort === "favorites") return sort;
+  return "";
+}
 
 export function HomePage() {
   const { signedIn, me, loading: accountLoading } = useMe();
@@ -39,7 +46,6 @@ export function HomePage() {
   const [uploadNotice, setUploadNotice] = useState("");
   const [pageDragging, setPageDragging] = useState(false);
   const { loading: siteLoading, error: siteError, retry: siteRetry } = useSite();
-  const sentinelRef = useRef<HTMLDivElement>(null);
   const [showToTop, setShowToTop] = useState(false);
   useEffect(() => {
     const onScroll = () => setShowToTop(window.scrollY > 600);
@@ -111,7 +117,7 @@ export function HomePage() {
           ),
         ]
       : [];
-  const urlKey = `${urlSearch.tags ?? ""}|${urlSearch.exclude ?? ""}|${urlSearch.q ?? ""}|${urlSearch.sort === "oldest" ? "oldest" : ""}`;
+  const urlKey = `${urlSearch.tags ?? ""}|${urlSearch.exclude ?? ""}|${urlSearch.q ?? ""}|${sortToken(urlSearch.sort)}`;
   const hasUrlFilter = !!(urlSearch.tags || urlSearch.exclude || urlSearch.q);
   // A chip edit or Clear sets this before navigate() resolves. The
   // history flag can land a render later; this stops that render from
@@ -123,18 +129,18 @@ export function HomePage() {
     include: string[],
     exclude: string[],
     q: string,
-    opts?: { replace?: boolean; cleared?: boolean; sort?: "newest" | "oldest" },
+    opts?: { replace?: boolean; cleared?: boolean; sort?: BoardSort },
   ) => {
     const cleared = opts?.cleared === true;
     const sort = opts?.sort ?? boardSort(urlSearch.sort);
     writeBoardMemory({ userId: viewerId, tags: include, exclude, q, cleared });
-    pendingWrite.current = `${include.join(",")}|${exclude.join(",")}|${q}|${sort === "oldest" ? "oldest" : ""}`;
-    const search: { tags?: string; exclude?: string; q?: string; sort?: "oldest" } = {
+    pendingWrite.current = `${include.join(",")}|${exclude.join(",")}|${q}|${sortToken(sort)}`;
+    const search: { tags?: string; exclude?: string; q?: string; sort?: "oldest" | "favorites" } = {
       tags: include.length > 0 ? include.join(",") : undefined,
       exclude: exclude.length > 0 ? exclude.join(",") : undefined,
       q: q !== "" ? q : undefined,
     };
-    if (sort === "oldest") search.sort = "oldest";
+    if (sort === "oldest" || sort === "favorites") search.sort = sort;
     void navigate({
       to: "/",
       replace: opts?.replace ?? true,
@@ -350,18 +356,7 @@ export function HomePage() {
     (item) => !selectedTags.includes(item.tag) && !excludedTags.includes(item.tag),
   );
   // Infinite scroll, including a filtered board. The server pages every search.
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting) && hasMore && !loadingMore) loadMore();
-      },
-      { rootMargin: "900px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, loadMore]);
+  const moreRef = useLoadMore(hasMore && !loadingMore, loadMore);
   // Changing the tag set means a new result list: jump back to the
   // start of the board instead of leaving the user mid-scroll.
   const goToBoardTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
@@ -426,7 +421,7 @@ export function HomePage() {
   };
   const shownPosts = posts;
   const filterActive = isFilterActive(appliedFilter);
-  const changeSort = (sort: "newest" | "oldest") => {
+  const changeSort = (sort: BoardSort) => {
     if (boardSort(urlSearch.sort) === sort) return;
     skipSeed.current = true;
     writeUrl(appliedTags, appliedExcludedTags, appliedQuery, { sort });
@@ -691,6 +686,14 @@ export function HomePage() {
             >
               Oldest
             </button>
+            <button
+              type="button"
+              aria-pressed={boardSort(urlSearch.sort) === "favorites"}
+              className={boardSort(urlSearch.sort) === "favorites" ? styles.viewActive : ""}
+              onClick={() => changeSort("favorites")}
+            >
+              Favorites
+            </button>
           </div>
           {filterActive &&
             (board.searching ? (
@@ -864,7 +867,7 @@ export function HomePage() {
       >
         ↑
       </button>
-      <div ref={sentinelRef} aria-hidden="true" />
+      <div ref={moreRef} aria-hidden="true" />
       {loadingMore && <p className={styles.message}>Loading more…</p>}
       {!loading && !board.searching && !failed && posts.length > 0 && !hasMore && (
         <p className={styles.message}>That's everything.</p>

@@ -1,14 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createSavedSearch, deleteSavedSearch, listSavedSearches } from "../api/savedSearches";
+import { queryKeys } from "../api/queryKeys";
 import type { CreateSavedSearch } from "../types/savedSearch";
 import { useMe } from "./useKura";
-
-const savedSearchesKey = ["saved-searches"] as const;
 
 export function useSavedSearches() {
   const { signedIn } = useMe();
   return useQuery({
-    queryKey: savedSearchesKey,
+    queryKey: queryKeys.savedSearches(),
     queryFn: ({ signal }) => listSavedSearches(signal),
     enabled: signedIn,
     retry: false,
@@ -20,7 +19,7 @@ export function useCreateSavedSearch() {
   return useMutation({
     mutationFn: (input: CreateSavedSearch) => createSavedSearch(input),
     onSuccess: () => {
-      void client.invalidateQueries({ queryKey: savedSearchesKey });
+      void client.invalidateQueries({ queryKey: queryKeys.savedSearches() });
     },
   });
 }
@@ -30,7 +29,7 @@ export function useDeleteSavedSearch() {
   return useMutation({
     mutationFn: (id: string) => deleteSavedSearch(id),
     onSuccess: () => {
-      void client.invalidateQueries({ queryKey: savedSearchesKey });
+      void client.invalidateQueries({ queryKey: queryKeys.savedSearches() });
     },
   });
 }

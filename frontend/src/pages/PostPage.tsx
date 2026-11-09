@@ -372,6 +372,8 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
             </span>
             <span className={styles.detailLabel}>Size</span>
             <span>{formatBytes(post.size_bytes)}</span>
+            <span className={styles.detailLabel}>Favorites</span>
+            <span>{post.favorite_count}</span>
           </p>
           {(post.artist || post.source_url || signedIn) && (
             <p className={styles.detailRow}>

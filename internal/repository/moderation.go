@@ -77,3 +77,7 @@ func (r *Moderation) ListRecentHistory(ctx context.Context, limit int32) ([]mode
 func (r *Moderation) ListHistoryByActor(ctx context.Context, actorID string, limit int32) ([]model.ChangeEntry, error) {
 	return r.audit.ListChangeHistoryByActor(ctx, actorID, limit)
 }
+
+func (r *Moderation) EnsureArtistPage(ctx context.Context, tag string) error {
+	return r.posts.EnsureArtistPage(ctx, tag)
+}

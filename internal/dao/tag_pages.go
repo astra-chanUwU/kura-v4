@@ -48,20 +48,30 @@ func (d *TagPagesDAO) UpsertPage(ctx context.Context, tag, category, description
 	return d.q.UpsertTagPage(ctx, sqlcgen.UpsertTagPageParams{Tag: tag, Category: category, Description: description, UpdatedBy: updatedBy})
 }
 
-func (d *TagPagesDAO) CountPosts(ctx context.Context, tag string, includeNSFW bool) (int64, error) {
-	return d.q.CountVisiblePostsForTag(ctx, sqlcgen.CountVisiblePostsForTagParams{Tag: tag, IncludeNsfw: includeNSFW})
+func (d *TagPagesDAO) CountPosts(ctx context.Context, tag string, includeNSFW bool, exclude []string) (int64, error) {
+	if exclude == nil {
+		exclude = []string{}
+	}
+	return d.q.CountVisiblePostsForTag(ctx, sqlcgen.CountVisiblePostsForTagParams{Tag: tag, IncludeNsfw: includeNSFW, Exclude: exclude})
 }
 
-func (d *TagPagesDAO) RecentPosts(ctx context.Context, tag string, includeNSFW bool) ([]model.Post, error) {
-	rows, err := d.q.ListRecentPostsForTag(ctx, sqlcgen.ListRecentPostsForTagParams{Tag: tag, IncludeNsfw: includeNSFW})
+func (d *TagPagesDAO) RecentPosts(ctx context.Context, tag string, includeNSFW bool, exclude []string) ([]model.Post, error) {
+	if exclude == nil {
+		exclude = []string{}
+	}
+	rows, err := d.q.ListRecentPostsForTag(ctx, sqlcgen.ListRecentPostsForTagParams{Tag: tag, IncludeNsfw: includeNSFW, Exclude: exclude})
 	if err != nil {
 		return nil, err
 	}
 	out := make([]model.Post, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.SourceUrl, r.ThumbnailKey, r.TagsCsv, r.Width, r.Height, r.Rating, r.Hidden, r.Deleted))
+		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.SourceUrl, r.ThumbnailKey, r.TagsCsv, r.Width, r.Height, r.Rating, r.Hidden, r.Deleted, r.FavoriteCount))
 	}
 	return out, nil
+}
+
+func (d *TagPagesDAO) EnsureArtistCategory(ctx context.Context, tag string) error {
+	return d.q.EnsureArtistCategory(ctx, tag)
 }
 
 func (d *TagPagesDAO) AliasTarget(ctx context.Context, alias string) (string, bool, error) {

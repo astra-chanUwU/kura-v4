@@ -98,7 +98,7 @@ func (h *Collections) getList(c fiber.Ctx) error {
 		viewerID = &u.ID
 	}
 	limit, offset := queryPage(c)
-	detail, err := h.service.GetList(c.Context(), viewerID, c.Params("id"), viewerSeesNSFW(c), limit, offset)
+	detail, err := h.service.GetList(c.Context(), viewerID, c.Params("id"), viewerSeesNSFW(c), viewerExcludeTags(c), limit, offset)
 	if err != nil {
 		return writeError(c, err)
 	}
