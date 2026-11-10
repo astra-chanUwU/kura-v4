@@ -38,4 +38,5 @@ export const queryKeys = {
   postHistory: (id: string) => ["post-history", id] as const,
   hiddenPosts: (kind: string) => ["hidden-posts", kind] as const,
   adminHistory: (actorId?: string) => ["admin-history", actorId ?? ""] as const,
+  openReports: () => ["open-reports"] as const,
 };

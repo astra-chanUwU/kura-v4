@@ -17,6 +17,7 @@ type Deps struct {
 	Moderation  Moderation
 	Site        Site
 	Tags        Tags
+	Reports     Reports
 }
 
 // Options configures one invocation. Tests set SessionPath; the
@@ -70,6 +71,13 @@ type Moderation interface {
 	HistoryByActor(ctx context.Context, actor model.User, actorID string, limit int32) ([]model.ChangeEntry, error)
 	Rollback(ctx context.Context, actor model.User, historyID string) (model.ChangeEntry, error)
 	ListHiddenPosts(ctx context.Context, actor model.User, kind string, limit, offset int) (model.HiddenPage, error)
+}
+
+// Reports is the subset of reports.Service the CLI uses.
+type Reports interface {
+	Create(ctx context.Context, viewer model.User, postID, reason, note string) (model.PostReport, error)
+	ListOpen(ctx context.Context, actor model.User, limit, offset int) (model.PostReportPage, error)
+	Dismiss(ctx context.Context, actor model.User, reportID string) (model.PostReport, error)
 }
 
 // Site is the subset of site.Service the CLI uses.

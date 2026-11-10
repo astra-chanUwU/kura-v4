@@ -17,6 +17,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/controllers"
 	"github.com/astra-chanUwU/kura-v4/internal/dto"
 	"github.com/astra-chanUwU/kura-v4/internal/moderation"
+	"github.com/astra-chanUwU/kura-v4/internal/reports"
 	"github.com/astra-chanUwU/kura-v4/internal/searches"
 	"github.com/astra-chanUwU/kura-v4/internal/site"
 	"github.com/astra-chanUwU/kura-v4/internal/tags"
@@ -32,6 +33,7 @@ type HTTPDeps struct {
 	Collections  *collections.Service
 	Moderation   *moderation.Service
 	Comments     *comments.Service
+	Reports      *reports.Service
 	Searches     *searches.Service
 	Tags         *tags.Service
 	Ping         func(context.Context) error
@@ -94,6 +96,9 @@ func NewHTTP(deps HTTPDeps) *fiber.App {
 		controllers.NewCollections(deps.Collections).RegisterRoutes(api)
 		if deps.Comments != nil {
 			controllers.NewComments(deps.Comments).RegisterRoutes(api)
+		}
+		if deps.Reports != nil {
+			controllers.NewReports(deps.Reports).RegisterRoutes(api)
 		}
 		if deps.Searches != nil {
 			controllers.NewSearches(deps.Searches).RegisterRoutes(api)

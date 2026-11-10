@@ -62,6 +62,8 @@ func (e *Engine) dispatch(ctx context.Context, args []string) int {
 		return e.users(ctx, args[1:])
 	case "tags":
 		return e.tags(ctx, args[1:])
+	case "reports":
+		return e.reports(ctx, args[1:])
 	default:
 		return e.usage()
 	}

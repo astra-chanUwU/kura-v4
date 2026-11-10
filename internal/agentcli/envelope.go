@@ -11,6 +11,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/board"
 	"github.com/astra-chanUwU/kura-v4/internal/collections"
 	"github.com/astra-chanUwU/kura-v4/internal/moderation"
+	"github.com/astra-chanUwU/kura-v4/internal/reports"
 	"github.com/astra-chanUwU/kura-v4/internal/tags"
 )
 
@@ -85,6 +86,7 @@ func classify(err error) (code, message string, unexpected bool) {
 	var cErr *collections.ValidationError
 	var mErr *moderation.ValidationError
 	var tErr *tags.ValidationError
+	var rErr *reports.ValidationError
 	switch {
 	case errors.As(err, &aErr):
 		return "validation", aErr.Message, false
@@ -96,15 +98,17 @@ func classify(err error) (code, message string, unexpected bool) {
 		return "validation", mErr.Message, false
 	case errors.As(err, &tErr):
 		return "validation", tErr.Message, false
+	case errors.As(err, &rErr):
+		return "validation", rErr.Message, false
 	case errors.Is(err, board.ErrBadSort):
 		return "validation", "Sort must be newest, oldest, or favorites.", false
 	case errors.Is(err, ErrExpiredSession):
 		return "unauthenticated", "That session expired. Sign in again with `kura agent login`.", false
 	case errors.Is(err, accounts.ErrInvalidCredentials):
 		return "unauthenticated", "That username and sign-in didn't match. Check it and try again.", false
-	case errors.Is(err, moderation.ErrForbidden), errors.Is(err, collections.ErrForbidden), errors.Is(err, tags.ErrForbidden):
+	case errors.Is(err, moderation.ErrForbidden), errors.Is(err, collections.ErrForbidden), errors.Is(err, tags.ErrForbidden), errors.Is(err, reports.ErrForbidden):
 		return "forbidden", "You don't have permission to do that.", false
-	case errors.Is(err, accounts.ErrNotFound), errors.Is(err, board.ErrNotFound), errors.Is(err, collections.ErrNotFound), errors.Is(err, moderation.ErrNotFound), errors.Is(err, tags.ErrNotFound):
+	case errors.Is(err, accounts.ErrNotFound), errors.Is(err, board.ErrNotFound), errors.Is(err, collections.ErrNotFound), errors.Is(err, moderation.ErrNotFound), errors.Is(err, tags.ErrNotFound), errors.Is(err, reports.ErrNotFound):
 		return "not_found", "Not found.", false
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		return "canceled", "The command was canceled.", false

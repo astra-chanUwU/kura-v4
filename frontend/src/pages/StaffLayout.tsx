@@ -1,6 +1,6 @@
 import { Link, Outlet } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { IconEyeOff, IconHistory, IconUser } from "../components/icons";
+import { IconEyeOff, IconHistory, IconShield, IconUser } from "../components/icons";
 import { atLeast, ROLE_DESCRIPTIONS, ROLE_LABELS } from "../domain/roles";
 import { useHiddenPosts, useMe } from "../hooks/useKura";
 import styles from "./StaffLayout.module.css";
@@ -74,6 +74,10 @@ export function StaffLayout() {
         <Link to="/admin/history" activeProps={{ className: styles.active }}>
           <IconHistory />
           History
+        </Link>
+        <Link to="/admin/reports" activeProps={{ className: styles.active }}>
+          <IconShield />
+          Reports
         </Link>
       </nav>
       <Outlet />

@@ -16,6 +16,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/db"
 	"github.com/astra-chanUwU/kura-v4/internal/jobs"
 	"github.com/astra-chanUwU/kura-v4/internal/moderation"
+	"github.com/astra-chanUwU/kura-v4/internal/reports"
 	"github.com/astra-chanUwU/kura-v4/internal/repository"
 	"github.com/astra-chanUwU/kura-v4/internal/searches"
 	"github.com/astra-chanUwU/kura-v4/internal/site"
@@ -46,6 +47,7 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	boardSvc := board.NewService(postsRepo, media)
 	collectionsSvc := collections.NewService(repository.NewCollections(dao.NewCollections(conn)))
 	commentsSvc := comments.NewService(repository.NewComments(dao.NewComments(conn)))
+	reportsSvc := reports.NewService(repository.NewReports(dao.NewReports(conn)))
 	searchesSvc := searches.NewService(repository.NewSavedSearches(dao.NewSavedSearches(conn)))
 	tagsSvc := tags.NewService(repository.NewTagPages(dao.NewTagPages(conn)))
 	moderationSvc := moderation.NewService(repository.NewModeration(dao.NewAccounts(conn), postsRepo, dao.NewAudit(conn)))
@@ -56,7 +58,7 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	if err != nil {
 		return errors.New("site schema unavailable; run the migrate command before serve")
 	}
-	api := NewHTTP(HTTPDeps{Site: svc, Accounts: accountsSvc, Board: boardSvc, Collections: collectionsSvc, Moderation: moderationSvc, Comments: commentsSvc, Searches: searchesSvc, Tags: tagsSvc, Ping: conn.PingContext, Assets: webui.Files(), Log: log, SecureCookie: strings.HasPrefix(cfg.PublicURL, "https://")})
+	api := NewHTTP(HTTPDeps{Site: svc, Accounts: accountsSvc, Board: boardSvc, Collections: collectionsSvc, Moderation: moderationSvc, Comments: commentsSvc, Reports: reportsSvc, Searches: searchesSvc, Tags: tagsSvc, Ping: conn.PingContext, Assets: webui.Files(), Log: log, SecureCookie: strings.HasPrefix(cfg.PublicURL, "https://")})
 	workerCtx, stopWorkers := context.WithCancel(ctx)
 	workerDone := make(chan struct{})
 	go func() {
