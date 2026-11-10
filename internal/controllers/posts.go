@@ -222,6 +222,11 @@ func (h *Posts) create(c fiber.Ctx) error {
 	if _, err := src.Seek(0, 0); err != nil {
 		return err
 	}
+	// Reject a full quota before the original is stored. Seed and demo
+	// do not use this handler.
+	if err := h.board.CheckUploadQuota(c.Context(), user.ID); err != nil {
+		return writeError(c, err)
+	}
 	key, sha, err := h.board.Upload(c.Context(), src)
 	if err != nil {
 		return err

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/astra-chanUwU/kura-v4/internal/model"
@@ -41,6 +42,9 @@ type Repository interface {
 	PostNeighbors(ctx context.Context, id string, q model.PostQuery) (model.Neighbors, error)
 	GetPostBySHA(ctx context.Context, sha string) (model.Post, error)
 	CountPostsByOwner(ctx context.Context, ownerID string) (int64, error)
+	// CountPostsByOwnerSince counts posts this owner created inside within.
+	// Hidden and soft-deleted rows count; deleting a post does not free a slot.
+	CountPostsByOwnerSince(ctx context.Context, ownerID string, within time.Duration) (int64, error)
 	CountVisiblePostsByOwner(ctx context.Context, ownerID string, includeNSFW bool) (int64, error)
 	ListPostsByOwner(ctx context.Context, ownerID string, includeNSFW bool, limit, offset int32) ([]model.Post, error)
 	RelatedPosts(ctx context.Context, id string, includeNSFW bool, exclude []string, limit int32) ([]model.Post, error)

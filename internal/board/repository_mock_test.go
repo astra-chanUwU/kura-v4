@@ -6,6 +6,7 @@ package board
 
 import (
 	"context"
+	"time"
 
 	"github.com/astra-chanUwU/kura-v4/internal/model"
 	mock "github.com/stretchr/testify/mock"
@@ -175,6 +176,78 @@ func (_c *MockRepository_CountPostsByOwner_Call) Return(n int64, err error) *Moc
 }
 
 func (_c *MockRepository_CountPostsByOwner_Call) RunAndReturn(run func(ctx context.Context, ownerID string) (int64, error)) *MockRepository_CountPostsByOwner_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CountPostsByOwnerSince provides a mock function for the type MockRepository
+func (_mock *MockRepository) CountPostsByOwnerSince(ctx context.Context, ownerID string, within time.Duration) (int64, error) {
+	ret := _mock.Called(ctx, ownerID, within)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountPostsByOwnerSince")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Duration) (int64, error)); ok {
+		return returnFunc(ctx, ownerID, within)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Duration) int64); ok {
+		r0 = returnFunc(ctx, ownerID, within)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, time.Duration) error); ok {
+		r1 = returnFunc(ctx, ownerID, within)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_CountPostsByOwnerSince_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountPostsByOwnerSince'
+type MockRepository_CountPostsByOwnerSince_Call struct {
+	*mock.Call
+}
+
+// CountPostsByOwnerSince is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ownerID string
+//   - within time.Duration
+func (_e *MockRepository_Expecter) CountPostsByOwnerSince(ctx any, ownerID any, within any) *MockRepository_CountPostsByOwnerSince_Call {
+	return &MockRepository_CountPostsByOwnerSince_Call{Call: _e.mock.On("CountPostsByOwnerSince", ctx, ownerID, within)}
+}
+
+func (_c *MockRepository_CountPostsByOwnerSince_Call) Run(run func(ctx context.Context, ownerID string, within time.Duration)) *MockRepository_CountPostsByOwnerSince_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 time.Duration
+		if args[2] != nil {
+			arg2 = args[2].(time.Duration)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_CountPostsByOwnerSince_Call) Return(n int64, err error) *MockRepository_CountPostsByOwnerSince_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockRepository_CountPostsByOwnerSince_Call) RunAndReturn(run func(ctx context.Context, ownerID string, within time.Duration) (int64, error)) *MockRepository_CountPostsByOwnerSince_Call {
 	_c.Call.Return(run)
 	return _c
 }

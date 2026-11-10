@@ -23,6 +23,26 @@ func (q *Queries) CountPostsByOwner(ctx context.Context, ownerID uuid.NullUUID) 
 	return count, err
 }
 
+const countPostsByOwnerSince = `-- name: CountPostsByOwnerSince :one
+SELECT count(*)::bigint AS total
+FROM posts
+WHERE owner_id = $1
+  AND created_at > now() - ($2::float8 * interval '1 second')
+`
+
+type CountPostsByOwnerSinceParams struct {
+	OwnerID       uuid.NullUUID
+	WithinSeconds float64
+}
+
+// Hidden and soft-deleted posts count. Deleting one does not free a slot.
+func (q *Queries) CountPostsByOwnerSince(ctx context.Context, arg CountPostsByOwnerSinceParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countPostsByOwnerSince, arg.OwnerID, arg.WithinSeconds)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
 const countRemovedPosts = `-- name: CountRemovedPosts :one
 SELECT
   count(*) FILTER (WHERE deleted_at IS NULL)::bigint AS hidden,

@@ -98,6 +98,8 @@ func classify(err error) (code, message string, unexpected bool) {
 		return "validation", tErr.Message, false
 	case errors.Is(err, board.ErrBadSort):
 		return "validation", "Sort must be newest, oldest, or favorites.", false
+	case errors.Is(err, board.ErrUploadLimit):
+		return "validation", board.ErrUploadLimit.Error(), false
 	case errors.Is(err, ErrExpiredSession):
 		return "unauthenticated", "That session expired. Sign in again with `kura agent login`.", false
 	case errors.Is(err, accounts.ErrInvalidCredentials):

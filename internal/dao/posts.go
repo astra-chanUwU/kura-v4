@@ -202,6 +202,18 @@ func (d *PostsDAO) CountPostsByOwner(ctx context.Context, ownerID string) (int64
 	}
 	return d.q.CountPostsByOwner(ctx, uuid.NullUUID{UUID: uid, Valid: true})
 }
+
+// CountPostsByOwnerSince counts every post this owner created inside within,
+// including hidden and soft-deleted posts.
+func (d *PostsDAO) CountPostsByOwnerSince(ctx context.Context, ownerID string, within time.Duration) (int64, error) {
+	uid, err := uuid.Parse(ownerID)
+	if err != nil {
+		return 0, err
+	}
+	return d.q.CountPostsByOwnerSince(ctx, sqlcgen.CountPostsByOwnerSinceParams{
+		OwnerID: uuid.NullUUID{UUID: uid, Valid: true}, WithinSeconds: within.Seconds(),
+	})
+}
 func (d *PostsDAO) ExistsBySHA(ctx context.Context, sha string) (bool, error) {
 	return d.q.PostExistsBySHA(ctx, sha)
 }

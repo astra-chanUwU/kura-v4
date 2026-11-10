@@ -117,7 +117,14 @@ export function UploadDialog({
           );
         } catch (e) {
           const duplicate = duplicateOf(e);
-          const short = duplicate ? "Already on the board." : shortError(e, "Upload failed.");
+          const apiMessage = e instanceof Error ? e.message.trim() : "";
+          // A short server message is shown whole. Longer ones stay on the
+          // first sentence, same as every other toast.
+          const short = duplicate
+            ? "Already on the board."
+            : apiMessage.length > 0 && apiMessage.length <= 110
+              ? apiMessage
+              : shortError(e, "Upload failed.");
           toasts.push(`${item.file.name} — ${short}`, "error");
           setItems((prev) =>
             prev.map((i) =>

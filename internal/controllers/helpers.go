@@ -22,6 +22,8 @@ func writeError(c fiber.Ctx, err error) error {
 	var mErr *moderation.ValidationError
 	var bErr *board.ValidationError
 	switch {
+	case errors.Is(err, board.ErrUploadLimit):
+		return fiber.NewError(429, board.ErrUploadLimit.Error())
 	case errors.As(err, &vErr):
 		return fiber.NewError(400, vErr.Message)
 	case errors.As(err, &cErr):

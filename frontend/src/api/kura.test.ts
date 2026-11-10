@@ -23,6 +23,26 @@ describe("api.upload", () => {
     await expect(api.upload(file, "", "sfw")).rejects.toThrow("Already on the board");
   });
 
+  it("surfaces the upload limit message", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            code: "request_error",
+            message: "Upload limit reached. Try again later.",
+            request_id: "r1",
+          }),
+          { status: 429 },
+        ),
+      ),
+    );
+    const file = new File(["x"], "cap.png", { type: "image/png" });
+    await expect(api.upload(file, "", "sfw")).rejects.toThrow(
+      "Upload limit reached. Try again later.",
+    );
+  });
+
   it("carries the existing post on a duplicate so the UI can show it", async () => {
     const existing = { id: "post-9", thumbnail_url: "/media/posts/post-9/thumb" };
     vi.stubGlobal(

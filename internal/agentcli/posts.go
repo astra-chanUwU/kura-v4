@@ -224,6 +224,11 @@ func (e *Engine) postsUpload(ctx context.Context, args []string) int {
 	if e.deps.Board == nil {
 		return e.fail(cmd, "internal", "Something went wrong. Please try again.")
 	}
+	// Same cap as the website, before the original is stored. Staff are
+	// not exempt. Seed and demo do not call this command.
+	if err := e.deps.Board.CheckUploadQuota(ctx, user.ID); err != nil {
+		return e.failErr(cmd, err)
+	}
 	key, sha, err := e.deps.Board.Upload(ctx, f)
 	if err != nil {
 		return e.failErr(cmd, err)

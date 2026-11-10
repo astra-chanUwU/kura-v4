@@ -44,6 +44,13 @@ INSERT INTO post_tags (post_id, tag) VALUES ($1,$2) ON CONFLICT DO NOTHING;
 -- name: CountPostsByOwner :one
 SELECT count(*) FROM posts WHERE owner_id=$1;
 
+-- name: CountPostsByOwnerSince :one
+-- Hidden and soft-deleted posts count. Deleting one does not free a slot.
+SELECT count(*)::bigint AS total
+FROM posts
+WHERE owner_id = sqlc.arg(owner_id)
+  AND created_at > now() - (sqlc.arg(within_seconds)::float8 * interval '1 second');
+
 -- name: CountVisiblePostsByOwner :one
 SELECT count(*)::bigint AS total
 FROM posts
