@@ -37,6 +37,7 @@ type Accounts interface {
 // Board is the subset of board.Service the CLI uses.
 type Board interface {
 	Upload(ctx context.Context, r io.Reader) (string, string, error)
+	CheckUploadQuota(ctx context.Context, ownerID string) error
 	GetBySHA(ctx context.Context, sha string) (model.Post, error)
 	Create(ctx context.Context, p model.Post, sha string) (model.Post, error)
 	SetMetaAs(ctx context.Context, actor *model.User, id, artist string, tags []string, rating, sourceURL string) (model.Post, error)

@@ -167,6 +167,31 @@ func TestPostsUploadDuplicate(t *testing.T) {
 	require.Equal(t, "existing-post-7", post["id"])
 }
 
+func TestPostsUploadQuotaStopsBeforeStore(t *testing.T) {
+	session, acc := postsSession(t, model.RoleAdmin)
+	file := filepath.Join(t.TempDir(), "x.jpg")
+	require.NoError(t, os.WriteFile(file, []byte{0xFF, 0xD8, 0xFF, 0xD9}, 0o644))
+	uploaded := false
+	b := &postsBoard{
+		quota: func(ctx context.Context, ownerID string) error {
+			require.Equal(t, "user-1", ownerID)
+			return board.ErrUploadLimit
+		},
+		upload: func(ctx context.Context, r io.Reader) (string, string, error) {
+			uploaded = true
+			return "", "", nil
+		},
+	}
+	code, env, _ := postsRun(t, Deps{Accounts: acc, Board: b}, []string{"posts", "upload", file}, session)
+	require.Equal(t, 1, code)
+	require.False(t, env.OK)
+	require.Equal(t, "posts.upload", env.Command)
+	require.NotNil(t, env.Error)
+	require.Equal(t, "validation", env.Error.Code)
+	require.Equal(t, "Upload limit reached. Try again later.", env.Error.Message)
+	require.False(t, uploaded)
+}
+
 func TestPostsUploadRejectsText(t *testing.T) {
 	session, acc := postsSession(t, model.RoleMember)
 	file := filepath.Join(t.TempDir(), "note.txt")
@@ -343,6 +368,7 @@ func (f *postsAccounts) UserForSession(ctx context.Context, token string) (model
 type postsBoard struct {
 	Board
 	upload   func(context.Context, io.Reader) (string, string, error)
+	quota    func(context.Context, string) error
 	getBySHA func(context.Context, string) (model.Post, error)
 	create   func(context.Context, model.Post, string) (model.Post, error)
 	setMeta  func(context.Context, *model.User, string, string, []string, string, string) (model.Post, error)
@@ -357,6 +383,13 @@ func (f *postsBoard) Upload(ctx context.Context, r io.Reader) (string, string, e
 		panic("Upload")
 	}
 	return f.upload(ctx, r)
+}
+
+func (f *postsBoard) CheckUploadQuota(ctx context.Context, ownerID string) error {
+	if f.quota == nil {
+		return nil
+	}
+	return f.quota(ctx, ownerID)
 }
 
 func (f *postsBoard) GetBySHA(ctx context.Context, sha string) (model.Post, error) {

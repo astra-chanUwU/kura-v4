@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/astra-chanUwU/kura-v4/internal/model"
 	"github.com/stretchr/testify/require"
@@ -78,6 +79,15 @@ func TestSetMetaHistoryIncludesSourceURL(t *testing.T) {
 	require.True(t, kept.HasSourceURL)
 }
 
+// ownedPost is one stored upload. Hidden and deleted rows still count:
+// the quota query does not look at hidden_at or deleted_at.
+type ownedPost struct {
+	ownerID   string
+	createdAt time.Time
+	hidden    bool
+	deleted   bool
+}
+
 type fakeRepo struct {
 	post           model.Post
 	meta           []model.Post
@@ -92,6 +102,7 @@ type fakeRepo struct {
 	random         model.Post
 	aliases        map[string]string
 	lastQuery      model.PostQuery
+	owned          []ownedPost
 }
 
 func (f *fakeRepo) CreatePost(_ context.Context, p model.Post, _ string) (model.Post, error) {
@@ -148,6 +159,20 @@ func (f *fakeRepo) GetPostBySHA(context.Context, string) (model.Post, error) {
 	return model.Post{}, sql.ErrNoRows
 }
 func (f *fakeRepo) CountPostsByOwner(context.Context, string) (int64, error) { return 0, nil }
+
+// CountPostsByOwnerSince counts every stored post inside the window.
+// Hidden and deleted rows count. createdAt must be strictly after
+// now-within, matching created_at > now() - interval.
+func (f *fakeRepo) CountPostsByOwnerSince(_ context.Context, ownerID string, within time.Duration) (int64, error) {
+	cutoff := time.Now().Add(-within)
+	var n int64
+	for _, post := range f.owned {
+		if post.ownerID == ownerID && post.createdAt.After(cutoff) {
+			n++
+		}
+	}
+	return n, nil
+}
 func (f *fakeRepo) CountVisiblePostsByOwner(context.Context, string, bool) (int64, error) {
 	return 0, nil
 }
