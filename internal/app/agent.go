@@ -12,6 +12,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/agentcli"
 	"github.com/astra-chanUwU/kura-v4/internal/board"
 	"github.com/astra-chanUwU/kura-v4/internal/collections"
+	"github.com/astra-chanUwU/kura-v4/internal/comments"
 	"github.com/astra-chanUwU/kura-v4/internal/config"
 	"github.com/astra-chanUwU/kura-v4/internal/dao"
 	"github.com/astra-chanUwU/kura-v4/internal/db"
@@ -48,6 +49,7 @@ func Agent(ctx context.Context, cfg config.Config, args []string, out io.Writer)
 	postsRepo := repository.NewPosts(dao.NewPosts(conn))
 	boardSvc := board.NewService(postsRepo, media)
 	collectionsSvc := collections.NewService(repository.NewCollections(dao.NewCollections(conn)))
+	commentsSvc := comments.NewService(repository.NewComments(dao.NewComments(conn)))
 	tagsSvc := tags.NewService(repository.NewTagPages(dao.NewTagPages(conn)))
 	moderationSvc := moderation.NewService(repository.NewModeration(dao.NewAccounts(conn), postsRepo, dao.NewAudit(conn)))
 	// Fail clearly if migrations have not been applied.
@@ -61,6 +63,7 @@ func Agent(ctx context.Context, cfg config.Config, args []string, out io.Writer)
 		Accounts:    accountsSvc,
 		Board:       boardSvc,
 		Collections: collectionsSvc,
+		Comments:    commentsSvc,
 		Moderation:  moderationSvc,
 		Site:        svc,
 		Tags:        tagsSvc,

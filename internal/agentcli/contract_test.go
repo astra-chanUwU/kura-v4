@@ -33,6 +33,10 @@ func TestCatalogRoles(t *testing.T) {
 	}
 	require.Contains(t, names, "posts.upload")
 	require.Contains(t, names, "posts.delete")
+	require.Contains(t, names, "comments.list")
+	require.Contains(t, names, "comments.create")
+	require.Contains(t, names, "comments.update")
+	require.Contains(t, names, "comments.delete")
 	require.Contains(t, names, "users.role")
 	require.Contains(t, names, "history.rollback")
 
