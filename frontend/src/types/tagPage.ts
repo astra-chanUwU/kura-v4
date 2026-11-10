@@ -23,6 +23,8 @@ export interface TagPage {
   tag: string;
   alias_of: string;
   aliases: string[];
+  implies: string[];
+  implied_by: string[];
   category: TagCategory;
   description: string;
   post_count: number;

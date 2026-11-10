@@ -22,6 +22,8 @@ func (h *Tags) RegisterRoutes(api fiber.Router) {
 	api.Put("/tag/:name", h.update)
 	api.Post("/tag/:name/aliases", h.addAlias)
 	api.Delete("/tag/:name/aliases/:alias", h.removeAlias)
+	api.Post("/tag/:name/implications", h.addImplication)
+	api.Delete("/tag/:name/implications/:consequent", h.removeImplication)
 }
 
 func (h *Tags) get(c fiber.Ctx) error {
@@ -76,6 +78,34 @@ func (h *Tags) removeAlias(c fiber.Ctx) error {
 	return c.JSON(tagPageDTO(page))
 }
 
+func (h *Tags) addImplication(c fiber.Ctx) error {
+	user, err := requireUser(c)
+	if err != nil {
+		return err
+	}
+	var in dto.CreateTagImplication
+	if err := c.Bind().Body(&in); err != nil {
+		return fiber.NewError(400, "That implication could not be read.")
+	}
+	page, err := h.service.AddImplication(c.Context(), *user, c.Params("name"), in.Consequent)
+	if err != nil {
+		return writeTagError(c, err)
+	}
+	return c.Status(201).JSON(tagPageDTO(page))
+}
+
+func (h *Tags) removeImplication(c fiber.Ctx) error {
+	user, err := requireUser(c)
+	if err != nil {
+		return err
+	}
+	page, err := h.service.RemoveImplication(c.Context(), *user, c.Params("name"), c.Params("consequent"))
+	if err != nil {
+		return writeTagError(c, err)
+	}
+	return c.JSON(tagPageDTO(page))
+}
+
 func writeTagError(c fiber.Ctx, err error) error {
 	var vErr *tags.ValidationError
 	switch {
@@ -95,12 +125,20 @@ func tagPageDTO(page model.TagPage) dto.TagPage {
 	if aliases == nil {
 		aliases = []string{}
 	}
+	implies := page.Implies
+	if implies == nil {
+		implies = []string{}
+	}
+	impliedBy := page.ImpliedBy
+	if impliedBy == nil {
+		impliedBy = []string{}
+	}
 	updated := ""
 	if !page.UpdatedAt.IsZero() {
 		updated = page.UpdatedAt.Format(tagTime)
 	}
 	return dto.TagPage{
-		Tag: page.Tag, AliasOf: page.AliasOf, Aliases: aliases, Category: page.Category,
+		Tag: page.Tag, AliasOf: page.AliasOf, Aliases: aliases, Implies: implies, ImpliedBy: impliedBy, Category: page.Category,
 		Description: page.Description, PostCount: page.PostCount,
 		UpdatedByUsername: page.UpdatedByUsername, UpdatedAt: updated,
 		Posts: postsDTO(page.Posts, map[string]bool{}),

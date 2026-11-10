@@ -311,6 +311,18 @@ func (d *PostsDAO) RandomPost(ctx context.Context, q model.PostQuery) (model.Pos
 	return postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.SourceUrl, r.ThumbnailKey, r.SampleKey, r.TagsCsv, r.Width, r.Height, r.Rating, r.Hidden, r.Deleted, r.FavoriteCount), nil
 }
 
+func (d *PostsDAO) ListImplications(ctx context.Context) ([]model.TagImplication, error) {
+	rows, err := d.q.ListTagImplications(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.TagImplication, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, model.TagImplication{Antecedent: row.Antecedent, Consequent: row.Consequent})
+	}
+	return out, nil
+}
+
 func (d *PostsDAO) TagAliasTargets(ctx context.Context, tags []string) (map[string]string, error) {
 	if len(tags) == 0 {
 		return map[string]string{}, nil

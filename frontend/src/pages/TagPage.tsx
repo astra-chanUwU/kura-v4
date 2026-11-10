@@ -21,6 +21,7 @@ export function TagPage({ name }: { name: string }) {
   const [category, setCategory] = useState<string | null>(null);
   const [description, setDescription] = useState<string | null>(null);
   const [alias, setAlias] = useState("");
+  const [consequent, setConsequent] = useState("");
   const [pendingRemove, setPendingRemove] = useState("");
   const moderator = !!user && atLeast(user.role, "moderator");
   const signedIn = !!user;
@@ -153,6 +154,79 @@ export function TagPage({ name }: { name: string }) {
             />
             <button type="submit" disabled={!alias.trim() || actions.addAlias.isPending}>
               Add alias
+            </button>
+          </form>
+        )}
+      </section>
+
+      <section className={styles.section} aria-labelledby="implications-title">
+        <h2 id="implications-title">Implications</h2>
+        <p className={styles.muted}>
+          A post with this tag also receives each implied tag. Removing a rule leaves tags already
+          added.
+        </p>
+        {(data.implied_by ?? []).length > 0 && (
+          <p className={styles.muted}>
+            Also added by{" "}
+            {data.implied_by.map((item, index) => (
+              <span key={item}>
+                {index > 0 ? ", " : ""}
+                <Link to="/tags/$tag" params={{ tag: item }}>
+                  {item}
+                </Link>
+              </span>
+            ))}
+            .
+          </p>
+        )}
+        {(data.implies ?? []).length === 0 ? (
+          <p className={styles.muted}>This tag implies nothing else.</p>
+        ) : (
+          <div className={styles.aliases}>
+            {data.implies.map((item) => (
+              <span key={item} className={styles.alias}>
+                <Link to="/tags/$tag" params={{ tag: item }}>
+                  {item}
+                </Link>
+                {moderator && (
+                  <button
+                    type="button"
+                    aria-label={`Remove implication ${item}`}
+                    onClick={() =>
+                      actions.removeImplication.mutate(item, {
+                        onError: (error) => toasts.push(shortError(error), "error"),
+                      })
+                    }
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+        {moderator && (
+          <form
+            className={styles.row}
+            onSubmit={(event: FormEvent) => {
+              event.preventDefault();
+              const next = consequent.trim();
+              if (!next) return;
+              actions.addImplication.mutate(next, {
+                onSuccess: () => setConsequent(""),
+                onError: (error) => toasts.push(shortError(error), "error"),
+              });
+            }}
+          >
+            <input
+              value={consequent}
+              onChange={(event) => setConsequent(event.target.value)}
+              placeholder="Tag this one implies, such as pleated_skirt"
+              aria-label="Implied tag"
+              maxLength={40}
+            />
+            <button type="submit" disabled={!consequent.trim() || actions.addImplication.isPending}>
+              Add implication
             </button>
           </form>
         )}

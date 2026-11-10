@@ -717,6 +717,68 @@ func (_c *MockRepository_InsertHistory_Call) RunAndReturn(run func(ctx context.C
 	return _c
 }
 
+// ListImplications provides a mock function for the type MockRepository
+func (_mock *MockRepository) ListImplications(ctx context.Context) ([]model.TagImplication, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListImplications")
+	}
+
+	var r0 []model.TagImplication
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]model.TagImplication, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []model.TagImplication); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]model.TagImplication)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_ListImplications_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListImplications'
+type MockRepository_ListImplications_Call struct {
+	*mock.Call
+}
+
+// ListImplications is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockRepository_Expecter) ListImplications(ctx any) *MockRepository_ListImplications_Call {
+	return &MockRepository_ListImplications_Call{Call: _e.mock.On("ListImplications", ctx)}
+}
+
+func (_c *MockRepository_ListImplications_Call) Run(run func(ctx context.Context)) *MockRepository_ListImplications_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_ListImplications_Call) Return(tagImplications []model.TagImplication, err error) *MockRepository_ListImplications_Call {
+	_c.Call.Return(tagImplications, err)
+	return _c
+}
+
+func (_c *MockRepository_ListImplications_Call) RunAndReturn(run func(ctx context.Context) ([]model.TagImplication, error)) *MockRepository_ListImplications_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListPosts provides a mock function for the type MockRepository
 func (_mock *MockRepository) ListPosts(ctx context.Context, limit int32, offset int32, includeNSFW bool) ([]model.Post, error) {
 	ret := _mock.Called(ctx, limit, offset, includeNSFW)

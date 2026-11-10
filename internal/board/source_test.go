@@ -196,6 +196,9 @@ func (f *fakeRepo) EnsureArtistPage(_ context.Context, tag string) error {
 	f.artistPages = append(f.artistPages, tag)
 	return nil
 }
+func (f *fakeRepo) ListImplications(context.Context) ([]model.TagImplication, error) {
+	return nil, nil
+}
 func (f *fakeRepo) TagAliasTargets(_ context.Context, tags []string) (map[string]string, error) {
 	out := map[string]string{}
 	for _, tag := range tags {

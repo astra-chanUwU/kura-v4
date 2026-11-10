@@ -116,6 +116,38 @@ func (d *TagPagesDAO) DeleteAlias(ctx context.Context, alias, target string) (in
 	return d.q.DeleteTagAlias(ctx, sqlcgen.DeleteTagAliasParams{Alias: alias, Target: target})
 }
 
+func (d *TagPagesDAO) ListImplications(ctx context.Context) ([]model.TagImplication, error) {
+	rows, err := d.q.ListTagImplications(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.TagImplication, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, model.TagImplication{Antecedent: row.Antecedent, Consequent: row.Consequent})
+	}
+	return out, nil
+}
+
+func (d *TagPagesDAO) InsertImplication(ctx context.Context, antecedent, consequent, userID string) error {
+	var createdBy uuid.NullUUID
+	if userID != "" {
+		id, err := uuid.Parse(userID)
+		if err != nil {
+			return err
+		}
+		createdBy = uuid.NullUUID{UUID: id, Valid: true}
+	}
+	return d.q.InsertTagImplication(ctx, sqlcgen.InsertTagImplicationParams{Antecedent: antecedent, Consequent: consequent, CreatedBy: createdBy})
+}
+
+func (d *TagPagesDAO) DeleteImplication(ctx context.Context, antecedent, consequent string) (int64, error) {
+	return d.q.DeleteTagImplication(ctx, sqlcgen.DeleteTagImplicationParams{Antecedent: antecedent, Consequent: consequent})
+}
+
+func (d *TagPagesDAO) BackfillImplication(ctx context.Context, antecedent, consequent string) error {
+	return d.q.BackfillImplication(ctx, sqlcgen.BackfillImplicationParams{Antecedent: antecedent, Consequent: consequent})
+}
+
 func (d *TagPagesDAO) MovePostTag(ctx context.Context, alias, target string) error {
 	if err := d.q.DeleteConflictingAliasTags(ctx, sqlcgen.DeleteConflictingAliasTagsParams{Alias: alias, Target: target}); err != nil {
 		return err

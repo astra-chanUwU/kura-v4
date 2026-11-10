@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../api/client";
-import { addTagAlias, getTagPage, removeTagAlias, updateTagPage } from "../api/tagPages";
+import {
+  addTagAlias,
+  addTagImplication,
+  getTagPage,
+  removeTagAlias,
+  removeTagImplication,
+  updateTagPage,
+} from "../api/tagPages";
 import { queryKeys } from "../api/queryKeys";
 
 export function useTagPage(name: string) {
@@ -33,5 +40,13 @@ export function useTagPageActions(name: string) {
     mutationFn: (alias: string) => removeTagAlias(name, alias),
     onSuccess: refresh,
   });
-  return { update, addAlias, removeAlias };
+  const addImplication = useMutation({
+    mutationFn: (consequent: string) => addTagImplication(name, consequent),
+    onSuccess: refresh,
+  });
+  const removeImplication = useMutation({
+    mutationFn: (consequent: string) => removeTagImplication(name, consequent),
+    onSuccess: refresh,
+  });
+  return { update, addAlias, removeAlias, addImplication, removeImplication };
 }

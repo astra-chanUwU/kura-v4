@@ -101,4 +101,6 @@ type Tags interface {
 	Update(ctx context.Context, viewer model.User, tag, category, description string) (model.TagPage, error)
 	AddAlias(ctx context.Context, actor model.User, target, alias string) (model.TagPage, error)
 	RemoveAlias(ctx context.Context, actor model.User, target, alias string) (model.TagPage, error)
+	AddImplication(ctx context.Context, actor model.User, antecedent, consequent string) (model.TagPage, error)
+	RemoveImplication(ctx context.Context, actor model.User, antecedent, consequent string) (model.TagPage, error)
 }

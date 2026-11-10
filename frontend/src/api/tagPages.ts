@@ -24,3 +24,14 @@ export function addTagAlias(target: string, alias: string): Promise<TagPage> {
 export function removeTagAlias(target: string, alias: string): Promise<TagPage> {
   return sendJSON<TagPage>(`${tagPath(target)}/aliases/${encodeURIComponent(alias)}`, "DELETE");
 }
+
+export function addTagImplication(antecedent: string, consequent: string): Promise<TagPage> {
+  return sendJSON<TagPage>(`${tagPath(antecedent)}/implications`, "POST", { consequent });
+}
+
+export function removeTagImplication(antecedent: string, consequent: string): Promise<TagPage> {
+  return sendJSON<TagPage>(
+    `${tagPath(antecedent)}/implications/${encodeURIComponent(consequent)}`,
+    "DELETE",
+  );
+}

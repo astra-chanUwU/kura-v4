@@ -41,6 +41,11 @@ type Repository interface {
 	IsAliasTarget(ctx context.Context, tag string) (bool, error)
 	CreateAlias(ctx context.Context, alias, target, userID string) error
 	DeleteAlias(ctx context.Context, alias, target string) (int64, error)
+	ListImplications(ctx context.Context) ([]model.TagImplication, error)
+	// CreateImplication stores the edge and adds each backfill tag to posts
+	// that already have the antecedent. The caller chooses those tags.
+	CreateImplication(ctx context.Context, antecedent, consequent, userID string, backfill []string) error
+	DeleteImplication(ctx context.Context, antecedent, consequent string) (int64, error)
 }
 
 type Service struct{ repo Repository }
@@ -174,7 +179,12 @@ func (s *Service) page(ctx context.Context, viewer *model.User, tag string) (mod
 	if aliases == nil {
 		aliases = []string{}
 	}
-	if !found && count == 0 && !isAlias && len(aliases) == 0 {
+	edges, err := s.repo.ListImplications(ctx)
+	if err != nil {
+		return model.TagPage{}, err
+	}
+	implies, impliedBy := implicationSides(canonical, edges)
+	if !found && count == 0 && !isAlias && len(aliases) == 0 && len(implies) == 0 && len(impliedBy) == 0 {
 		return model.TagPage{}, ErrNotFound
 	}
 	posts, err := s.repo.RecentPosts(ctx, canonical, includeNSFW, exclude)
@@ -185,7 +195,8 @@ func (s *Service) page(ctx context.Context, viewer *model.User, tag string) (mod
 		posts = []model.Post{}
 	}
 	page := model.TagPage{
-		Tag: tag, Aliases: aliases, Category: "general", PostCount: count, Posts: posts,
+		Tag: tag, Aliases: aliases, Implies: implies, ImpliedBy: impliedBy,
+		Category: "general", PostCount: count, Posts: posts,
 	}
 	if isAlias {
 		page.AliasOf = canonical
@@ -245,4 +256,149 @@ func normalizeTags(in []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// AddImplication records that antecedent brings consequent along, and
+// backfills posts that already have the antecedent, including every tag
+// the consequent implies. Moderators and above.
+func (s *Service) AddImplication(ctx context.Context, actor model.User, antecedentRaw, consequentRaw string) (model.TagPage, error) {
+	if !actor.Role.AtLeast(model.RoleModerator) {
+		return model.TagPage{}, ErrForbidden
+	}
+	antecedent, consequent, err := s.implicationPair(ctx, antecedentRaw, consequentRaw)
+	if err != nil {
+		return model.TagPage{}, err
+	}
+	edges, err := s.repo.ListImplications(ctx)
+	if err != nil {
+		return model.TagPage{}, err
+	}
+	if implicationExists(edges, antecedent, consequent) {
+		return model.TagPage{}, invalid("That implication already exists.")
+	}
+	// The edge is included before it is stored. Posts that have the
+	// antecedent gain the consequent and every tag that consequent implies.
+	pending := make([]model.TagImplication, len(edges)+1)
+	copy(pending, edges)
+	pending[len(edges)] = model.TagImplication{Antecedent: antecedent, Consequent: consequent}
+	if implicationCycle(pending) {
+		return model.TagPage{}, invalid("That implication would loop.")
+	}
+	backfill := make([]string, 0)
+	for _, tag := range CloseImplications([]string{consequent}, pending) {
+		if tag != antecedent {
+			backfill = append(backfill, tag)
+		}
+	}
+	if err := s.repo.CreateImplication(ctx, antecedent, consequent, actor.ID, backfill); err != nil {
+		if strings.Contains(err.Error(), "23505") {
+			return model.TagPage{}, invalid("That implication already exists.")
+		}
+		return model.TagPage{}, err
+	}
+	return s.page(ctx, &actor, antecedent)
+}
+
+// RemoveImplication drops the rule. Posts that already received the
+// consequent keep it.
+func (s *Service) RemoveImplication(ctx context.Context, actor model.User, antecedentRaw, consequentRaw string) (model.TagPage, error) {
+	if !actor.Role.AtLeast(model.RoleModerator) {
+		return model.TagPage{}, ErrForbidden
+	}
+	antecedent, consequent, err := s.implicationPair(ctx, antecedentRaw, consequentRaw)
+	if err != nil {
+		return model.TagPage{}, err
+	}
+	n, err := s.repo.DeleteImplication(ctx, antecedent, consequent)
+	if err != nil {
+		return model.TagPage{}, err
+	}
+	if n == 0 {
+		return model.TagPage{}, ErrNotFound
+	}
+	return s.page(ctx, &actor, antecedent)
+}
+
+func (s *Service) implicationPair(ctx context.Context, antecedentRaw, consequentRaw string) (string, string, error) {
+	antecedent, err := oneTag(antecedentRaw)
+	if err != nil {
+		return "", "", err
+	}
+	consequent, err := oneTag(consequentRaw)
+	if err != nil {
+		return "", "", err
+	}
+	antecedent, _, err = s.canonical(ctx, antecedent)
+	if err != nil {
+		return "", "", err
+	}
+	consequent, _, err = s.canonical(ctx, consequent)
+	if err != nil {
+		return "", "", err
+	}
+	if antecedent == "" || consequent == "" {
+		return "", "", invalid(tagMessage)
+	}
+	if antecedent == consequent {
+		return "", "", invalid("A tag can't imply itself.")
+	}
+	return antecedent, consequent, nil
+}
+
+func implicationExists(edges []model.TagImplication, antecedent, consequent string) bool {
+	for _, edge := range edges {
+		if edge.Antecedent == antecedent && edge.Consequent == consequent {
+			return true
+		}
+	}
+	return false
+}
+
+func implicationSides(tag string, edges []model.TagImplication) (implies, impliedBy []string) {
+	implies, impliedBy = []string{}, []string{}
+	for _, edge := range edges {
+		if edge.Antecedent == tag {
+			implies = append(implies, edge.Consequent)
+		}
+		if edge.Consequent == tag {
+			impliedBy = append(impliedBy, edge.Antecedent)
+		}
+	}
+	sort.Strings(implies)
+	sort.Strings(impliedBy)
+	return implies, impliedBy
+}
+
+func implicationCycle(edges []model.TagImplication) bool {
+	next := map[string][]string{}
+	for _, edge := range edges {
+		if edge.Antecedent == edge.Consequent {
+			return true
+		}
+		next[edge.Antecedent] = append(next[edge.Antecedent], edge.Consequent)
+	}
+	color := map[string]int{}
+	var visit func(string) bool
+	visit = func(tag string) bool {
+		switch color[tag] {
+		case 1:
+			return true
+		case 2:
+			return false
+		}
+		color[tag] = 1
+		for _, child := range next[tag] {
+			if visit(child) {
+				return true
+			}
+		}
+		color[tag] = 2
+		return false
+	}
+	for tag := range next {
+		if visit(tag) {
+			return true
+		}
+	}
+	return false
 }
