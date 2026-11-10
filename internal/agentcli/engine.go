@@ -11,9 +11,9 @@ import (
 )
 
 // Engine runs one agent invocation. Command methods live in auth.go,
-// posts.go, collect.go, and staff.go. They call services and write one
-// JSON envelope. They do not open the database and they do not bypass
-// service permission checks.
+// posts.go, comments.go, collect.go, and staff.go. They call services
+// and write one JSON envelope. They do not open the database and they
+// do not bypass service permission checks.
 type Engine struct {
 	deps        Deps
 	out         io.Writer
@@ -52,6 +52,8 @@ func (e *Engine) dispatch(ctx context.Context, args []string) int {
 		return e.site(ctx)
 	case "posts":
 		return e.posts(ctx, args[1:])
+	case "comments":
+		return e.comments(ctx, args[1:])
 	case "favorites":
 		return e.favorites(ctx, args[1:])
 	case "lists":

@@ -14,6 +14,7 @@ type Deps struct {
 	Accounts    Accounts
 	Board       Board
 	Collections Collections
+	Comments    Comments
 	Moderation  Moderation
 	Site        Site
 	Tags        Tags
@@ -58,6 +59,14 @@ type Collections interface {
 	GetList(ctx context.Context, viewerID *string, id string, includeNSFW bool, exclude []string, limit, offset int) (model.ListDetail, error)
 	AddItem(ctx context.Context, ownerID, listID, postID string) error
 	RemoveItem(ctx context.Context, ownerID, listID, postID string) error
+}
+
+// Comments is the subset of comments.Service the CLI uses.
+type Comments interface {
+	List(ctx context.Context, viewer *model.User, postID string, limit, offset int) (model.CommentPage, error)
+	Create(ctx context.Context, viewer model.User, postID, body string) (model.Comment, error)
+	Update(ctx context.Context, viewer model.User, commentID, body string) (model.Comment, error)
+	Delete(ctx context.Context, viewer model.User, commentID string) error
 }
 
 // Moderation is the subset of moderation.Service the CLI uses.
