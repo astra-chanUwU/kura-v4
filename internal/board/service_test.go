@@ -57,6 +57,7 @@ func TestSetMetaAsWritesHistoryOnlyWhenChanged(t *testing.T) {
 	existing := model.Post{ID: "p1", Artist: "old", Tags: []string{"keep"}, Rating: "sfw"}
 	repo := NewMockRepository(t)
 	repo.EXPECT().TagAliasTargets(mock.Anything, mock.Anything).Return(map[string]string{}, nil).Times(2)
+	repo.EXPECT().ListImplications(mock.Anything).Return(nil, nil)
 	repo.EXPECT().GetPost(mock.Anything, "p1").Return(existing, nil)
 	repo.EXPECT().EnsureArtistPage(mock.Anything, "new").Return(nil)
 	repo.EXPECT().ReplacePostMetaAudited(mock.Anything, mock.MatchedBy(func(p model.Post) bool {

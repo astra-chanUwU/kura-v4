@@ -17,10 +17,18 @@ type TagPage struct {
 	Tag               string
 	AliasOf           string
 	Aliases           []string
+	Implies           []string
+	ImpliedBy         []string
 	Category          string
 	Description       string
 	PostCount         int64
 	UpdatedByUsername string
 	UpdatedAt         time.Time
 	Posts             []Post
+}
+
+// TagImplication says posts tagged with Antecedent also receive Consequent.
+type TagImplication struct {
+	Antecedent string
+	Consequent string
 }

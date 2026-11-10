@@ -143,6 +143,13 @@ type TagAlias struct {
 	CreatedAt time.Time
 }
 
+type TagImplication struct {
+	Antecedent string
+	Consequent string
+	CreatedBy  uuid.NullUUID
+	CreatedAt  time.Time
+}
+
 type TagPage struct {
 	Tag         string
 	Category    string

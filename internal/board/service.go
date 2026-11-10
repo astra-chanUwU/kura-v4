@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/astra-chanUwU/kura-v4/internal/model"
+	"github.com/astra-chanUwU/kura-v4/internal/tags"
 	"github.com/google/uuid"
 )
 
@@ -51,6 +52,7 @@ type Repository interface {
 	// TagAliasTargets maps an alternate tag name to the canonical tag.
 	// Missing names are omitted. An empty input returns an empty map.
 	TagAliasTargets(ctx context.Context, tags []string) (map[string]string, error)
+	ListImplications(ctx context.Context) ([]model.TagImplication, error)
 }
 
 // Media is the original-file store the board reads and writes through.
@@ -97,6 +99,10 @@ func (s *Service) Create(ctx context.Context, p model.Post, sha string) (model.P
 	p.Rating = model.NormalizeRating(p.Rating)
 	var artistTag string
 	p.Tags, artistTag, err = s.attachArtist(ctx, "", p.Tags, p.Artist)
+	if err != nil {
+		return model.Post{}, err
+	}
+	p.Tags, err = s.applyImplications(ctx, p.Tags)
 	if err != nil {
 		return model.Post{}, err
 	}
@@ -260,6 +266,10 @@ func (s *Service) setMeta(ctx context.Context, actor *model.User, id, artist str
 	if err != nil {
 		return model.Post{}, err
 	}
+	post.Tags, err = s.applyImplications(ctx, post.Tags)
+	if err != nil {
+		return model.Post{}, err
+	}
 	after := model.SnapshotOf(post)
 	changed := before.Artist != after.Artist || before.Rating != after.Rating || before.SourceURL != after.SourceURL || !equalTags(before.Tags, after.Tags)
 	if actor != nil && changed {
@@ -368,6 +378,25 @@ func (s *Service) prepareSearch(ctx context.Context, q model.PostQuery) (model.P
 		return model.PostQuery{}, err
 	}
 	return prepared, nil
+}
+
+func (s *Service) applyImplications(ctx context.Context, tags []string) ([]string, error) {
+	if len(tags) == 0 {
+		return tags, nil
+	}
+	edges, err := s.repo.ListImplications(ctx)
+	if err != nil || len(edges) == 0 {
+		if tags == nil {
+			tags = []string{}
+		}
+		return tags, err
+	}
+	return closeImplications(tags, edges), nil
+}
+
+// closeImplications adds every tag implied by names. The walk lives in the tags package.
+func closeImplications(names []string, edges []model.TagImplication) []string {
+	return tags.CloseImplications(names, edges)
 }
 
 // applyAliases replaces alternate names with the canonical tag and drops

@@ -28,6 +28,8 @@ const page: TagPageData = {
   tag: "grey_hair",
   alias_of: "gray_hair",
   aliases: ["grey_hair"],
+  implies: ["long_hair"],
+  implied_by: [],
   category: "general",
   description: "Hair that is gray.",
   post_count: 4,
@@ -96,6 +98,7 @@ describe("TagPage", () => {
       "href",
       "/?tags=gray_hair",
     );
+    expect(screen.getByRole("link", { name: "long_hair" })).toHaveAttribute("href", "/tags/long_hair");
     expect(screen.getByRole("article")).toHaveTextContent("gray_hair");
     expect(screen.queryByRole("button", { name: "Save description" })).not.toBeInTheDocument();
   });

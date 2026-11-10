@@ -16,6 +16,9 @@ type fakeRepo struct {
 	posts       map[string][]model.Post
 	moved       []string
 	lastExclude []string
+	edges       []model.TagImplication
+	postTags    map[string]bool
+	backfilled  []string
 }
 
 func (f *fakeRepo) GetPage(_ context.Context, tag string) (model.TagWiki, bool, error) {
@@ -65,6 +68,33 @@ func (f *fakeRepo) CreateAlias(_ context.Context, alias, target, _ string) error
 	f.aliases[alias] = target
 	f.moved = append(f.moved, alias+"->"+target)
 	return nil
+}
+func (f *fakeRepo) ListImplications(context.Context) ([]model.TagImplication, error) {
+	return f.edges, nil
+}
+func (f *fakeRepo) CreateImplication(_ context.Context, antecedent, consequent, _ string, tags []string) error {
+	f.edges = append(f.edges, model.TagImplication{Antecedent: antecedent, Consequent: consequent})
+	f.backfilled = append([]string{}, tags...)
+	if f.postTags == nil {
+		f.postTags = map[string]bool{}
+	}
+	for _, tag := range tags {
+		f.postTags[tag] = true
+	}
+	return nil
+}
+func (f *fakeRepo) DeleteImplication(_ context.Context, antecedent, consequent string) (int64, error) {
+	kept := make([]model.TagImplication, 0, len(f.edges))
+	var n int64
+	for _, edge := range f.edges {
+		if edge.Antecedent == antecedent && edge.Consequent == consequent {
+			n++
+			continue
+		}
+		kept = append(kept, edge)
+	}
+	f.edges = kept
+	return n, nil
 }
 func (f *fakeRepo) DeleteAlias(_ context.Context, alias, target string) (int64, error) {
 	if f.aliases[alias] != target {
@@ -193,6 +223,59 @@ func TestGetPassesViewerExcludeTags(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, repo.lastExclude)
 	require.Empty(t, repo.lastExclude)
+}
+
+func TestImplications(t *testing.T) {
+	mod := model.User{ID: "mod", Role: model.RoleModerator}
+	member := model.User{ID: "mem", Role: model.RoleMember}
+	repo := &fakeRepo{counts: map[string]int64{"school_uniform": 1}}
+	svc := NewService(repo)
+
+	_, err := svc.AddImplication(context.Background(), member, "school_uniform", "pleated_skirt")
+	require.ErrorIs(t, err, ErrForbidden)
+
+	_, err = svc.AddImplication(context.Background(), mod, "school_uniform", "school_uniform")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "itself")
+
+	page, err := svc.AddImplication(context.Background(), mod, "school_uniform", "pleated_skirt")
+	require.NoError(t, err)
+	require.Equal(t, []string{"pleated_skirt"}, page.Implies)
+	require.Equal(t, []string{"pleated_skirt"}, repo.backfilled)
+	require.True(t, repo.postTags["pleated_skirt"])
+
+	_, err = svc.AddImplication(context.Background(), mod, "school_uniform", "pleated_skirt")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "already exists")
+
+	_, err = svc.AddImplication(context.Background(), mod, "pleated_skirt", "school_uniform")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "loop")
+
+	page, err = svc.RemoveImplication(context.Background(), mod, "school_uniform", "pleated_skirt")
+	require.NoError(t, err)
+	require.Empty(t, page.Implies)
+	require.True(t, repo.postTags["pleated_skirt"], "removing the rule leaves the consequent on posts")
+}
+
+func TestAddImplicationBackfillsTheChain(t *testing.T) {
+	mod := model.User{ID: "mod", Role: model.RoleModerator}
+	repo := &fakeRepo{
+		counts: map[string]int64{"school_uniform": 2},
+		edges: []model.TagImplication{
+			{Antecedent: "other_uniform", Consequent: "pleated_skirt"},
+			{Antecedent: "pleated_skirt", Consequent: "skirt"},
+			{Antecedent: "skirt", Consequent: "clothing"},
+			{Antecedent: "school_uniform", Consequent: "uniform"},
+		},
+	}
+	page, err := NewService(repo).AddImplication(context.Background(), mod, "school_uniform", "pleated_skirt")
+	require.NoError(t, err)
+	require.Equal(t, []string{"pleated_skirt", "uniform"}, page.Implies)
+	require.Equal(t, []string{"clothing", "pleated_skirt", "skirt"}, repo.backfilled)
+	require.NotContains(t, repo.backfilled, "school_uniform")
+	require.NotContains(t, repo.backfilled, "other_uniform")
+	require.NotContains(t, repo.backfilled, "uniform")
 }
 
 func stringsOf(n int) string {

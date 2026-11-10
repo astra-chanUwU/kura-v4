@@ -6,7 +6,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/model"
 )
 
-const tagsUsage = "usage: kura agent tags <show|edit|alias|unalias>"
+const tagsUsage = "usage: kura agent tags <show|edit|alias|unalias|imply|unimply>"
 
 func (e *Engine) tags(ctx context.Context, args []string) int {
 	if e.deps.Tags == nil {
@@ -24,6 +24,10 @@ func (e *Engine) tags(ctx context.Context, args []string) int {
 		return e.tagsAlias(ctx, args[1:], true)
 	case "unalias":
 		return e.tagsAlias(ctx, args[1:], false)
+	case "imply":
+		return e.tagsImply(ctx, args[1:], true)
+	case "unimply":
+		return e.tagsImply(ctx, args[1:], false)
 	default:
 		return e.badUsage("tags", tagsUsage)
 	}
@@ -108,6 +112,43 @@ func (e *Engine) tagsAlias(ctx context.Context, args []string, add bool) int {
 	return e.ok(cmd, presentTagPage(page))
 }
 
+func (e *Engine) tagsImply(ctx context.Context, args []string, add bool) int {
+	cmd := "tags.unimply"
+	usage := "usage: kura agent tags unimply <antecedent> <consequent>"
+	if add {
+		cmd = "tags.imply"
+		usage = "usage: kura agent tags imply <antecedent> <consequent>"
+	}
+	user, ok := e.requireActor(ctx, cmd)
+	if !ok || !e.requireMin(cmd, user, "moderator") {
+		return 1
+	}
+	parsed, err := parseArgs(args)
+	if err != nil {
+		return e.badUsage(cmd, err.Error())
+	}
+	if err := parsed.Only(); err != nil || len(parsed.Pos) != 2 {
+		return e.badUsage(cmd, usage)
+	}
+	var page model.TagPage
+	if add {
+		page, err = e.deps.Tags.AddImplication(ctx, user, parsed.Pos[0], parsed.Pos[1])
+	} else {
+		page, err = e.deps.Tags.RemoveImplication(ctx, user, parsed.Pos[0], parsed.Pos[1])
+	}
+	if err != nil {
+		return e.failErr(cmd, err)
+	}
+	return e.ok(cmd, presentTagPage(page))
+}
+
+func stringList(items []string) []string {
+	if items == nil {
+		return []string{}
+	}
+	return items
+}
+
 func presentTagPage(page model.TagPage) map[string]any {
 	aliases := page.Aliases
 	if aliases == nil {
@@ -119,6 +160,7 @@ func presentTagPage(page model.TagPage) map[string]any {
 	}
 	return map[string]any{
 		"tag": page.Tag, "alias_of": page.AliasOf, "aliases": aliases,
+		"implies": stringList(page.Implies), "implied_by": stringList(page.ImpliedBy),
 		"category": page.Category, "description": page.Description,
 		"post_count": page.PostCount, "updated_by_username": page.UpdatedByUsername,
 		"updated_at": updated, "posts": presentPosts(page.Posts, map[string]bool{}),
