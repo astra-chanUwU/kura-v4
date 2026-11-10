@@ -41,3 +41,26 @@ func (d *JobDAO) Fail(ctx context.Context, job model.Job, message string) error 
 	}
 	return err
 }
+
+func (d *JobDAO) ListFailed(ctx context.Context, limit, offset int32) ([]model.FailedJob, error) {
+	rows, err := d.queries.ListFailedJobs(ctx, sqlcgen.ListFailedJobsParams{RowLimit: limit, RowOffset: offset})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.FailedJob, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, model.FailedJob{
+			ID: row.ID, Kind: row.Kind, Attempts: row.Attempts, MaxAttempts: row.MaxAttempts,
+			LastError: row.LastError.String, UpdatedAt: row.UpdatedAt,
+		})
+	}
+	return out, nil
+}
+
+func (d *JobDAO) CountFailed(ctx context.Context) (int64, error) {
+	return d.queries.CountFailedJobs(ctx)
+}
+
+func (d *JobDAO) RetryFailed(ctx context.Context, id int64) (int64, error) {
+	return d.queries.RetryFailedJob(ctx, id)
+}

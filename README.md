@@ -236,8 +236,15 @@ configuration and required secrets in a separate protected backup.
 
 Restore into a separate Compose project/volumes: restore PostgreSQL and media from
 the same backup set, use the matching application version, and check database
-readiness plus original-byte integrity before opening access. Automated backup
-scripts and an operator restore drill are not part of this initial scaffold.
+readiness plus original-byte integrity before opening access.
+
+`kura backup` writes a pg_dump custom-format file and a manifest under
+`.local/backups/<UTC timestamp>/`. The manifest records the UTC time, the
+database name, and the absolute media directory. It does not copy media, and
+it never prints the database password. Copy the media directory named in the
+manifest separately and keep it with that dump. The command refuses to run
+when `DATABASE_URL` is empty, and it creates nothing when `pg_dump` is not
+installed. An operator restore drill is still a manual step.
 
 ## Roles
 

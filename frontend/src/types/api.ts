@@ -77,6 +77,18 @@ export interface HiddenPage {
   deleted: number;
   posts: Post[];
 }
+export interface FailedJob {
+  id: number;
+  kind: string;
+  attempts: number;
+  max_attempts: number;
+  last_error: string;
+  updated_at: string;
+}
+export interface FailedJobPage {
+  total: number;
+  jobs: FailedJob[];
+}
 export interface Profile {
   user: User;
   public_lists: ListSummary[];

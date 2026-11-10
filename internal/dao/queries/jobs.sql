@@ -31,3 +31,24 @@ WHERE id = sqlc.arg(id) AND lease_token = sqlc.arg(token) AND state = 'running';
 UPDATE jobs SET state = 'failed', last_error = 'worker lease expired after final attempt',
     lease_until = NULL, lease_token = NULL, updated_at = now()
 WHERE state = 'running' AND lease_until < now() AND attempts >= max_attempts;
+
+-- name: ListFailedJobs :many
+SELECT id, kind, attempts, max_attempts, last_error, updated_at
+FROM jobs
+WHERE state = 'failed'
+ORDER BY updated_at DESC, id DESC
+LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
+
+-- name: CountFailedJobs :one
+SELECT count(*) FROM jobs WHERE state = 'failed';
+
+-- name: RetryFailedJob :execrows
+UPDATE jobs SET
+    state = 'queued',
+    attempts = 0,
+    last_error = NULL,
+    available_at = now(),
+    lease_until = NULL,
+    lease_token = NULL,
+    updated_at = now()
+WHERE id = sqlc.arg(id) AND state = 'failed';

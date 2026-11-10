@@ -9,6 +9,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/lib/pq"
 )
@@ -73,6 +74,17 @@ func (q *Queries) CompleteJob(ctx context.Context, arg CompleteJobParams) (int64
 	return result.RowsAffected()
 }
 
+const countFailedJobs = `-- name: CountFailedJobs :one
+SELECT count(*) FROM jobs WHERE state = 'failed'
+`
+
+func (q *Queries) CountFailedJobs(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countFailedJobs)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const enqueueJob = `-- name: EnqueueJob :one
 INSERT INTO jobs (kind, payload) VALUES ($1, $2) RETURNING id
 `
@@ -111,6 +123,58 @@ func (q *Queries) FailJob(ctx context.Context, arg FailJobParams) (int64, error)
 	return result.RowsAffected()
 }
 
+const listFailedJobs = `-- name: ListFailedJobs :many
+SELECT id, kind, attempts, max_attempts, last_error, updated_at
+FROM jobs
+WHERE state = 'failed'
+ORDER BY updated_at DESC, id DESC
+LIMIT $2 OFFSET $1
+`
+
+type ListFailedJobsParams struct {
+	RowOffset int32
+	RowLimit  int32
+}
+
+type ListFailedJobsRow struct {
+	ID          int64
+	Kind        string
+	Attempts    int32
+	MaxAttempts int32
+	LastError   sql.NullString
+	UpdatedAt   time.Time
+}
+
+func (q *Queries) ListFailedJobs(ctx context.Context, arg ListFailedJobsParams) ([]ListFailedJobsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listFailedJobs, arg.RowOffset, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListFailedJobsRow{}
+	for rows.Next() {
+		var i ListFailedJobsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Kind,
+			&i.Attempts,
+			&i.MaxAttempts,
+			&i.LastError,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const reapExhaustedJobs = `-- name: ReapExhaustedJobs :exec
 UPDATE jobs SET state = 'failed', last_error = 'worker lease expired after final attempt',
     lease_until = NULL, lease_token = NULL, updated_at = now()
@@ -120,4 +184,24 @@ WHERE state = 'running' AND lease_until < now() AND attempts >= max_attempts
 func (q *Queries) ReapExhaustedJobs(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, reapExhaustedJobs)
 	return err
+}
+
+const retryFailedJob = `-- name: RetryFailedJob :execrows
+UPDATE jobs SET
+    state = 'queued',
+    attempts = 0,
+    last_error = NULL,
+    available_at = now(),
+    lease_until = NULL,
+    lease_token = NULL,
+    updated_at = now()
+WHERE id = $1 AND state = 'failed'
+`
+
+func (q *Queries) RetryFailedJob(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, retryFailedJob, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/comments"
 	"github.com/astra-chanUwU/kura-v4/internal/controllers"
 	"github.com/astra-chanUwU/kura-v4/internal/dto"
+	"github.com/astra-chanUwU/kura-v4/internal/jobs"
 	"github.com/astra-chanUwU/kura-v4/internal/moderation"
 	"github.com/astra-chanUwU/kura-v4/internal/searches"
 	"github.com/astra-chanUwU/kura-v4/internal/site"
@@ -31,6 +32,7 @@ type HTTPDeps struct {
 	Board        *board.Service
 	Collections  *collections.Service
 	Moderation   *moderation.Service
+	Jobs         *jobs.Service
 	Comments     *comments.Service
 	Searches     *searches.Service
 	Tags         *tags.Service
@@ -103,6 +105,9 @@ func NewHTTP(deps HTTPDeps) *fiber.App {
 		}
 		if deps.Moderation != nil {
 			controllers.NewAdmin(deps.Moderation).RegisterRoutes(api)
+		}
+		if deps.Jobs != nil {
+			controllers.NewJobAdmin(deps.Jobs).RegisterRoutes(api)
 		}
 	}
 	app.Use("/api", func(c fiber.Ctx) error { return fiber.ErrNotFound })

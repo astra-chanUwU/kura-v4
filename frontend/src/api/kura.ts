@@ -1,5 +1,6 @@
 import type {
   ChangeEntry,
+  FailedJobPage,
   HiddenPage,
   ListDetail,
   ListSummary,
@@ -199,4 +200,7 @@ export const api = {
     }
     return response.json() as Promise<Post>;
   },
+  failedJobs: (offset: number, signal?: AbortSignal) =>
+    getJSON<FailedJobPage>(`/admin/jobs?state=failed&limit=40&offset=${offset}`, signal),
+  retryFailedJob: (id: number) => sendJSON<void>(`/admin/jobs/${id}/retry`, "POST"),
 };

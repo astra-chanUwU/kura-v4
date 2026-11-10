@@ -8,6 +8,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/board"
 	"github.com/astra-chanUwU/kura-v4/internal/collections"
 	"github.com/astra-chanUwU/kura-v4/internal/dto"
+	"github.com/astra-chanUwU/kura-v4/internal/jobs"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
 	"github.com/astra-chanUwU/kura-v4/internal/moderation"
 	"github.com/gofiber/fiber/v3"
@@ -21,6 +22,7 @@ func writeError(c fiber.Ctx, err error) error {
 	var cErr *collections.ValidationError
 	var mErr *moderation.ValidationError
 	var bErr *board.ValidationError
+	var jErr *jobs.ValidationError
 	switch {
 	case errors.As(err, &vErr):
 		return fiber.NewError(400, vErr.Message)
@@ -30,9 +32,11 @@ func writeError(c fiber.Ctx, err error) error {
 		return fiber.NewError(400, mErr.Message)
 	case errors.As(err, &bErr):
 		return fiber.NewError(400, bErr.Message)
-	case errors.Is(err, moderation.ErrForbidden):
+	case errors.As(err, &jErr):
+		return fiber.NewError(400, jErr.Message)
+	case errors.Is(err, moderation.ErrForbidden), errors.Is(err, jobs.ErrForbidden):
 		return fiber.NewError(403, "You don't have permission to do that.")
-	case errors.Is(err, moderation.ErrNotFound):
+	case errors.Is(err, moderation.ErrNotFound), errors.Is(err, jobs.ErrNotFound):
 		return fiber.NewError(404, "Not found.")
 	case errors.Is(err, accounts.ErrInvalidCredentials):
 		return fiber.NewError(401, "That username and sign-in didn't match. Check it and try again.")
