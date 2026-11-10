@@ -102,6 +102,18 @@ type PostComment struct {
 	UpdatedAt time.Time
 }
 
+type PostReport struct {
+	ID         uuid.UUID
+	PostID     uuid.UUID
+	ReporterID uuid.UUID
+	Reason     string
+	Note       string
+	Status     string
+	CreatedAt  time.Time
+	ResolvedAt sql.NullTime
+	ResolverID uuid.NullUUID
+}
+
 type PostTag struct {
 	PostID    uuid.UUID
 	Tag       string

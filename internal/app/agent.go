@@ -18,6 +18,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/dao"
 	"github.com/astra-chanUwU/kura-v4/internal/db"
 	"github.com/astra-chanUwU/kura-v4/internal/moderation"
+	"github.com/astra-chanUwU/kura-v4/internal/reports"
 	"github.com/astra-chanUwU/kura-v4/internal/repository"
 	"github.com/astra-chanUwU/kura-v4/internal/site"
 	"github.com/astra-chanUwU/kura-v4/internal/storage"
@@ -53,6 +54,7 @@ func Agent(ctx context.Context, cfg config.Config, args []string, out io.Writer)
 	collectionsSvc := collections.NewService(repository.NewCollections(dao.NewCollections(conn)))
 	commentsSvc := comments.NewService(repository.NewComments(dao.NewComments(conn)))
 	tagsSvc := tags.NewService(repository.NewTagPages(dao.NewTagPages(conn)))
+	reportsSvc := reports.NewService(repository.NewReports(dao.NewReports(conn)))
 	moderationSvc := moderation.NewService(repository.NewModeration(dao.NewAccounts(conn), postsRepo, dao.NewAudit(conn)))
 	// Fail clearly if migrations have not been applied.
 	readyCtx, readyCancel := context.WithTimeout(ctx, 5*time.Second)
@@ -69,6 +71,7 @@ func Agent(ctx context.Context, cfg config.Config, args []string, out io.Writer)
 		Moderation:  moderationSvc,
 		Site:        svc,
 		Tags:        tagsSvc,
+		Reports:     reportsSvc,
 	}, args, out, agentcli.Options{})
 }
 

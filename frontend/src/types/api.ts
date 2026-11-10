@@ -118,6 +118,24 @@ export interface WebAuthnCeremony {
   options: unknown;
 }
 
+/** A member's report of one post. Dismissing it does not hide the post. */
+export interface PostReport {
+  id: string;
+  post_id: string;
+  thumbnail_url: string;
+  reporter_username: string;
+  reason: string;
+  note: string;
+  status: string;
+  created_at: string;
+  resolved_at?: string;
+  resolver_id?: string;
+}
+export interface PostReportPage {
+  total: number;
+  reports: PostReport[];
+}
+
 /** One append-only history row. before/after are post snapshots ({artist,tags,rating,hidden}) or {"role": "..."} . */
 export interface ChangeEntry {
   id: string;

@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { PostComments } from "../components/PostComments";
+import { PostReport } from "../components/PostReport";
 import { HistoryList } from "../components/HistoryList";
 import { IconEye, IconEyeOff, IconTrash } from "../components/icons";
 import { PostActions } from "../components/PostCard";
@@ -503,6 +504,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
           )}
         </div>
       </div>
+      <PostReport postId={post.id} signedIn={!!user} />
       <PostComments postId={post.id} />
       {signedIn && (
         <section className={styles.historySection} aria-labelledby="post-history-title">
