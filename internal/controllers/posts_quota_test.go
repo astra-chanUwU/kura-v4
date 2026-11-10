@@ -41,6 +41,7 @@ func (r *quotaRepo) ListPosts(context.Context, int32, int32, bool) ([]model.Post
 }
 func (r *quotaRepo) ExistsBySHA(context.Context, string) (bool, error)      { return false, nil }
 func (r *quotaRepo) SetPostThumbnail(context.Context, string, string) error { return nil }
+func (r *quotaRepo) SetPostSample(context.Context, string, string) error    { return nil }
 func (r *quotaRepo) SetPostDimensions(context.Context, string, int, int) error {
 	return nil
 }
@@ -82,6 +83,9 @@ func (r *quotaRepo) RandomPost(context.Context, model.PostQuery) (model.Post, er
 func (r *quotaRepo) EnsureArtistPage(context.Context, string) error { return nil }
 func (r *quotaRepo) TagAliasTargets(context.Context, []string) (map[string]string, error) {
 	return map[string]string{}, nil
+}
+func (r *quotaRepo) ListImplications(context.Context) ([]model.TagImplication, error) {
+	return nil, nil
 }
 
 type quotaMedia struct{ stored bool }

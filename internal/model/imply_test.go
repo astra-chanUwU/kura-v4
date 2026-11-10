@@ -1,14 +1,13 @@
-package tags
+package model
 
 import (
 	"testing"
 
-	"github.com/astra-chanUwU/kura-v4/internal/model"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCloseImplicationsFollowsTheChain(t *testing.T) {
-	got := CloseImplications([]string{"pleated_skirt"}, []model.TagImplication{
+	got := CloseImplications([]string{"pleated_skirt"}, []TagImplication{
 		{Antecedent: "school_uniform", Consequent: "pleated_skirt"},
 		{Antecedent: "pleated_skirt", Consequent: "skirt"},
 		{Antecedent: "skirt", Consequent: "clothing"},
@@ -17,7 +16,7 @@ func TestCloseImplicationsFollowsTheChain(t *testing.T) {
 }
 
 func TestCloseImplicationsAddsConsequent(t *testing.T) {
-	got := CloseImplications([]string{"school_uniform", "smile"}, []model.TagImplication{
+	got := CloseImplications([]string{"school_uniform", "smile"}, []TagImplication{
 		{Antecedent: "school_uniform", Consequent: "pleated_skirt"},
 		{Antecedent: "pleated_skirt", Consequent: "skirt"},
 	})

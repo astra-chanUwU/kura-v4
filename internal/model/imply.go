@@ -1,15 +1,11 @@
-package tags
+package model
 
-import (
-	"sort"
-
-	"github.com/astra-chanUwU/kura-v4/internal/model"
-)
+import "sort"
 
 // CloseImplications returns tags plus every tag they imply, directly or
 // through a chain. The result is sorted and has no duplicates. An empty
 // name is skipped. edges may include a rule that is not stored yet.
-func CloseImplications(tags []string, edges []model.TagImplication) []string {
+func CloseImplications(tags []string, edges []TagImplication) []string {
 	next := map[string][]string{}
 	for _, edge := range edges {
 		next[edge.Antecedent] = append(next[edge.Antecedent], edge.Consequent)

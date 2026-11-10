@@ -13,7 +13,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/astra-chanUwU/kura-v4/internal/model"
-	"github.com/astra-chanUwU/kura-v4/internal/tags"
 	"github.com/google/uuid"
 )
 
@@ -405,9 +404,9 @@ func (s *Service) applyImplications(ctx context.Context, tags []string) ([]strin
 	return closeImplications(tags, edges), nil
 }
 
-// closeImplications adds every tag implied by names. The walk lives in the tags package.
+// closeImplications adds every tag implied by names. The walk lives with the other tag rules.
 func closeImplications(names []string, edges []model.TagImplication) []string {
-	return tags.CloseImplications(names, edges)
+	return model.CloseImplications(names, edges)
 }
 
 // applyAliases replaces alternate names with the canonical tag and drops

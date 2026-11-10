@@ -285,7 +285,7 @@ func (s *Service) AddImplication(ctx context.Context, actor model.User, antecede
 		return model.TagPage{}, invalid("That implication would loop.")
 	}
 	backfill := make([]string, 0)
-	for _, tag := range CloseImplications([]string{consequent}, pending) {
+	for _, tag := range model.CloseImplications([]string{consequent}, pending) {
 		if tag != antecedent {
 			backfill = append(backfill, tag)
 		}

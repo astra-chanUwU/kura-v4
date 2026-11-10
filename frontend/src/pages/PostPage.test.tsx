@@ -67,6 +67,7 @@ vi.mock("../hooks/usePrefetchPost", () => ({ usePrefetchNeighbors: () => undefin
 vi.mock("../components/PostCard", () => ({ PostActions: () => null }));
 vi.mock("../components/HistoryList", () => ({ HistoryList: () => null }));
 vi.mock("../components/PostComments", () => ({ PostComments: () => null }));
+vi.mock("../components/PostReport", () => ({ PostReport: () => null }));
 vi.mock("../components/Toasts", () => ({
   useToasts: () => ({ push: vi.fn() }),
   shortError: (e: unknown) => (e instanceof Error ? e.message : "error"),

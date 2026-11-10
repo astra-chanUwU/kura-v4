@@ -13,8 +13,11 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/board"
 	"github.com/astra-chanUwU/kura-v4/internal/dao"
 	"github.com/astra-chanUwU/kura-v4/internal/db"
+	"github.com/astra-chanUwU/kura-v4/internal/jobs"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
+	"github.com/astra-chanUwU/kura-v4/internal/reports"
 	"github.com/astra-chanUwU/kura-v4/internal/repository"
+	"github.com/astra-chanUwU/kura-v4/internal/tags"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -247,6 +250,50 @@ func TestPostgresContracts(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Ada", stored.Artist)
 	require.Equal(t, []string{"cute", "yuri"}, stored.Tags)
+
+	freshOwner := ownerID
+	fresh, err := postsDAO.CreatePost(ctx, model.Post{
+		OwnerID: &freshOwner, OriginalName: "quota.jpg", StorageKey: "quota.jpg", ContentType: "image/jpeg", SizeBytes: 1, Rating: "sfw",
+	}, "quota-sha")
+	require.NoError(t, err)
+	hourCount, err := postsDAO.CountPostsByOwnerSince(ctx, ownerID, time.Hour)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), hourCount, "only the new post is inside the rolling hour")
+	require.NoError(t, board.NewService(repository.NewPosts(postsDAO), nil).CheckUploadQuota(ctx, ownerID))
+	_, err = conn.ExecContext(ctx, `UPDATE posts SET deleted_at = now() WHERE id = $1`, fresh.ID)
+	require.NoError(t, err)
+	hourCount, err = postsDAO.CountPostsByOwnerSince(ctx, ownerID, time.Hour)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), hourCount, "a deleted post still counts toward the cap")
+
+	uniform := seed("uniform.jpg", "", "sfw", []string{"uniform"})
+	mod := model.User{ID: fanB, Username: "fanb", Role: model.RoleModerator}
+	_, err = tags.NewService(repository.NewTagPages(dao.NewTagPages(conn))).AddImplication(ctx, mod, "uniform", "skirt")
+	require.NoError(t, err)
+	implied, err := postsDAO.GetPost(ctx, uniform.ID)
+	require.NoError(t, err)
+	require.Equal(t, []string{"skirt", "uniform"}, implied.Tags)
+
+	member := model.User{ID: fanA, Username: "fana", Role: model.RoleMember}
+	reportSvc := reports.NewService(repository.NewReports(dao.NewReports(conn)))
+	filed, err := reportSvc.Create(ctx, member, cute.ID, "spam", "wrong tags")
+	require.NoError(t, err)
+	open, err := reportSvc.ListOpen(ctx, mod, 40, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), open.Total)
+	_, err = reportSvc.Dismiss(ctx, mod, filed.ID)
+	require.NoError(t, err)
+	var hiddenAt sql.NullTime
+	require.NoError(t, conn.QueryRowContext(ctx, `SELECT hidden_at FROM posts WHERE id = $1`, cute.ID).Scan(&hiddenAt))
+	require.False(t, hiddenAt.Valid, "dismissing a report leaves the post visible")
+
+	staffJobs := jobs.NewService(repository.NewJobs(dao.NewJobs(conn)))
+	failedPage, err := staffJobs.ListFailed(ctx, mod, "failed", 40, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), failedPage.Total)
+	require.NoError(t, staffJobs.Retry(ctx, mod, id))
+	require.NoError(t, conn.QueryRowContext(ctx, `SELECT state FROM jobs WHERE id = $1`, id).Scan(&state))
+	require.Equal(t, "queued", state)
 
 	require.NoError(t, goose.DownToContext(ctx, conn, "migrations", 0))
 	require.NoError(t, db.Migrate(ctx, conn), "fresh schema can be rebuilt after rollback")
