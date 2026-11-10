@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -116,6 +119,46 @@ func (s *Local) Open(ctx context.Context, key string) (io.ReadCloser, error) {
 	}
 	return s.root.Open(key)
 }
+
+// SweepPartials removes abandoned upload temps. A file is removed only
+// when its name ends in .partial and its modification time is older than
+// olderThan. Finished objects and anything still being written stay.
+func SweepPartials(dir string, olderThan time.Duration) (int, error) {
+	if olderThan <= 0 {
+		return 0, fmt.Errorf("partial sweep cutoff must be positive")
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	cutoff := time.Now().Add(-olderThan)
+	removed := 0
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".partial") || name != filepath.Base(name) {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return removed, err
+		}
+		if !info.ModTime().Before(cutoff) {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dir, name)); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return removed, err
+		}
+		removed++
+	}
+	return removed, nil
+}
+
 func (s *Local) Delete(ctx context.Context, key string) error {
 	if err := ctx.Err(); err != nil {
 		return err

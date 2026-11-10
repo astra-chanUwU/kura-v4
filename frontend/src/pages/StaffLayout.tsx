@@ -79,6 +79,10 @@ export function StaffLayout() {
           <IconShield />
           Reports
         </Link>
+        <Link to="/admin/jobs" activeProps={{ className: styles.active }}>
+          <IconShield />
+          Jobs
+        </Link>
       </nav>
       <Outlet />
     </section>

@@ -20,8 +20,8 @@ func main() {
 	}
 	log := slog.New(slog.NewJSONHandler(logWriter, nil))
 	slog.SetDefault(log)
-	if len(os.Args) < 2 || (os.Args[1] != "serve" && os.Args[1] != "migrate" && os.Args[1] != "seed" && os.Args[1] != "demo" && os.Args[1] != "audit" && os.Args[1] != "promote" && os.Args[1] != "agent") {
-		log.Error("usage: kura serve | migrate | seed <dir> [dir...] | demo <dir> [dir...] | audit | promote <username> <role> | agent <command>")
+	if len(os.Args) < 2 || (os.Args[1] != "serve" && os.Args[1] != "migrate" && os.Args[1] != "seed" && os.Args[1] != "demo" && os.Args[1] != "audit" && os.Args[1] != "promote" && os.Args[1] != "backup" && os.Args[1] != "agent") {
+		log.Error("usage: kura serve | migrate | seed <dir> [dir...] | demo <dir> [dir...] | audit | promote <username> <role> | backup | agent <command>")
 		os.Exit(2)
 	}
 	if os.Args[1] == "promote" && len(os.Args) != 4 {
@@ -70,6 +70,12 @@ func main() {
 		err = app.Seed(ctx, cfg, os.Args[2:], log)
 	} else if os.Args[1] == "demo" {
 		err = app.Demo(ctx, cfg, os.Args[2:], log)
+	} else if os.Args[1] == "backup" {
+		dir, backupErr := app.Backup(ctx, cfg.DatabaseURL, cfg.MediaDir)
+		err = backupErr
+		if err == nil {
+			log.Info("backup written", "dir", dir)
+		}
 	} else {
 		err = app.Run(ctx, cfg, log)
 	}

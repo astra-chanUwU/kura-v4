@@ -7,6 +7,7 @@ import { ListPage } from "../pages/ListPage";
 import { MePage } from "../pages/MePage";
 import { AdminPage } from "../pages/AdminPage";
 import { HiddenPostsPage } from "../pages/HiddenPostsPage";
+import { FailedJobsPage } from "../pages/FailedJobsPage";
 import { HistoryPage } from "../pages/HistoryPage";
 import { ReportsPage } from "../pages/ReportsPage";
 import { PostPage } from "../pages/PostPage";
@@ -74,6 +75,11 @@ const reportsRoute = createRoute({
   path: "reports",
   component: ReportsPage,
 });
+const jobsRoute = createRoute({
+  getParentRoute: () => staffRoute,
+  path: "jobs",
+  component: FailedJobsPage,
+});
 const recoverRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/recover",
@@ -122,7 +128,7 @@ export const router = createRouter({
     registerRoute,
     recoverRoute,
     meRoute,
-    staffRoute.addChildren([staffPeopleRoute, hiddenRoute, historyRoute, reportsRoute]),
+    staffRoute.addChildren([staffPeopleRoute, hiddenRoute, historyRoute, reportsRoute, jobsRoute]),
     postRoute,
     profileRoute,
     tagRoute,

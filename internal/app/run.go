@@ -53,6 +53,7 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	searchesSvc := searches.NewService(repository.NewSavedSearches(dao.NewSavedSearches(conn)))
 	tagsSvc := tags.NewService(repository.NewTagPages(dao.NewTagPages(conn)))
 	moderationSvc := moderation.NewService(repository.NewModeration(dao.NewAccounts(conn), postsRepo, dao.NewAudit(conn)))
+	jobsSvc := jobs.NewService(repository.NewJobs(dao.NewJobs(conn)))
 	// Fail clearly if migrations have not been applied.
 	readyCtx, readyCancel := context.WithTimeout(ctx, 5*time.Second)
 	_, err = svc.Get(readyCtx)
@@ -60,16 +61,21 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	if err != nil {
 		return errors.New("site schema unavailable; run the migrate command before serve")
 	}
-	api := NewHTTP(HTTPDeps{Site: svc, Accounts: accountsSvc, Board: boardSvc, Collections: collectionsSvc, Moderation: moderationSvc, Comments: commentsSvc, Reports: reportsSvc, Searches: searchesSvc, Tags: tagsSvc, Ping: conn.PingContext, Assets: webui.Files(), Log: log, SecureCookie: strings.HasPrefix(cfg.PublicURL, "https://")})
+	api := NewHTTP(HTTPDeps{Site: svc, Accounts: accountsSvc, Board: boardSvc, Collections: collectionsSvc, Moderation: moderationSvc, Jobs: jobsSvc, Comments: commentsSvc, Reports: reportsSvc, Searches: searchesSvc, Tags: tagsSvc, Ping: conn.PingContext, Assets: webui.Files(), Log: log, SecureCookie: strings.HasPrefix(cfg.PublicURL, "https://")})
 	workerCtx, stopWorkers := context.WithCancel(ctx)
 	workerDone := make(chan struct{})
+	sweepDone := make(chan struct{})
 	go func() {
 		defer close(workerDone)
 		jobs.Run(workerCtx, jobQueue, map[string]jobs.Handler{
 			board.KindPostDerive: boardSvc.DerivePost,
 		}, 2, log)
 	}()
-	defer func() { stopWorkers(); <-workerDone }()
+	go func() {
+		defer close(sweepDone)
+		sweepAbandonedUploads(workerCtx, cfg.MediaDir, log)
+	}()
+	defer func() { stopWorkers(); <-workerDone; <-sweepDone }()
 	listenErr := make(chan error, 1)
 	go func() { listenErr <- api.Listen(cfg.Address) }()
 	log.Info("Kura listening", "address", cfg.Address)

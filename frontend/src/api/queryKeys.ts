@@ -39,4 +39,6 @@ export const queryKeys = {
   hiddenPosts: (kind: string) => ["hidden-posts", kind] as const,
   adminHistory: (actorId?: string) => ["admin-history", actorId ?? ""] as const,
   openReports: () => ["open-reports"] as const,
+  failedJobs: (offset?: number) =>
+    offset === undefined ? (["failed-jobs"] as const) : (["failed-jobs", offset] as const),
 };

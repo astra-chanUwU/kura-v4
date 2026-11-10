@@ -116,10 +116,21 @@ list.
 - Roles and change history (below): staff tiers with an append-only audit
   log and one-click rollback for post and role changes.
 - An agent CLI (`kura agent`) that speaks one JSON object per command and signs
-  in as a real account. Members can upload, tag, favorite, and manage lists.
-  Moderators and admins can hide, restore, review history, and roll back, with
-  the same role checks as the website. `kura promote` stays the operator-only
-  bootstrap.
+  in as a real account. Members can upload, tag, comment, favorite, and manage
+  lists. Moderators and admins can hide, restore, review history, roll back,
+  dismiss reports, and edit tag implications, with the same role checks as the
+  website. `kura promote` and `kura backup` stay operator-only.
+- Members can report a visible post (one open report per post). Moderators see
+  the open queue under Staff → Reports and can dismiss a report without hiding
+  the picture.
+- A moderator can record that one tag implies another. Saving a post adds the
+  implied tags, including the rest of the chain, and posts that already have
+  the antecedent are updated in the same transaction. Removing the rule leaves
+  tags that were already applied.
+- One account can publish 20 posts per rolling hour and 100 per rolling day,
+  counting hidden and deleted posts. The website and `kura agent posts upload`
+  both check before the file is stored and answer "Upload limit reached. Try
+  again later." Seed and demo imports are not capped. Staff are not exempt.
 - A real `GET /api/v1/site` route reading site settings through every backend
   layer; frontend loading, connection-error and retry states.
 - Separate `/health/live` and `/health/ready` endpoints and consistent API errors
@@ -128,7 +139,9 @@ list.
 - Durable job persistence: atomic claims, expiring leases, bounded retries,
   ownership tokens and rejection of stale completion attempts. The worker runner
   is wired into app lifecycle and runs `post.derive`, which fills a new post's
-  thumbnail, dimensions, and medium sample.
+  thumbnail, dimensions, and medium sample. Moderators can list failed jobs
+  and retry them from Staff → Jobs. Upload fragments left as `.partial` files
+  are deleted once they are older than an hour.
 - Local byte-preserving storage with opaque keys, atomic publication and failed-write
   cleanup. Storage is not exposed as a public static directory.
 - VPS Compose configuration, embedded-frontend production build, CI and graceful shutdown.
@@ -237,8 +250,15 @@ configuration and required secrets in a separate protected backup.
 
 Restore into a separate Compose project/volumes: restore PostgreSQL and media from
 the same backup set, use the matching application version, and check database
-readiness plus original-byte integrity before opening access. Automated backup
-scripts and an operator restore drill are not part of this initial scaffold.
+readiness plus original-byte integrity before opening access.
+
+`kura backup` writes a pg_dump custom-format file and a manifest under
+`.local/backups/<UTC timestamp>/`. The manifest records the UTC time, the
+database name, and the absolute media directory. It does not copy media, and
+it never prints the database password. Copy the media directory named in the
+manifest separately and keep it with that dump. The command refuses to run
+when `DATABASE_URL` is empty, and it creates nothing when `pg_dump` is not
+installed. An operator restore drill is still a manual step.
 
 ## Roles
 
@@ -248,8 +268,8 @@ role:
 
 | Role | Can do (in addition to the tier below) |
 | --- | --- |
-| Member | Upload, communal tagging, favorites, lists, own profile. The default for new accounts. |
-| Moderator | Fix tags/artist/rating on any post, hide posts from the board, roll back content changes. No permanent deletion, no user management. |
+| Member | Upload, communal tagging, comments, favorites, lists, report a visible post, own profile. The default for new accounts. |
+| Moderator | Fix tags/artist/rating on any post, record tag implications, hide posts, dismiss reports, retry failed jobs, roll back content changes. No permanent deletion, no user management. |
 | Admin | Promote/demote Member <-> Moderator, delete posts (soft — restorable from history), roll back role and content changes. Cannot touch Admins or Super Admins. |
 | Super Admin | Everything an Admin can do, plus create/promote/demote Admins and other Super Admins. At least one Super Admin must always exist. |
 
