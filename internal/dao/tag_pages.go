@@ -65,7 +65,7 @@ func (d *TagPagesDAO) RecentPosts(ctx context.Context, tag string, includeNSFW b
 	}
 	out := make([]model.Post, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.SourceUrl, r.ThumbnailKey, r.TagsCsv, r.Width, r.Height, r.Rating, r.Hidden, r.Deleted, r.FavoriteCount))
+		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, r.SourceUrl, r.ThumbnailKey, r.SampleKey, r.TagsCsv, r.Width, r.Height, r.Rating, r.Hidden, r.Deleted, r.FavoriteCount))
 	}
 	return out, nil
 }

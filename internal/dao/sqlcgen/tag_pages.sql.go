@@ -174,7 +174,7 @@ func (q *Queries) ListAliasesOfTarget(ctx context.Context, target string) ([]str
 
 const listRecentPostsForTag = `-- name: ListRecentPostsForTag :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count,
+  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, COALESCE(p.sample_key, '')::text AS sample_key, p.width, p.height, p.rating, p.favorite_count,
   (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username, '')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
@@ -211,6 +211,7 @@ type ListRecentPostsForTagRow struct {
 	SourceID      string
 	SourceUrl     string
 	ThumbnailKey  string
+	SampleKey     string
 	Width         int32
 	Height        int32
 	Rating        string
@@ -243,6 +244,7 @@ func (q *Queries) ListRecentPostsForTag(ctx context.Context, arg ListRecentPosts
 			&i.SourceID,
 			&i.SourceUrl,
 			&i.ThumbnailKey,
+			&i.SampleKey,
 			&i.Width,
 			&i.Height,
 			&i.Rating,

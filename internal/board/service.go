@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"io"
+	"log/slog"
 	"net/url"
 	"sort"
 	"strings"
@@ -31,6 +32,7 @@ type Repository interface {
 	ListPosts(ctx context.Context, limit, offset int32, includeNSFW bool) ([]model.Post, error)
 	ExistsBySHA(ctx context.Context, sha string) (bool, error)
 	SetPostThumbnail(ctx context.Context, id, key string) error
+	SetPostSample(ctx context.Context, id, key string) error
 	SetPostDimensions(ctx context.Context, id string, width, height int) error
 	ReplacePostMeta(ctx context.Context, p model.Post) error
 	ReplacePostMetaAudited(ctx context.Context, p model.Post, entry model.ChangeEntry) error
@@ -64,6 +66,8 @@ type Media interface {
 type Service struct {
 	repo  Repository
 	media Media
+	jobs  JobQueue
+	log   *slog.Logger
 }
 
 func NewService(repo Repository, media Media) *Service { return &Service{repo: repo, media: media} }
@@ -113,6 +117,9 @@ func (s *Service) Create(ctx context.Context, p model.Post, sha string) (model.P
 	if err := s.ensureArtistPage(ctx, artistTag); err != nil {
 		return model.Post{}, err
 	}
+	// One job per new post. HTTP, the agent, and seed all come through here.
+	// A queue error is logged and does not undo the post.
+	s.enqueueDerive(ctx, created.ID)
 	return created, nil
 }
 

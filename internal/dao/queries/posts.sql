@@ -1,24 +1,24 @@
 -- name: CreatePost :one
 INSERT INTO posts (owner_id, original_name, storage_key, content_type, size_bytes, sha256, artist, source, source_id, source_url, thumbnail_key, width, height, rating)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id, owner_id, original_name, storage_key, content_type, size_bytes, created_at, artist, source, source_id, source_url, thumbnail_key, width, height, rating, favorite_count, (hidden_at IS NOT NULL)::bool AS hidden, (deleted_at IS NOT NULL)::bool AS deleted;
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id, owner_id, original_name, storage_key, content_type, size_bytes, created_at, artist, source, source_id, source_url, thumbnail_key, COALESCE(sample_key, '')::text AS sample_key, width, height, rating, favorite_count, (hidden_at IS NOT NULL)::bool AS hidden, (deleted_at IS NOT NULL)::bool AS deleted;
 
 -- name: GetPost :one
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  p.artist, p.source, p.source_id, p.source_url, p.thumbnail_key, COALESCE(p.sample_key, '')::text AS sample_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.id=$1;
 
 -- name: ListPosts :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  p.artist, p.source, p.source_id, p.thumbnail_key, COALESCE(p.sample_key, '')::text AS sample_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.hidden_at IS NULL AND ($3::bool OR p.rating='sfw') ORDER BY p.created_at DESC, p.id DESC LIMIT $1 OFFSET $2;
 
 -- name: GetPostBySHA :one
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  p.artist, p.source, p.source_id, p.thumbnail_key, COALESCE(p.sample_key, '')::text AS sample_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.sha256=$1 AND $1<>'';
@@ -31,6 +31,9 @@ UPDATE posts SET width=$2, height=$3 WHERE id=$1;
 
 -- name: SetPostThumbnail :exec
 UPDATE posts SET thumbnail_key=$2 WHERE id=$1;
+
+-- name: SetPostSample :exec
+UPDATE posts SET sample_key=$2 WHERE id=$1;
 
 -- name: UpdatePostMeta :exec
 UPDATE posts SET artist=$2, rating=$3, source_url=$4 WHERE id=$1;
@@ -52,7 +55,7 @@ WHERE owner_id = sqlc.arg(owner_id)
 
 -- name: ListPostsByOwner :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  p.artist, p.source, p.source_id, p.thumbnail_key, COALESCE(p.sample_key, '')::text AS sample_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM posts p LEFT JOIN users u ON u.id=p.owner_id
@@ -73,7 +76,7 @@ WHERE hidden_at IS NOT NULL;
 
 -- name: ListHiddenPosts :many
 SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
-  p.artist, p.source, p.source_id, p.thumbnail_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  p.artist, p.source, p.source_id, p.thumbnail_key, COALESCE(p.sample_key, '')::text AS sample_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
 FROM posts p LEFT JOIN users u ON u.id=p.owner_id

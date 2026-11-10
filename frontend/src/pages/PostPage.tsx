@@ -77,6 +77,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
   const [metaError, setMetaError] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [sampleFailedFor, setSampleFailedFor] = useState<string | null>(null);
 
   // Drafts belong to one post; never carry them across pictures.
   // (Adjusting state while rendering is the React-recommended reset
@@ -137,6 +138,8 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
   if (isPending) return <p>Loading…</p>;
   if (error || !post) return <p role="alert">That picture could not be found.</p>;
   const isVideo = post.content_type.startsWith("video/");
+  const stillSrc =
+    sampleFailedFor === post.id || !post.sample_url ? post.media_url : post.sample_url;
   const artist = artistDraft ?? post.artist;
   const source = sourceDraft ?? post.source_url;
   const tags = tagsDraft ?? post.tags;
@@ -242,6 +245,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
               <video
                 className={styles.full}
                 src={post.media_url}
+                poster={post.thumbnail_url || undefined}
                 controls
                 muted
                 loop
@@ -258,7 +262,14 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
               aria-label="Open full size in a new tab (picture only, no page)"
               title="Open full size in a new tab"
             >
-              <img className={styles.full} src={post.media_url} alt={post.artist || ""} />
+              <img
+                className={styles.full}
+                src={stillSrc}
+                alt={post.artist || ""}
+                onError={() => {
+                  if (stillSrc !== post.media_url) setSampleFailedFor(post.id);
+                }}
+              />
             </a>
           )}
 

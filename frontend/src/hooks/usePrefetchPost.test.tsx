@@ -87,6 +87,13 @@ describe("usePrefetchPost", () => {
     expect(client.getQueryState(["post", "p1"])?.status).toBe("pending");
   });
 
+  it("warms the sample when the post has one", () => {
+    const { result } = setup({ ...post, sample_url: "/media/posts/p1/sample" });
+    act(() => result.current.onPointerEnter());
+    act(() => vi.advanceTimersByTime(HOVER_PREFETCH_DELAY_MS));
+    expect(images.map((i) => i.src)).toEqual(["/media/posts/p1/sample"]);
+  });
+
   it("cancels when the cursor leaves before the delay", () => {
     const { result } = setup();
     act(() => result.current.onPointerEnter());

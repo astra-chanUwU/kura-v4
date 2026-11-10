@@ -1291,6 +1291,69 @@ func (_c *MockRepository_SetPostDimensions_Call) RunAndReturn(run func(ctx conte
 	return _c
 }
 
+// SetPostSample provides a mock function for the type MockRepository
+func (_mock *MockRepository) SetPostSample(ctx context.Context, id string, key string) error {
+	ret := _mock.Called(ctx, id, key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetPostSample")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = returnFunc(ctx, id, key)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_SetPostSample_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetPostSample'
+type MockRepository_SetPostSample_Call struct {
+	*mock.Call
+}
+
+// SetPostSample is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id string
+//   - key string
+func (_e *MockRepository_Expecter) SetPostSample(ctx any, id any, key any) *MockRepository_SetPostSample_Call {
+	return &MockRepository_SetPostSample_Call{Call: _e.mock.On("SetPostSample", ctx, id, key)}
+}
+
+func (_c *MockRepository_SetPostSample_Call) Run(run func(ctx context.Context, id string, key string)) *MockRepository_SetPostSample_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_SetPostSample_Call) Return(err error) *MockRepository_SetPostSample_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_SetPostSample_Call) RunAndReturn(run func(ctx context.Context, id string, key string) error) *MockRepository_SetPostSample_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetPostThumbnail provides a mock function for the type MockRepository
 func (_mock *MockRepository) SetPostThumbnail(ctx context.Context, id string, key string) error {
 	ret := _mock.Called(ctx, id, key)

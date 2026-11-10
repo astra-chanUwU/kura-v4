@@ -44,6 +44,7 @@ func Seed(ctx context.Context, cfg config.Config, dirs []string, log *slog.Logge
 	}
 	defer store.Close() //nolint:errcheck
 	svc := board.NewService(repository.NewPosts(dao.NewPosts(conn)), store)
+	svc.SetJobQueue(repository.NewJobs(dao.NewJobs(conn)), log)
 
 	imported, skipped := 0, 0
 	for _, dir := range dirs {

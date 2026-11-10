@@ -186,8 +186,10 @@ func Demo(ctx context.Context, cfg config.Config, dirs []string, log *slog.Logge
 		return err
 	}
 	postsRepo := repository.NewPosts(dao.NewPosts(conn))
+	boardSvc := board.NewService(postsRepo, store)
+	boardSvc.SetJobQueue(repository.NewJobs(dao.NewJobs(conn)), log)
 	env := &demoEnv{
-		log: log, accounts: accountsSvc, board: board.NewService(postsRepo, store),
+		log: log, accounts: accountsSvc, board: boardSvc,
 		collections: collections.NewService(repository.NewCollections(dao.NewCollections(conn))),
 		roleRepo:    repository.NewModeration(accountsDAO, postsRepo, dao.NewAudit(conn)),
 		store:       store, rng: demoRand(),

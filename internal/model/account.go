@@ -78,6 +78,7 @@ type Post struct {
 	SourceID      string // e.g. the tweet id
 	SourceURL     string // member-set http(s) link; empty when unset
 	ThumbnailKey  string
+	SampleKey     string // medium JPEG; empty until post.derive stores one
 	Tags          []string
 	Width         int
 	Height        int

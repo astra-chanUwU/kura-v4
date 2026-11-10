@@ -116,6 +116,7 @@ func (f *fakeRepo) ExistsBySHA(context.Context, string) (bool, error) { return f
 func (f *fakeRepo) SetPostThumbnail(context.Context, string, string) error {
 	return nil
 }
+func (f *fakeRepo) SetPostSample(context.Context, string, string) error       { return nil }
 func (f *fakeRepo) SetPostDimensions(context.Context, string, int, int) error { return nil }
 func (f *fakeRepo) ReplacePostMeta(_ context.Context, p model.Post) error {
 	f.meta = append(f.meta, p)

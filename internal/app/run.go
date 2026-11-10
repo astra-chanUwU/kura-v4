@@ -43,7 +43,9 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		return err
 	}
 	postsRepo := repository.NewPosts(dao.NewPosts(conn))
+	jobQueue := repository.NewJobs(dao.NewJobs(conn))
 	boardSvc := board.NewService(postsRepo, media)
+	boardSvc.SetJobQueue(jobQueue, log)
 	collectionsSvc := collections.NewService(repository.NewCollections(dao.NewCollections(conn)))
 	commentsSvc := comments.NewService(repository.NewComments(dao.NewComments(conn)))
 	searchesSvc := searches.NewService(repository.NewSavedSearches(dao.NewSavedSearches(conn)))
@@ -61,8 +63,9 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	workerDone := make(chan struct{})
 	go func() {
 		defer close(workerDone)
-		// Register feature handlers here as media/import workflows are added.
-		jobs.Run(workerCtx, repository.NewJobs(dao.NewJobs(conn)), map[string]jobs.Handler{}, 2, log)
+		jobs.Run(workerCtx, jobQueue, map[string]jobs.Handler{
+			board.KindPostDerive: boardSvc.DerivePost,
+		}, 2, log)
 	}()
 	defer func() { stopWorkers(); <-workerDone }()
 	listenErr := make(chan error, 1)

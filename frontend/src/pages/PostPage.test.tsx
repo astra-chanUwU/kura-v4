@@ -225,4 +225,39 @@ describe("PostPage staged editing", () => {
       "/media/posts/p1",
     );
   });
+
+  it("shows the sample for a still and falls back to the original", () => {
+    post.sample_url = "/media/posts/p1/sample";
+    try {
+      render(<PostPage id="p1" />);
+      const img = screen.getByRole("img", { name: "ana" });
+      expect(img).toHaveAttribute("src", "/media/posts/p1/sample");
+      fireEvent.error(img);
+      expect(img).toHaveAttribute("src", "/media/posts/p1");
+      expect(screen.getByRole("link", { name: /Full size/ })).toHaveAttribute(
+        "href",
+        "/media/posts/p1",
+      );
+      expect(screen.getByRole("link", { name: /Open full size/ })).toHaveAttribute(
+        "href",
+        "/media/posts/p1",
+      );
+    } finally {
+      delete post.sample_url;
+    }
+  });
+
+  it("keeps video playback on the file and uses the thumbnail as poster", () => {
+    const previous = post.content_type;
+    post.content_type = "video/mp4";
+    try {
+      const { container } = render(<PostPage id="p1" />);
+      const video = container.querySelector("video");
+      expect(video).toHaveAttribute("src", "/media/posts/p1");
+      expect(video).toHaveAttribute("poster", "/media/posts/p1/thumb");
+      expect(container.querySelector("img")).toBeNull();
+    } finally {
+      post.content_type = previous;
+    }
+  });
 });

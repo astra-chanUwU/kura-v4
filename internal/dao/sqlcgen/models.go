@@ -90,6 +90,7 @@ type Post struct {
 	DeletedAt     sql.NullTime
 	SourceUrl     string
 	FavoriteCount int32
+	SampleKey     sql.NullString
 }
 
 type PostComment struct {

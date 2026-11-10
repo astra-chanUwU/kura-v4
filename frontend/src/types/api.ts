@@ -33,6 +33,7 @@ export interface Post {
   favorite_count: number;
   media_url: string;
   thumbnail_url: string;
+  sample_url?: string;
   artist: string;
   rating: "sfw" | "nsfw";
   hidden: boolean;

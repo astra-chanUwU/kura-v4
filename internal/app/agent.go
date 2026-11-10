@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"time"
 
@@ -47,6 +48,7 @@ func Agent(ctx context.Context, cfg config.Config, args []string, out io.Writer)
 	}
 	postsRepo := repository.NewPosts(dao.NewPosts(conn))
 	boardSvc := board.NewService(postsRepo, media)
+	boardSvc.SetJobQueue(repository.NewJobs(dao.NewJobs(conn)), slog.Default())
 	collectionsSvc := collections.NewService(repository.NewCollections(dao.NewCollections(conn)))
 	tagsSvc := tags.NewService(repository.NewTagPages(dao.NewTagPages(conn)))
 	moderationSvc := moderation.NewService(repository.NewModeration(dao.NewAccounts(conn), postsRepo, dao.NewAudit(conn)))

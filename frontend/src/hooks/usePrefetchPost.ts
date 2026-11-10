@@ -55,8 +55,9 @@ export function resetPrefetchCache(): void {
  * Hover-intent prefetch for a post link. Spread the returned handlers
  * on the link: after the cursor (or keyboard focus) rests briefly, the
  * post JSON enters the React Query cache and — when
- * shouldPrefetchMedia allows — the full-size image enters the HTTP
- * cache, so opening the post page renders without a network wait.
+ * shouldPrefetchMedia allows — the image the post page shows (the
+ * medium sample when one is stored, otherwise the original) enters
+ * the HTTP cache, so opening the post page renders without a network wait.
  * Leaving before the delay cancels; prefetchQuery dedupes the JSON
  * and warmedMedia dedupes the image.
  */
@@ -83,7 +84,7 @@ export function usePrefetchPost(post: Post) {
         staleTime: 60_000,
       });
       if (shouldPrefetchMedia(post, connectionInfo(), reducedDataPreferred())) {
-        warmMedia(post.media_url);
+        warmMedia(post.sample_url || post.media_url);
       }
     }, HOVER_PREFETCH_DELAY_MS);
   }, [client, post]);
@@ -108,7 +109,7 @@ export function usePrefetchNeighbors(prevId?: string, nextId?: string) {
         })
         .then((post) => {
           if (shouldPrefetchMedia(post, connectionInfo(), reducedDataPreferred())) {
-            warmMedia(post.media_url);
+            warmMedia(post.sample_url || post.media_url);
           }
         });
     }

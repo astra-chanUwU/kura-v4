@@ -33,6 +33,7 @@ type Post struct {
 	IsFavorite    bool     `json:"is_favorite"`
 	MediaURL      string   `json:"media_url"`
 	ThumbnailURL  string   `json:"thumbnail_url"`
+	SampleURL     string   `json:"sample_url,omitempty"`
 	Artist        string   `json:"artist"`
 	Width         int      `json:"width"`
 	Height        int      `json:"height"`

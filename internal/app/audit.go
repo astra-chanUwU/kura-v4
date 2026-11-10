@@ -81,6 +81,9 @@ func Audit(ctx context.Context, cfg config.Config, out io.Writer) error {
 		} else {
 			noThumb++
 		}
+		if p.SampleKey != "" {
+			referenced[p.SampleKey] = true
+		}
 		if len(p.Tags) == 0 {
 			noTags++
 		}
@@ -125,6 +128,15 @@ func Audit(ctx context.Context, cfg config.Config, out io.Writer) error {
 			}
 		}
 		thumbRows.Close() //nolint:errcheck
+	}
+	if sampleRows, err := conn.QueryContext(ctx, `SELECT sample_key FROM posts WHERE sample_key IS NOT NULL AND sample_key<>''`); err == nil {
+		for sampleRows.Next() {
+			var key string
+			if err := sampleRows.Scan(&key); err == nil {
+				referenced[key] = true
+			}
+		}
+		sampleRows.Close() //nolint:errcheck
 	}
 
 	// Orphan files: in the media dir but referenced by no post.

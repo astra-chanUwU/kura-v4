@@ -65,6 +65,7 @@ func (h *Posts) myPosts(c fiber.Ctx) error {
 func (h *Posts) RegisterMedia(app fiber.Router) {
 	app.Get("/posts/:id", h.media)
 	app.Get("/posts/:id/thumb", h.thumbnail)
+	app.Get("/posts/:id/sample", h.sample)
 }
 
 func (h *Posts) searchQuery(c fiber.Ctx) model.PostQuery {
@@ -295,6 +296,20 @@ func (h *Posts) thumbnail(c fiber.Ctx) error {
 		return fiber.ErrNotFound
 	}
 	c.Set("Content-Type", contentType)
+	c.Set("Cache-Control", "public, max-age=3600")
+	return c.SendStream(file)
+}
+
+func (h *Posts) sample(c fiber.Ctx) error {
+	post, err := h.board.Get(c.Context(), c.Params("id"))
+	if err != nil || !canReadPost(c, post) {
+		return fiber.ErrNotFound
+	}
+	file, err := h.board.OpenSample(c.Context(), post)
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	c.Set("Content-Type", "image/jpeg")
 	c.Set("Cache-Control", "public, max-age=3600")
 	return c.SendStream(file)
 }
