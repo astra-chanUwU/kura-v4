@@ -127,7 +127,8 @@ list.
 - PostgreSQL migrations, generated query bindings, interface mocks and layer checks.
 - Durable job persistence: atomic claims, expiring leases, bounded retries,
   ownership tokens and rejection of stale completion attempts. The worker runner
-  is wired into app lifecycle but remains idle until feature handlers are registered.
+  is wired into app lifecycle and runs `post.derive`, which fills a new post's
+  thumbnail, dimensions, and medium sample.
 - Local byte-preserving storage with opaque keys, atomic publication and failed-write
   cleanup. Storage is not exposed as a public static directory.
 - VPS Compose configuration, embedded-frontend production build, CI and graceful shutdown.
