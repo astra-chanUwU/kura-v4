@@ -13,18 +13,12 @@
   gap: 1rem;
   min-width: 0;
 }
-/* Landscape desktop (e.g. 1920x1080): media and details side by side,
-   details sticky so tags stay reachable while the picture is tall.
-   Portrait / narrow screens keep the stacked layout. */
+/* Landscape desktop: picture and details side by side. The picture is
+   capped to the window; the details grow with their content and move
+   with the page, so this column never grows its own scrollbar. */
 @media (min-width: 1024px) and (orientation: landscape) {
   .layout {
     grid-template-columns: minmax(0, 1fr) minmax(20rem, 25rem);
-  }
-  .details {
-    position: sticky;
-    top: calc(var(--header-h) + 1rem);
-    max-height: calc(100dvh - var(--header-h) - 2rem);
-    overflow-y: auto;
   }
   .full {
     max-height: calc(100dvh - var(--header-h) - 3rem);
@@ -126,31 +120,84 @@ a.stepButton:focus-visible {
 }
 .details {
   display: grid;
-  gap: 0.75rem;
+  gap: 1rem;
+  align-content: start;
   padding: 1rem;
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   background: var(--surface);
 }
-.detailRow {
-  display: flex;
-  gap: 0.75rem;
-  align-items: start;
-  margin: 0;
-  flex-wrap: wrap;
-}
 .detailLabel {
-  min-width: 3.5rem;
   color: var(--muted);
-  font-size: 0.85rem;
-  padding-top: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.fieldTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.changedDot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: none;
 }
 .details a {
   color: var(--accent);
   font-size: 0.85rem;
 }
+.facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem 1rem;
+  margin: 0;
+}
+.facts div {
+  display: grid;
+  gap: 0.12rem;
+}
+.facts dd {
+  margin: 0;
+  font-size: 0.92rem;
+}
+.fields {
+  display: grid;
+  gap: 0.75rem;
+}
+.field {
+  display: grid;
+  gap: 0.3rem;
+}
+.choiceRow,
+.staffActions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.choice {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+.choice[aria-pressed="true"] {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+.ratingValue {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
 .artistInput {
-  padding: 0.3rem 0.5rem;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
   border: 1px solid var(--border-strong);
   border-radius: 0.35rem;
   background: var(--surface-soft);
@@ -192,6 +239,8 @@ a.stepButton:focus-visible {
   gap: 0.5rem;
 }
 .tagForm input {
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 0.4rem 0.6rem;
   border: 1px solid var(--border-strong);
   border-radius: 0.35rem;
@@ -223,19 +272,11 @@ a.stepButton:focus-visible {
   .details {
     padding: 0.8rem;
   }
-  .detailLabel {
-    min-width: 3rem;
-  }
   .artistInput {
-    flex: 1 1 10rem;
     min-width: 0;
   }
   .tagForm {
     width: 100%;
-  }
-  .tagForm input {
-    flex: 1 1 auto;
-    min-width: 0;
   }
   .tagForm button {
     flex: none;
@@ -323,6 +364,14 @@ a.stepButton:focus-visible {
 }
 .tagStaged {
   border-color: var(--accent);
+}
+.tagRemoved {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+  background: transparent;
+}
+.tagRemoved a {
+  color: var(--muted);
+  text-decoration: line-through;
 }
 
 /* History lives below the media/details layout as a plain full-width

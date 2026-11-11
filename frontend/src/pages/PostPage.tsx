@@ -44,6 +44,17 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function FieldTitle({ name, changed }: { name: string; changed: boolean }) {
+  return (
+    <span className={`${styles.detailLabel} ${styles.fieldTitle}`}>
+      {name}
+      {changed && (
+        <span className={styles.changedDot} role="img" aria-label={`${name} has unsaved changes`} />
+      )}
+    </span>
+  );
+}
+
 type PendingNav = { to: "board" } | { to: "post"; id: string };
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -145,6 +156,11 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
   const source = sourceDraft ?? post.source_url;
   const tags = tagsDraft ?? post.tags;
   const rating = ratingDraft ?? post.rating;
+  const artistChanged = artistDraft !== null && artistDraft.trim() !== post.artist;
+  const sourceChanged = sourceDraft !== null && sourceDraft.trim() !== post.source_url;
+  const ratingChanged = ratingDraft !== null && ratingDraft !== post.rating;
+  const tagsChanged = tagsDraft !== null && JSON.stringify(tagsDraft) !== JSON.stringify(post.tags);
+  const shownTags = [...new Set([...post.tags, ...tags])].sort();
   const filterLabel = [
     ...filter.tags,
     ...filter.exclude.map((t) => `−${t}`),
@@ -304,9 +320,9 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
             </p>
           )}
           {(isModerator || isAdmin) && (
-            <p className={styles.detailRow}>
+            <div className={styles.field}>
               <span className={styles.detailLabel}>Staff</span>
-              <span style={{ display: "inline-flex", gap: "0.4rem", flexWrap: "wrap" }}>
+              <span className={styles.staffActions}>
                 {post.hidden ? (
                   <button
                     type="button"
@@ -344,114 +360,125 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
                   </button>
                 )}
               </span>
-            </p>
+            </div>
           )}
-          <p className={styles.detailRow}>
-            <span className={styles.detailLabel}>Rating</span>
+          <div className={styles.field}>
+            <FieldTitle name="Rating" changed={ratingChanged} />
             {signedIn ? (
-              <span style={{ display: "inline-flex", gap: "0.4rem" }}>
+              <span className={styles.choiceRow}>
                 {(["sfw", "nsfw"] as const).map((r) => (
                   <button
                     key={r}
                     type="button"
+                    className={styles.choice}
                     aria-pressed={rating === r}
                     onClick={() => setRatingDraft(r)}
-                    style={{
-                      padding: "0.25rem 0.6rem",
-                      borderRadius: "999px",
-                      border: "1px solid var(--border-strong)",
-                      background: rating === r ? "var(--surface-soft)" : "var(--surface)",
-                      color: rating === r ? "var(--text)" : "var(--muted)",
-                      cursor: "pointer",
-                      textTransform: "uppercase",
-                      fontSize: "0.75rem",
-                    }}
                   >
                     {r}
                   </button>
                 ))}
               </span>
             ) : (
-              <span style={{ textTransform: "uppercase" }}>{post.rating}</span>
+              <span className={styles.ratingValue}>{post.rating}</span>
             )}
-          </p>
-          <p className={styles.detailRow}>
-            <span className={styles.detailLabel}>Type</span>
-            <span>{formatType(post.content_type)}</span>
-            <span className={styles.detailLabel}>Resolution</span>
-            <span>
-              {post.width > 0 && post.height > 0 ? `${post.width} × ${post.height}` : "Unknown"}
-            </span>
-            <span className={styles.detailLabel}>Size</span>
-            <span>{formatBytes(post.size_bytes)}</span>
-            <span className={styles.detailLabel}>Favorites</span>
-            <span>{post.favorite_count}</span>
-          </p>
+          </div>
+          <dl className={styles.facts}>
+            <div>
+              <dt className={styles.detailLabel}>Type</dt>
+              <dd>{formatType(post.content_type)}</dd>
+            </div>
+            <div>
+              <dt className={styles.detailLabel}>Resolution</dt>
+              <dd>
+                {post.width > 0 && post.height > 0 ? `${post.width} × ${post.height}` : "Unknown"}
+              </dd>
+            </div>
+            <div>
+              <dt className={styles.detailLabel}>Size</dt>
+              <dd>{formatBytes(post.size_bytes)}</dd>
+            </div>
+            <div>
+              <dt className={styles.detailLabel}>Favorites</dt>
+              <dd>{post.favorite_count}</dd>
+            </div>
+          </dl>
           {(post.artist || post.source_url || signedIn) && (
-            <p className={styles.detailRow}>
-              <span className={styles.detailLabel}>Artist</span>
-              {signedIn ? (
-                <input
-                  className={styles.artistInput}
-                  value={artist}
-                  placeholder="Unknown artist"
-                  aria-label="Artist"
-                  onChange={(e) => setArtistDraft(e.target.value)}
-                />
-              ) : (
-                <span>{post.artist || "Unknown"}</span>
-              )}
-              {signedIn && (
-                <>
-                  <span className={styles.detailLabel}>Source</span>
+            <div className={styles.fields}>
+              <div className={styles.field}>
+                <FieldTitle name="Artist" changed={artistChanged} />
+                {signedIn ? (
                   <input
                     className={styles.artistInput}
-                    value={source}
-                    placeholder="https://"
-                    aria-label="Source link"
-                    inputMode="url"
-                    onChange={(e) => setSourceDraft(e.target.value)}
+                    value={artist}
+                    placeholder="Unknown artist"
+                    aria-label="Artist"
+                    onChange={(e) => setArtistDraft(e.target.value)}
                   />
-                </>
-              )}
-              {post.source_url && (
-                <a href={post.source_url} target="_blank" rel="noreferrer">
-                  View original ↗
-                </a>
-              )}
-            </p>
-          )}
-          <div className={styles.detailRow}>
-            <span className={styles.detailLabel}>Tags</span>
-            <div className={styles.tagList}>
-              {tags.length === 0 && <span className={styles.muted}>No tags yet.</span>}
-              {tags.map((tag) => (
-                <span
-                  key={tag}
-                  className={
-                    tagsDraft !== null && !post.tags.includes(tag)
-                      ? `${styles.tag} ${styles.tagStaged}`
-                      : styles.tag
-                  }
-                >
-                  <Link to="/tags/$tag" params={{ tag }}>
-                    {tag}
-                  </Link>
+                ) : (
+                  <span>{post.artist || "Unknown"}</span>
+                )}
+              </div>
+              {(signedIn || post.source_url) && (
+                <div className={styles.field}>
+                  <FieldTitle name="Source" changed={sourceChanged} />
                   {signedIn && (
-                    <button
-                      type="button"
-                      aria-label={`Remove tag ${tag}`}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        setTagsDraft(tags.filter((t) => t !== tag));
-                      }}
-                    >
-                      ×
-                    </button>
+                    <input
+                      className={styles.artistInput}
+                      value={source}
+                      placeholder="https://"
+                      aria-label="Source link"
+                      inputMode="url"
+                      onChange={(e) => setSourceDraft(e.target.value)}
+                    />
                   )}
-                </span>
-              ))}
+                  {post.source_url && (
+                    <a href={post.source_url} target="_blank" rel="noreferrer">
+                      View original ↗
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          <div className={styles.field}>
+            <FieldTitle name="Tags" changed={tagsChanged} />
+            <div className={styles.tagList}>
+              {shownTags.length === 0 && <span className={styles.muted}>No tags yet.</span>}
+              {shownTags.map((tag) => {
+                const added = !post.tags.includes(tag);
+                const removed = !tags.includes(tag);
+                return (
+                  <span
+                    key={tag}
+                    className={
+                      added
+                        ? `${styles.tag} ${styles.tagStaged}`
+                        : removed
+                          ? `${styles.tag} ${styles.tagRemoved}`
+                          : styles.tag
+                    }
+                  >
+                    <Link to="/tags/$tag" params={{ tag }}>
+                      {tag}
+                    </Link>
+                    {signedIn && (
+                      <button
+                        type="button"
+                        aria-label={removed ? `Restore tag ${tag}` : `Remove tag ${tag}`}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setTagsDraft(
+                            removed ? [...tags, tag].sort() : tags.filter((t) => t !== tag),
+                          );
+                        }}
+                      >
+                        {removed ? "↩" : "×"}
+                      </button>
+                    )}
+                  </span>
+                );
+              })}
             </div>
           </div>
           {signedIn && (

@@ -121,9 +121,12 @@ describe("PostPage staged editing", () => {
     expect(updatePostMeta).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove tag keep_me" }));
+    expect(screen.getByRole("link", { name: "keep_me" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Restore tag keep_me" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "nsfw" }));
     expect(updatePostMeta).not.toHaveBeenCalled();
     expect(save).toBeEnabled();
+    expect(screen.getByRole("img", { name: "Rating has unsaved changes" })).toBeInTheDocument();
 
     fireEvent.click(save);
     await waitFor(() => expect(updatePostMeta).toHaveBeenCalledTimes(1));
@@ -131,6 +134,7 @@ describe("PostPage staged editing", () => {
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled(),
     );
+    expect(screen.queryByRole("img", { name: "Rating has unsaved changes" })).not.toBeInTheDocument();
   });
 
   it("saves a source link with the other staged fields", async () => {
@@ -139,6 +143,7 @@ describe("PostPage staged editing", () => {
     fireEvent.change(screen.getByLabelText("Source link"), {
       target: { value: "  https://example.com/a  " },
     });
+    expect(screen.getByRole("img", { name: "Source has unsaved changes" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() =>
       expect(updatePostMeta).toHaveBeenCalledWith(
@@ -155,10 +160,12 @@ describe("PostPage staged editing", () => {
     navigate.mockClear();
     render(<PostPage id="p1" />);
     fireEvent.click(screen.getByRole("button", { name: "Remove tag keep_me" }));
-    expect(screen.queryByText("keep_me")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Restore tag keep_me" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Tags has unsaved changes" })).toBeInTheDocument();
     expect(navigate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
-    expect(screen.getByText("keep_me")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove tag keep_me" })).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Tags has unsaved changes" })).not.toBeInTheDocument();
     expect(updatePostMeta).not.toHaveBeenCalled();
   });
 
