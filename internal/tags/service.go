@@ -51,9 +51,9 @@ type Repository interface {
 	CreateSuggestion(ctx context.Context, kind, sourceTag, targetTag, reason, authorID string) (model.TagSuggestion, error)
 	GetSuggestion(ctx context.Context, id string) (model.TagSuggestion, error)
 	ListSuggestions(ctx context.Context, status string) ([]model.TagSuggestion, error)
-	// ResolveSuggestion marks a pending row accepted or rejected. A row that
-	// is not pending is sql.ErrNoRows.
-	ResolveSuggestion(ctx context.Context, id, resolverID, status string) (model.TagSuggestion, error)
+	// ResolveSuggestion sets status when the row is still fromStatus.
+	// A row that no longer has that status is sql.ErrNoRows.
+	ResolveSuggestion(ctx context.Context, id, resolverID, status, fromStatus string) (model.TagSuggestion, error)
 }
 
 type Service struct{ repo Repository }
@@ -398,10 +398,46 @@ func (s *Service) ListSuggestions(ctx context.Context, actor model.User, status 
 	return items, nil
 }
 
-// AcceptSuggestion applies a pending alias or implication with AddAlias or
-// AddImplication, then records the moderator. A row that is not pending is
-// not found. The tag rules and post updates are the same as adding it directly.
+// AcceptSuggestion applies an alias or implication, then records the
+// moderator. A pending or rejected row can be accepted. Accepting a row
+// that is already accepted leaves it as it is. When the rule is already
+// in place and points the same way, it is left alone. The tag rules and
+// post updates match adding it directly.
 func (s *Service) AcceptSuggestion(ctx context.Context, actor model.User, id string) (model.TagSuggestion, error) {
+	current, err := s.suggestionForModerator(ctx, actor, id)
+	if err != nil {
+		return model.TagSuggestion{}, err
+	}
+	if current.Status == "accepted" {
+		return current, nil
+	}
+	if err := s.applySuggestion(ctx, actor, current); err != nil {
+		return model.TagSuggestion{}, err
+	}
+	return s.recordSuggestion(ctx, actor, current, "accepted")
+}
+
+// RejectSuggestion records a no. A pending row is closed without changing
+// tags. An accepted row is undone first: the alias or implication is
+// removed, and posts that already received the tag keep it. Rejecting a
+// row that is already rejected leaves it as it is.
+func (s *Service) RejectSuggestion(ctx context.Context, actor model.User, id string) (model.TagSuggestion, error) {
+	current, err := s.suggestionForModerator(ctx, actor, id)
+	if err != nil {
+		return model.TagSuggestion{}, err
+	}
+	if current.Status == "rejected" {
+		return current, nil
+	}
+	if current.Status == "accepted" {
+		if err := s.undoSuggestion(ctx, actor, current); err != nil {
+			return model.TagSuggestion{}, err
+		}
+	}
+	return s.recordSuggestion(ctx, actor, current, "rejected")
+}
+
+func (s *Service) suggestionForModerator(ctx context.Context, actor model.User, id string) (model.TagSuggestion, error) {
 	if actor.ID == "" || !actor.Role.AtLeast(model.RoleModerator) {
 		return model.TagSuggestion{}, ErrForbidden
 	}
@@ -412,38 +448,61 @@ func (s *Service) AcceptSuggestion(ctx context.Context, actor model.User, id str
 	if err != nil {
 		return model.TagSuggestion{}, err
 	}
-	if current.Status != "pending" {
-		return model.TagSuggestion{}, ErrNotFound
-	}
-	switch current.Kind {
-	case "alias":
-		if _, err := s.AddAlias(ctx, actor, current.TargetTag, current.SourceTag); err != nil {
-			return model.TagSuggestion{}, err
-		}
-	case "implication":
-		if _, err := s.AddImplication(ctx, actor, current.SourceTag, current.TargetTag); err != nil {
-			return model.TagSuggestion{}, err
-		}
-	default:
-		return model.TagSuggestion{}, invalid("Kind must be alias or implication.")
-	}
-	resolved, err := s.repo.ResolveSuggestion(ctx, id, actor.ID, "accepted")
+	return current, nil
+}
+
+func (s *Service) recordSuggestion(ctx context.Context, actor model.User, current model.TagSuggestion, status string) (model.TagSuggestion, error) {
+	resolved, err := s.repo.ResolveSuggestion(ctx, current.ID, actor.ID, status, current.Status)
 	if errors.Is(err, sql.ErrNoRows) {
-		return model.TagSuggestion{}, ErrNotFound
+		return model.TagSuggestion{}, invalid("That suggestion changed. Refresh and try again.")
 	}
 	return resolved, err
 }
 
-// RejectSuggestion closes a pending suggestion. It does not change tags.
-func (s *Service) RejectSuggestion(ctx context.Context, actor model.User, id string) (model.TagSuggestion, error) {
-	if actor.ID == "" || !actor.Role.AtLeast(model.RoleModerator) {
-		return model.TagSuggestion{}, ErrForbidden
+// applySuggestion installs the proposed rule. A rule that already matches
+// this suggestion is left in place so a changed decision can be recorded
+// without failing.
+func (s *Service) applySuggestion(ctx context.Context, actor model.User, item model.TagSuggestion) error {
+	switch item.Kind {
+	case "alias":
+		target, ok, err := s.repo.AliasTarget(ctx, item.SourceTag)
+		if err != nil {
+			return err
+		}
+		if ok && target == item.TargetTag {
+			return nil
+		}
+		_, err = s.AddAlias(ctx, actor, item.TargetTag, item.SourceTag)
+		return err
+	case "implication":
+		edges, err := s.repo.ListImplications(ctx)
+		if err != nil {
+			return err
+		}
+		if implicationExists(edges, item.SourceTag, item.TargetTag) {
+			return nil
+		}
+		_, err = s.AddImplication(ctx, actor, item.SourceTag, item.TargetTag)
+		return err
+	default:
+		return invalid("Kind must be alias or implication.")
 	}
-	resolved, err := s.repo.ResolveSuggestion(ctx, id, actor.ID, "rejected")
-	if errors.Is(err, sql.ErrNoRows) {
-		return model.TagSuggestion{}, ErrNotFound
+}
+
+// undoSuggestion drops the exact rule this suggestion applied. The stored
+// names are used as they were accepted, and a rule that is already gone
+// still counts as undone. Posts keep tags they already have.
+func (s *Service) undoSuggestion(ctx context.Context, _ model.User, item model.TagSuggestion) error {
+	switch item.Kind {
+	case "alias":
+		_, err := s.repo.DeleteAlias(ctx, item.SourceTag, item.TargetTag)
+		return err
+	case "implication":
+		_, err := s.repo.DeleteImplication(ctx, item.SourceTag, item.TargetTag)
+		return err
+	default:
+		return invalid("Kind must be alias or implication.")
 	}
-	return resolved, err
 }
 
 func isUnique(err error) bool {

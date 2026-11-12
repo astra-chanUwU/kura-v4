@@ -1,23 +1,28 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { acceptTagSuggestion, listTagSuggestions, rejectTagSuggestion, suggestTag } from "../api/suggestions";
-import type { SuggestionKind } from "../types/suggestion";
+import {
+  acceptTagSuggestion,
+  listTagSuggestions,
+  rejectTagSuggestion,
+  suggestTag,
+} from "../api/suggestions";
+import type { SuggestionKind, SuggestionStatus } from "../types/suggestion";
 import { useMe } from "./useKura";
 import { atLeast } from "../domain/roles";
 
 const suggestionsKey = ["tag-alias-suggestions"] as const;
 
-export function useTagSuggestions(enabled: boolean) {
+export function useTagSuggestions(status: SuggestionStatus) {
   return useQuery({
-    queryKey: suggestionsKey,
-    queryFn: ({ signal }) => listTagSuggestions(signal),
-    enabled,
+    queryKey: [...suggestionsKey, status],
+    queryFn: ({ signal }) => listTagSuggestions(status, signal),
     retry: false,
   });
 }
 
 export function useSuggestTag(tag: string) {
   return useMutation({
-    mutationFn: (body: { kind: SuggestionKind; other: string; reason: string }) => suggestTag(tag, body),
+    mutationFn: (body: { kind: SuggestionKind; other: string; reason: string }) =>
+      suggestTag(tag, body),
   });
 }
 

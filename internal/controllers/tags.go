@@ -167,11 +167,16 @@ func (h *Tags) rejectSuggestion(c fiber.Ctx) error {
 }
 
 func suggestionDTO(item model.TagSuggestion) dto.TagSuggestion {
-	return dto.TagSuggestion{
+	out := dto.TagSuggestion{
 		ID: item.ID, Kind: item.Kind, SourceTag: item.SourceTag, TargetTag: item.TargetTag,
 		Reason: item.Reason, Status: item.Status, AuthorUsername: item.AuthorUsername,
-		CreatedAt: item.CreatedAt.UTC().Format(tagTime),
+		ResolverUsername: item.ResolverUsername,
+		CreatedAt:        item.CreatedAt.UTC().Format(tagTime),
 	}
+	if !item.ResolvedAt.IsZero() {
+		out.ResolvedAt = item.ResolvedAt.UTC().Format(tagTime)
+	}
+	return out
 }
 
 func writeTagError(c fiber.Ctx, err error) error {

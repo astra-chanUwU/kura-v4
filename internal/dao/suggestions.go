@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/astra-chanUwU/kura-v4/internal/dao/sqlcgen"
@@ -9,11 +10,16 @@ import (
 	"github.com/google/uuid"
 )
 
-func suggestionFrom(id uuid.UUID, kind, source, target, reason, status, author string, created time.Time) model.TagSuggestion {
-	return model.TagSuggestion{
+func suggestionFrom(id uuid.UUID, kind, source, target, reason, status, author, resolver string, created time.Time, resolved sql.NullTime) model.TagSuggestion {
+	item := model.TagSuggestion{
 		ID: id.String(), Kind: kind, SourceTag: source, TargetTag: target,
-		Reason: reason, Status: status, AuthorUsername: author, CreatedAt: created,
+		Reason: reason, Status: status, AuthorUsername: author, ResolverUsername: resolver,
+		CreatedAt: created,
 	}
+	if resolved.Valid {
+		item.ResolvedAt = resolved.Time
+	}
+	return item
 }
 
 func (d *TagPagesDAO) CreateSuggestion(ctx context.Context, kind, sourceTag, targetTag, reason, authorID string) (model.TagSuggestion, error) {
@@ -27,7 +33,7 @@ func (d *TagPagesDAO) CreateSuggestion(ctx context.Context, kind, sourceTag, tar
 	if err != nil {
 		return model.TagSuggestion{}, err
 	}
-	return suggestionFrom(row.ID, row.Kind, row.SourceTag, row.TargetTag, row.Reason, row.Status, row.AuthorUsername, row.CreatedAt), nil
+	return suggestionFrom(row.ID, row.Kind, row.SourceTag, row.TargetTag, row.Reason, row.Status, row.AuthorUsername, row.ResolverUsername, row.CreatedAt, row.ResolvedAt), nil
 }
 
 func (d *TagPagesDAO) GetSuggestion(ctx context.Context, id string) (model.TagSuggestion, error) {
@@ -39,7 +45,7 @@ func (d *TagPagesDAO) GetSuggestion(ctx context.Context, id string) (model.TagSu
 	if err != nil {
 		return model.TagSuggestion{}, err
 	}
-	return suggestionFrom(row.ID, row.Kind, row.SourceTag, row.TargetTag, row.Reason, row.Status, row.AuthorUsername, row.CreatedAt), nil
+	return suggestionFrom(row.ID, row.Kind, row.SourceTag, row.TargetTag, row.Reason, row.Status, row.AuthorUsername, row.ResolverUsername, row.CreatedAt, row.ResolvedAt), nil
 }
 
 func (d *TagPagesDAO) ListSuggestions(ctx context.Context, status string) ([]model.TagSuggestion, error) {
@@ -49,12 +55,12 @@ func (d *TagPagesDAO) ListSuggestions(ctx context.Context, status string) ([]mod
 	}
 	out := make([]model.TagSuggestion, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, suggestionFrom(row.ID, row.Kind, row.SourceTag, row.TargetTag, row.Reason, row.Status, row.AuthorUsername, row.CreatedAt))
+		out = append(out, suggestionFrom(row.ID, row.Kind, row.SourceTag, row.TargetTag, row.Reason, row.Status, row.AuthorUsername, row.ResolverUsername, row.CreatedAt, row.ResolvedAt))
 	}
 	return out, nil
 }
 
-func (d *TagPagesDAO) ResolveSuggestion(ctx context.Context, id, resolverID, status string) (model.TagSuggestion, error) {
+func (d *TagPagesDAO) ResolveSuggestion(ctx context.Context, id, resolverID, status, fromStatus string) (model.TagSuggestion, error) {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return model.TagSuggestion{}, err
@@ -64,10 +70,10 @@ func (d *TagPagesDAO) ResolveSuggestion(ctx context.Context, id, resolverID, sta
 		return model.TagSuggestion{}, err
 	}
 	row, err := d.q.ResolveTagSuggestion(ctx, sqlcgen.ResolveTagSuggestionParams{
-		ID: uid, Status: status, ResolvedBy: uuid.NullUUID{UUID: resolver, Valid: true},
+		ID: uid, Status: status, FromStatus: fromStatus, ResolvedBy: uuid.NullUUID{UUID: resolver, Valid: true},
 	})
 	if err != nil {
 		return model.TagSuggestion{}, err
 	}
-	return suggestionFrom(row.ID, row.Kind, row.SourceTag, row.TargetTag, row.Reason, row.Status, row.AuthorUsername, row.CreatedAt), nil
+	return suggestionFrom(row.ID, row.Kind, row.SourceTag, row.TargetTag, row.Reason, row.Status, row.AuthorUsername, row.ResolverUsername, row.CreatedAt, row.ResolvedAt), nil
 }

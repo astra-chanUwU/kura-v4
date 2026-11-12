@@ -23,6 +23,8 @@ type fakeRepo struct {
 	postTags    map[string]bool
 	backfilled  []string
 	suggestions []model.TagSuggestion
+	removed     []string
+	resolveErr  error
 }
 
 func (f *fakeRepo) GetPage(_ context.Context, tag string) (model.TagWiki, bool, error) {
@@ -130,10 +132,14 @@ func (f *fakeRepo) ListSuggestions(_ context.Context, status string) ([]model.Ta
 	}
 	return out, nil
 }
-func (f *fakeRepo) ResolveSuggestion(_ context.Context, id, _, status string) (model.TagSuggestion, error) {
+func (f *fakeRepo) ResolveSuggestion(_ context.Context, id, _, status, from string) (model.TagSuggestion, error) {
+	if f.resolveErr != nil {
+		return model.TagSuggestion{}, f.resolveErr
+	}
 	for i, item := range f.suggestions {
-		if item.ID == id && item.Status == "pending" {
+		if item.ID == id && item.Status == from {
 			item.Status = status
+			item.ResolvedAt = time.Unix(20, 0).UTC()
 			f.suggestions[i] = item
 			return item, nil
 		}
@@ -141,6 +147,7 @@ func (f *fakeRepo) ResolveSuggestion(_ context.Context, id, _, status string) (m
 	return model.TagSuggestion{}, sql.ErrNoRows
 }
 func (f *fakeRepo) DeleteAlias(_ context.Context, alias, target string) (int64, error) {
+	f.removed = append(f.removed, alias+"->"+target)
 	if f.aliases[alias] != target {
 		return 0, nil
 	}
@@ -354,6 +361,189 @@ func TestSuggestAndAccept(t *testing.T) {
 	pending, err := svc.ListSuggestions(context.Background(), mod, "")
 	require.NoError(t, err)
 	require.Empty(t, pending)
+	acceptedList, err := svc.ListSuggestions(context.Background(), mod, "accepted")
+	require.NoError(t, err)
+	require.Equal(t, []string{item.ID}, suggestionIDs(acceptedList))
+}
+
+func TestPendingRejectLeavesTagsAlone(t *testing.T) {
+	member := model.User{ID: "mem", Username: "hana", Role: model.RoleMember}
+	mod := model.User{ID: "mod", Username: "kiri", Role: model.RoleModerator}
+	repo := &fakeRepo{}
+	svc := NewService(repo)
+
+	item, err := svc.Suggest(context.Background(), member, "long_hair", "alias", "longhair", "")
+	require.NoError(t, err)
+	rejected, err := svc.RejectSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	require.Equal(t, "rejected", rejected.Status)
+	require.Empty(t, repo.aliases)
+	require.Empty(t, repo.removed)
+
+	again, err := svc.RejectSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	require.Equal(t, "rejected", again.Status)
+	require.Empty(t, repo.removed)
+}
+
+func TestReviseAliasSuggestion(t *testing.T) {
+	member := model.User{ID: "mem", Username: "hana", Role: model.RoleMember}
+	mod := model.User{ID: "mod", Username: "kiri", Role: model.RoleModerator}
+	repo := &fakeRepo{}
+	svc := NewService(repo)
+
+	item, err := svc.Suggest(context.Background(), member, "silver_hair", "alias", "silverhair", "Same hair.")
+	require.NoError(t, err)
+	accepted, err := svc.AcceptSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	require.Equal(t, "accepted", accepted.Status)
+	require.Equal(t, "silver_hair", repo.aliases["silverhair"])
+
+	again, err := svc.AcceptSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	require.Equal(t, "accepted", again.Status)
+	require.Len(t, repo.moved, 1)
+
+	_, err = svc.RejectSuggestion(context.Background(), member, item.ID)
+	require.ErrorIs(t, err, ErrForbidden)
+	require.Equal(t, "silver_hair", repo.aliases["silverhair"])
+
+	rejected, err := svc.RejectSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	require.Equal(t, "rejected", rejected.Status)
+	_, still := repo.aliases["silverhair"]
+	require.False(t, still)
+	require.Equal(t, []string{"silverhair->silver_hair"}, repo.removed)
+
+	same, err := svc.RejectSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	require.Equal(t, "rejected", same.Status)
+	require.Len(t, repo.removed, 1)
+
+	accepted, err = svc.AcceptSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	require.Equal(t, "accepted", accepted.Status)
+	require.Equal(t, "silver_hair", repo.aliases["silverhair"])
+	require.Len(t, repo.moved, 2)
+
+	history, err := svc.ListSuggestions(context.Background(), mod, "rejected")
+	require.NoError(t, err)
+	require.Empty(t, history)
+	history, err = svc.ListSuggestions(context.Background(), mod, "accepted")
+	require.NoError(t, err)
+	require.Equal(t, []string{item.ID}, suggestionIDs(history))
+}
+
+func TestRejectAcceptedAliasAlreadyGone(t *testing.T) {
+	member := model.User{ID: "mem", Role: model.RoleMember}
+	mod := model.User{ID: "mod", Role: model.RoleModerator}
+	repo := &fakeRepo{}
+	svc := NewService(repo)
+
+	item, err := svc.Suggest(context.Background(), member, "silver_hair", "alias", "silverhair", "")
+	require.NoError(t, err)
+	_, err = svc.AcceptSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	delete(repo.aliases, "silverhair")
+
+	rejected, err := svc.RejectSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	require.Equal(t, "rejected", rejected.Status)
+	require.Equal(t, []string{"silverhair->silver_hair"}, repo.removed)
+}
+
+func TestAcceptRejectedAliasAlreadyPresent(t *testing.T) {
+	member := model.User{ID: "mem", Role: model.RoleMember}
+	mod := model.User{ID: "mod", Role: model.RoleModerator}
+	repo := &fakeRepo{}
+	svc := NewService(repo)
+
+	item, err := svc.Suggest(context.Background(), member, "silver_hair", "alias", "silverhair", "")
+	require.NoError(t, err)
+	_, err = svc.AcceptSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	_, err = svc.RejectSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+
+	repo.aliases["silverhair"] = "silver_hair"
+	moved := len(repo.moved)
+	accepted, err := svc.AcceptSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	require.Equal(t, "accepted", accepted.Status)
+	require.Len(t, repo.moved, moved)
+}
+
+func TestAcceptRejectedAliasPointingElsewhere(t *testing.T) {
+	member := model.User{ID: "mem", Role: model.RoleMember}
+	mod := model.User{ID: "mod", Role: model.RoleModerator}
+	repo := &fakeRepo{}
+	svc := NewService(repo)
+
+	item, err := svc.Suggest(context.Background(), member, "silver_hair", "alias", "silverhair", "")
+	require.NoError(t, err)
+	_, err = svc.AcceptSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	_, err = svc.RejectSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+
+	repo.aliases["silverhair"] = "other_hair"
+	_, err = svc.AcceptSuggestion(context.Background(), mod, item.ID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "already an alias")
+	require.Equal(t, "other_hair", repo.aliases["silverhair"])
+	rejected, err := svc.ListSuggestions(context.Background(), mod, "rejected")
+	require.NoError(t, err)
+	require.Equal(t, []string{item.ID}, suggestionIDs(rejected))
+}
+
+func TestReviseImplicationSuggestion(t *testing.T) {
+	member := model.User{ID: "mem", Role: model.RoleMember}
+	mod := model.User{ID: "mod", Role: model.RoleModerator}
+	repo := &fakeRepo{}
+	svc := NewService(repo)
+
+	item, err := svc.Suggest(context.Background(), member, "smile", "implication", "open_mouth", "Usually open.")
+	require.NoError(t, err)
+	_, err = svc.AcceptSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	require.True(t, implicationExists(repo.edges, "smile", "open_mouth"))
+	require.True(t, repo.postTags["open_mouth"])
+
+	_, err = svc.RejectSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	require.False(t, implicationExists(repo.edges, "smile", "open_mouth"))
+	require.True(t, repo.postTags["open_mouth"], "removing the rule leaves the consequent on posts")
+
+	_, err = svc.AcceptSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	require.True(t, implicationExists(repo.edges, "smile", "open_mouth"))
+}
+
+func TestSuggestionResolveConflict(t *testing.T) {
+	member := model.User{ID: "mem", Role: model.RoleMember}
+	mod := model.User{ID: "mod", Role: model.RoleModerator}
+	repo := &fakeRepo{resolveErr: sql.ErrNoRows}
+	svc := NewService(repo)
+
+	item, err := svc.Suggest(context.Background(), member, "long_hair", "alias", "longhair", "")
+	require.NoError(t, err)
+	_, err = svc.RejectSuggestion(context.Background(), mod, item.ID)
+	var vErr *ValidationError
+	require.ErrorAs(t, err, &vErr)
+	require.Contains(t, vErr.Message, "Refresh")
+	require.Equal(t, "pending", repo.suggestions[0].Status)
+	require.Equal(t, item.ID, repo.suggestions[0].ID)
+
+	_, err = svc.AcceptSuggestion(context.Background(), mod, "missing")
+	require.ErrorIs(t, err, ErrNotFound)
+}
+
+func suggestionIDs(items []model.TagSuggestion) []string {
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		out = append(out, item.ID)
+	}
+	return out
 }
 
 func stringsOf(n int) string {

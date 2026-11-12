@@ -37,12 +37,14 @@ type TagImplication struct {
 // Alias: SourceTag is the alternate name, TargetTag is the canonical tag.
 // Implication: SourceTag is the antecedent, TargetTag is the consequent.
 type TagSuggestion struct {
-	ID             string
-	Kind           string
-	SourceTag      string
-	TargetTag      string
-	Reason         string
-	Status         string
-	AuthorUsername string
-	CreatedAt      time.Time
+	ID               string
+	Kind             string
+	SourceTag        string
+	TargetTag        string
+	Reason           string
+	Status           string
+	AuthorUsername   string
+	ResolverUsername string
+	CreatedAt        time.Time
+	ResolvedAt       time.Time
 }

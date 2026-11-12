@@ -7,6 +7,7 @@ package sqlcgen
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,8 +16,9 @@ import (
 const createTagSuggestion = `-- name: CreateTagSuggestion :one
 INSERT INTO tag_suggestions (kind, source_tag, target_tag, reason, author_id)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, kind, source_tag, target_tag, reason, status, created_at,
-  ''::text AS author_username
+RETURNING id, kind, source_tag, target_tag, reason, status, created_at, resolved_at,
+  ''::text AS author_username,
+  ''::text AS resolver_username
 `
 
 type CreateTagSuggestionParams struct {
@@ -28,14 +30,16 @@ type CreateTagSuggestionParams struct {
 }
 
 type CreateTagSuggestionRow struct {
-	ID             uuid.UUID
-	Kind           string
-	SourceTag      string
-	TargetTag      string
-	Reason         string
-	Status         string
-	CreatedAt      time.Time
-	AuthorUsername string
+	ID               uuid.UUID
+	Kind             string
+	SourceTag        string
+	TargetTag        string
+	Reason           string
+	Status           string
+	CreatedAt        time.Time
+	ResolvedAt       sql.NullTime
+	AuthorUsername   string
+	ResolverUsername string
 }
 
 func (q *Queries) CreateTagSuggestion(ctx context.Context, arg CreateTagSuggestionParams) (CreateTagSuggestionRow, error) {
@@ -55,28 +59,35 @@ func (q *Queries) CreateTagSuggestion(ctx context.Context, arg CreateTagSuggesti
 		&i.Reason,
 		&i.Status,
 		&i.CreatedAt,
+		&i.ResolvedAt,
 		&i.AuthorUsername,
+		&i.ResolverUsername,
 	)
 	return i, err
 }
 
 const getTagSuggestion = `-- name: GetTagSuggestion :one
 SELECT s.id, s.kind, s.source_tag, s.target_tag, s.reason, s.status, s.created_at,
-  COALESCE(u.username, '')::text AS author_username
+  s.resolved_at,
+  COALESCE(u.username, '')::text AS author_username,
+  COALESCE(r.username, '')::text AS resolver_username
 FROM tag_suggestions s
 LEFT JOIN users u ON u.id = s.author_id
+LEFT JOIN users r ON r.id = s.resolved_by
 WHERE s.id = $1
 `
 
 type GetTagSuggestionRow struct {
-	ID             uuid.UUID
-	Kind           string
-	SourceTag      string
-	TargetTag      string
-	Reason         string
-	Status         string
-	CreatedAt      time.Time
-	AuthorUsername string
+	ID               uuid.UUID
+	Kind             string
+	SourceTag        string
+	TargetTag        string
+	Reason           string
+	Status           string
+	CreatedAt        time.Time
+	ResolvedAt       sql.NullTime
+	AuthorUsername   string
+	ResolverUsername string
 }
 
 func (q *Queries) GetTagSuggestion(ctx context.Context, id uuid.UUID) (GetTagSuggestionRow, error) {
@@ -90,29 +101,36 @@ func (q *Queries) GetTagSuggestion(ctx context.Context, id uuid.UUID) (GetTagSug
 		&i.Reason,
 		&i.Status,
 		&i.CreatedAt,
+		&i.ResolvedAt,
 		&i.AuthorUsername,
+		&i.ResolverUsername,
 	)
 	return i, err
 }
 
 const listTagSuggestions = `-- name: ListTagSuggestions :many
 SELECT s.id, s.kind, s.source_tag, s.target_tag, s.reason, s.status, s.created_at,
-  COALESCE(u.username, '')::text AS author_username
+  s.resolved_at,
+  COALESCE(u.username, '')::text AS author_username,
+  COALESCE(r.username, '')::text AS resolver_username
 FROM tag_suggestions s
 LEFT JOIN users u ON u.id = s.author_id
+LEFT JOIN users r ON r.id = s.resolved_by
 WHERE s.status = $1
-ORDER BY s.created_at DESC, s.id DESC
+ORDER BY COALESCE(s.resolved_at, s.created_at) DESC, s.id DESC
 `
 
 type ListTagSuggestionsRow struct {
-	ID             uuid.UUID
-	Kind           string
-	SourceTag      string
-	TargetTag      string
-	Reason         string
-	Status         string
-	CreatedAt      time.Time
-	AuthorUsername string
+	ID               uuid.UUID
+	Kind             string
+	SourceTag        string
+	TargetTag        string
+	Reason           string
+	Status           string
+	CreatedAt        time.Time
+	ResolvedAt       sql.NullTime
+	AuthorUsername   string
+	ResolverUsername string
 }
 
 func (q *Queries) ListTagSuggestions(ctx context.Context, status string) ([]ListTagSuggestionsRow, error) {
@@ -132,7 +150,9 @@ func (q *Queries) ListTagSuggestions(ctx context.Context, status string) ([]List
 			&i.Reason,
 			&i.Status,
 			&i.CreatedAt,
+			&i.ResolvedAt,
 			&i.AuthorUsername,
+			&i.ResolverUsername,
 		); err != nil {
 			return nil, err
 		}
@@ -153,30 +173,42 @@ SET status = $1,
     resolved_by = $2,
     resolved_at = now()
 WHERE s.id = $3
-  AND s.status = 'pending'
+  AND s.status = $4
 RETURNING s.id, s.kind, s.source_tag, s.target_tag, s.reason, s.status, s.created_at,
-  COALESCE((SELECT username FROM users WHERE id = s.author_id), '')::text AS author_username
+  s.resolved_at,
+  COALESCE((SELECT username FROM users WHERE id = s.author_id), '')::text AS author_username,
+  COALESCE((SELECT username FROM users WHERE id = s.resolved_by), '')::text AS resolver_username
 `
 
 type ResolveTagSuggestionParams struct {
 	Status     string
 	ResolvedBy uuid.NullUUID
 	ID         uuid.UUID
+	FromStatus string
 }
 
 type ResolveTagSuggestionRow struct {
-	ID             uuid.UUID
-	Kind           string
-	SourceTag      string
-	TargetTag      string
-	Reason         string
-	Status         string
-	CreatedAt      time.Time
-	AuthorUsername string
+	ID               uuid.UUID
+	Kind             string
+	SourceTag        string
+	TargetTag        string
+	Reason           string
+	Status           string
+	CreatedAt        time.Time
+	ResolvedAt       sql.NullTime
+	AuthorUsername   string
+	ResolverUsername string
 }
 
+// from_status keeps a second moderator from overwriting a decision that
+// landed between the read and this update.
 func (q *Queries) ResolveTagSuggestion(ctx context.Context, arg ResolveTagSuggestionParams) (ResolveTagSuggestionRow, error) {
-	row := q.db.QueryRowContext(ctx, resolveTagSuggestion, arg.Status, arg.ResolvedBy, arg.ID)
+	row := q.db.QueryRowContext(ctx, resolveTagSuggestion,
+		arg.Status,
+		arg.ResolvedBy,
+		arg.ID,
+		arg.FromStatus,
+	)
 	var i ResolveTagSuggestionRow
 	err := row.Scan(
 		&i.ID,
@@ -186,7 +218,9 @@ func (q *Queries) ResolveTagSuggestion(ctx context.Context, arg ResolveTagSugges
 		&i.Reason,
 		&i.Status,
 		&i.CreatedAt,
+		&i.ResolvedAt,
 		&i.AuthorUsername,
+		&i.ResolverUsername,
 	)
 	return i, err
 }

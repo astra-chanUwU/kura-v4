@@ -1,5 +1,5 @@
 import type { ApiErrorBody } from "../types/api";
-import type { TagSuggestion } from "../types/suggestion";
+import type { SuggestionStatus, TagSuggestion } from "../types/suggestion";
 import { ApiError } from "./client";
 
 async function handle<T>(response: Response): Promise<T> {
@@ -45,8 +45,11 @@ export function suggestTag(
   return sendJSON<TagSuggestion>(`/tag/${encodeURIComponent(tag)}/suggestions`, "POST", body);
 }
 
-export function listTagSuggestions(signal?: AbortSignal): Promise<TagSuggestion[]> {
-  return getJSON<TagSuggestion[]>("/tag-suggestions?status=pending", signal);
+export function listTagSuggestions(
+  status: SuggestionStatus,
+  signal?: AbortSignal,
+): Promise<TagSuggestion[]> {
+  return getJSON<TagSuggestion[]>(`/tag-suggestions?status=${encodeURIComponent(status)}`, signal);
 }
 
 export function acceptTagSuggestion(id: string): Promise<TagSuggestion> {
