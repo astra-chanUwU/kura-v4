@@ -10,12 +10,14 @@ import {
   useToggleFavorite,
 } from "../hooks/useKura";
 import { usePrefetchPost } from "../hooks/usePrefetchPost";
+import { IconHeart, IconList } from "./icons";
 import { VisibilityToggle } from "./VisibilityToggle";
 import { shortError, useToasts } from "./Toasts";
 import styles from "./PostCard.module.css";
 
-/** Save / + List controls, shared by board tiles (overlay) and the post page. */
-export function PostActions({ post }: { post: Post }) {
+/** Save / + List controls, shared by board tiles (overlay) and the post page.
+ * `compact` is the thumbnail overlay: icons only, so the words don't cover the picture. */
+export function PostActions({ post, compact = false }: { post: Post; compact?: boolean }) {
   const { signedIn } = useMe();
   const { data: lists } = useMyLists(signedIn);
   const toggle = useToggleFavorite();
@@ -61,7 +63,7 @@ export function PostActions({ post }: { post: Post }) {
   );
   return (
     <div ref={rootRef} className={styles.actionsRoot}>
-      <div className={styles.actions}>
+      <div className={compact ? `${styles.actions} ${styles.actionsIcon}` : styles.actions}>
         <button
           type="button"
           aria-pressed={post.is_favorite}
@@ -82,14 +84,22 @@ export function PostActions({ post }: { post: Post }) {
             )
           }
         >
-          {post.is_favorite ? "♥ Saved" : "♡ Save"}
+          {compact ? (
+            <IconHeart filled={post.is_favorite} />
+          ) : post.is_favorite ? (
+            "♥ Saved"
+          ) : (
+            "♡ Save"
+          )}
         </button>
         <button
           type="button"
           aria-expanded={menuOpen}
+          aria-label="Add to a list"
+          title="Add to a list"
           onClick={() => (menuOpen ? closeMenu() : setMenuOpen(true))}
         >
-          + List
+          {compact ? <IconList /> : "+ List"}
         </button>
       </div>
       {menuOpen && (
@@ -209,7 +219,7 @@ export function PostCard({
         <img src={post.thumbnail_url} alt="" loading="lazy" />
       </Link>
       {post.rating === "nsfw" && <span className={styles.nsfwBadge}>NSFW</span>}
-      <PostActions post={post} />
+      <PostActions post={post} compact />
     </article>
   );
 }

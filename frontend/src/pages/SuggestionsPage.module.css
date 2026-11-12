@@ -1,0 +1,82 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--border);
+}
+.row:last-child {
+  border-bottom: 1px solid var(--border);
+}
+.body {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.rule {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.5rem;
+  align-items: baseline;
+  margin: 0;
+}
+.kind {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.rule a {
+  color: var(--accent);
+}
+.meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.actions {
+  display: flex;
+  gap: 0.45rem;
+  flex: none;
+}
+.actions button {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.actions button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.accept {
+  border: 1px solid var(--success);
+  color: var(--success);
+}
+.accept:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--success) 16%, var(--surface));
+}
+.reject {
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}
+.reject:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 16%, var(--surface));
+}
+
+@media (max-width: 640px) {
+  .row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+}

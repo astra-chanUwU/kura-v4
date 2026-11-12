@@ -127,6 +127,23 @@
   }
 }
 
+/* Thumbnail overlay: two icon buttons, not a pair of labels across the picture. */
+.actionsIcon {
+  gap: 0.3rem;
+}
+.actionsIcon button {
+  display: grid;
+  place-items: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  border-radius: 999px;
+}
+.actionsIcon button[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .nsfwBadge {
   position: absolute;
   left: 0.5rem;

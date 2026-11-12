@@ -1,15 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import { shortError, useToasts } from "../components/Toasts";
 import { useSuggestionActions, useTagSuggestions } from "../hooks/useSuggestions";
-import type { TagSuggestion } from "../types/suggestion";
 import { StaffSection } from "./StaffLayout";
+import styles from "./SuggestionsPage.module.css";
 import simple from "./Simple.module.css";
 
-function line(item: TagSuggestion): string {
-  if (item.kind === "alias") {
-    return `${item.source_tag} → ${item.target_tag}`;
-  }
-  return `${item.source_tag} implies ${item.target_tag}`;
+function TagLink({ tag }: { tag: string }) {
+  return (
+    <Link to="/tags/$tag" params={{ tag }}>
+      {tag}
+    </Link>
+  );
 }
 
 export function SuggestionsPage() {
@@ -33,50 +34,56 @@ export function SuggestionsPage() {
       {!query.isPending && !query.error && items.length === 0 && (
         <p className={simple.muted}>No pending suggestions.</p>
       )}
-      <ul className={simple.grid}>
-        {items.map((item) => (
-          <li key={item.id}>
-            <strong>{item.kind}</strong>
-            <span>
-              {" "}
-              <Link to="/tags/$tag" params={{ tag: item.target_tag }}>
-                {line(item)}
-              </Link>
-            </span>
-            <span className={simple.muted}>
-              {" "}
-              by @{item.author_username || "member"}
-              {item.reason ? ` · ${item.reason}` : ""}
-            </span>
-            <div className={simple.actions}>
-              <button
-                type="button"
-                disabled={accept.isPending || reject.isPending}
-                onClick={() =>
-                  accept.mutate(item.id, {
-                    onSuccess: () => toasts.push("Suggestion accepted.", "success"),
-                    onError: (error: unknown) => toasts.push(shortError(error), "error"),
-                  })
-                }
-              >
-                Accept
-              </button>
-              <button
-                type="button"
-                disabled={accept.isPending || reject.isPending}
-                onClick={() =>
-                  reject.mutate(item.id, {
-                    onSuccess: () => toasts.push("Suggestion rejected.", "success"),
-                    onError: (error: unknown) => toasts.push(shortError(error), "error"),
-                  })
-                }
-              >
-                Reject
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {items.length > 0 && (
+        <ul className={styles.list}>
+          {items.map((item) => (
+            <li key={item.id} className={styles.row}>
+              <div className={styles.body}>
+                <p className={styles.rule}>
+                  <span className={styles.kind}>{item.kind}</span>
+                  <span>
+                    <TagLink tag={item.source_tag} />
+                    {item.kind === "alias" ? " → " : " implies "}
+                    <TagLink tag={item.target_tag} />
+                  </span>
+                </p>
+                <p className={styles.meta}>
+                  by @{item.author_username || "member"}
+                  {item.reason ? ` · ${item.reason}` : ""}
+                </p>
+              </div>
+              <div className={styles.actions}>
+                <button
+                  type="button"
+                  className={styles.accept}
+                  disabled={accept.isPending || reject.isPending}
+                  onClick={() =>
+                    accept.mutate(item.id, {
+                      onSuccess: () => toasts.push("Suggestion accepted.", "success"),
+                      onError: (error: unknown) => toasts.push(shortError(error), "error"),
+                    })
+                  }
+                >
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  className={styles.reject}
+                  disabled={accept.isPending || reject.isPending}
+                  onClick={() =>
+                    reject.mutate(item.id, {
+                      onSuccess: () => toasts.push("Suggestion rejected.", "success"),
+                      onError: (error: unknown) => toasts.push(shortError(error), "error"),
+                    })
+                  }
+                >
+                  Reject
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </StaffSection>
   );
 }
