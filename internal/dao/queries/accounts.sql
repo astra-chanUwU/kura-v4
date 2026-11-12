@@ -95,3 +95,45 @@ SELECT count(*) FROM users WHERE role=$1;
 
 -- name: CountUsers :one
 SELECT count(*) FROM users;
+
+-- name: SearchUsernames :many
+SELECT id, username FROM users WHERE sqlc.arg(query)::text <> '' AND username ILIKE sqlc.arg(query)::text ESCAPE '\' ORDER BY username LIMIT 8;
+
+-- name: ListFilteredUsers :many
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, role
+FROM users
+WHERE (
+    sqlc.arg(role)::text = ''
+    OR users.role = sqlc.arg(role)::text
+  )
+  AND (
+    sqlc.arg(query)::text = ''
+    OR username ILIKE sqlc.arg(query)::text ESCAPE '\'
+    OR display_name ILIKE sqlc.arg(query)::text ESCAPE '\'
+  )
+ORDER BY
+  CASE WHEN sqlc.arg(sort)::text = 'newest' THEN created_at END DESC,
+  CASE WHEN sqlc.arg(sort)::text = 'oldest' THEN created_at END ASC,
+  username ASC
+LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
+
+-- name: CountFilteredUsers :one
+SELECT count(*)::bigint AS total
+FROM users
+WHERE (
+    sqlc.arg(role)::text = ''
+    OR users.role = sqlc.arg(role)::text
+  )
+  AND (
+    sqlc.arg(query)::text = ''
+    OR username ILIKE sqlc.arg(query)::text ESCAPE '\'
+    OR display_name ILIKE sqlc.arg(query)::text ESCAPE '\'
+  );
+
+-- name: CountUsersByRoles :one
+SELECT
+  count(*) FILTER (WHERE role = 'member')::bigint AS member,
+  count(*) FILTER (WHERE role = 'moderator')::bigint AS moderator,
+  count(*) FILTER (WHERE role = 'admin')::bigint AS admin,
+  count(*) FILTER (WHERE role = 'super_admin')::bigint AS super_admin
+FROM users;

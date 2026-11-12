@@ -58,6 +58,15 @@ type Repository interface {
 	// Missing names are omitted. An empty input returns an empty map.
 	TagAliasTargets(ctx context.Context, tags []string) (map[string]string, error)
 	ListImplications(ctx context.Context) ([]model.TagImplication, error)
+	// CountPublicPostsByOwner counts posts this owner has that a visitor
+	// can see: not hidden, not deleted, and NSFW only when includeNSFW.
+	CountPublicPostsByOwner(ctx context.Context, ownerID string, includeNSFW bool) (int64, error)
+	ListPublicPostsByOwner(ctx context.Context, ownerID string, includeNSFW bool, limit, offset int32) ([]model.Post, error)
+	// CountMetaEditsByActor counts post.meta_updated history rows for this person.
+	CountMetaEditsByActor(ctx context.Context, actorID string) (int64, error)
+	// LastMetaEditor is the username on the latest post.meta_updated row.
+	// sql.ErrNoRows means nobody has retagged the post.
+	LastMetaEditor(ctx context.Context, postID string) (string, error)
 }
 
 // Media is the original-file store the board reads and writes through.
@@ -144,6 +153,29 @@ func (s *Service) GetBySHA(ctx context.Context, sha string) (model.Post, error) 
 // Contributions counts how many posts a user has added to the board.
 func (s *Service) Contributions(ctx context.Context, userID string) (int64, error) {
 	return s.repo.CountPostsByOwner(ctx, userID)
+}
+
+// EditCount is how many tag, artist, rating, or source saves this person made.
+func (s *Service) EditCount(ctx context.Context, userID string) (int64, error) {
+	return s.repo.CountMetaEditsByActor(ctx, userID)
+}
+
+// PublicByOwner is the first page of posts a profile visitor can see.
+// Hidden and deleted posts stay off the public profile.
+func (s *Service) PublicByOwner(ctx context.Context, userID string, includeNSFW bool, limit int) ([]model.Post, int64, error) {
+	lim, _ := model.PageBounds(limit, 0)
+	total, err := s.repo.CountPublicPostsByOwner(ctx, userID, includeNSFW)
+	if err != nil {
+		return nil, 0, err
+	}
+	posts, err := s.repo.ListPublicPostsByOwner(ctx, userID, includeNSFW, lim, 0)
+	if err != nil {
+		return nil, 0, err
+	}
+	if posts == nil {
+		posts = []model.Post{}
+	}
+	return posts, total, nil
 }
 
 // ListByOwner returns one page of a user's own posts, newest first.
@@ -576,6 +608,20 @@ func (s *Service) Get(ctx context.Context, id string) (model.Post, error) {
 		return p, err
 	}
 	return s.ensureDimensions(ctx, p), nil
+}
+
+// WithLastTagger sets the username of the latest tag save. A post nobody
+// has retagged keeps an empty name. Missing history is not an error.
+func (s *Service) WithLastTagger(ctx context.Context, p model.Post) (model.Post, error) {
+	name, err := s.repo.LastMetaEditor(ctx, p.ID)
+	if errors.Is(err, sql.ErrNoRows) || name == "" && err == nil {
+		return p, nil
+	}
+	if err != nil {
+		return model.Post{}, err
+	}
+	p.LastTaggerUsername = name
+	return p, nil
 }
 
 func (s *Service) List(ctx context.Context, limit, offset int32, includeNSFW bool) ([]model.Post, error) {

@@ -237,7 +237,7 @@ func TestPostgresContracts(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), hiddenCount)
 	require.Equal(t, int64(0), deletedCount)
-	hiddenPage, err := postsDAO.ListHiddenPosts(ctx, "hidden", 40, 0)
+	hiddenPage, err := postsDAO.ListHiddenPosts(ctx, "hidden", "", "", "", 40, 0)
 	require.NoError(t, err)
 	require.Equal(t, []string{hidden.ID}, idsOf(hiddenPage))
 

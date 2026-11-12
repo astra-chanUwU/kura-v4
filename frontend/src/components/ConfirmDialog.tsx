@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import styles from "./ConfirmDialog.module.css";
 
 /**
@@ -19,7 +19,7 @@ export function ConfirmDialog({
 }: {
   open: boolean;
   title: string;
-  message: string;
+  message: ReactNode;
   confirmLabel: string;
   cancelLabel?: string;
   destructive?: boolean;
@@ -60,9 +60,9 @@ export function ConfirmDialog({
         <h2 id={titleId} className={styles.title}>
           {title}
         </h2>
-        <p id={messageId} className={styles.message}>
+        <div id={messageId} className={styles.message}>
           {message}
-        </p>
+        </div>
         <div className={styles.actions}>
           <button ref={cancelRef} type="button" className={styles.button} onClick={onCancel}>
             {cancelLabel}

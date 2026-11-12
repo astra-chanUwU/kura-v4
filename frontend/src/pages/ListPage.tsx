@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { ThemedSelect } from "../components/ThemedSelect";
+import { VisibilityToggle } from "../components/VisibilityToggle";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { Post } from "../types/api";
 import { BoardViewControls } from "../components/BoardViewControls";
@@ -252,15 +252,11 @@ export function ListPage({ id }: { id: string }) {
             aria-label="List description"
             placeholder="Description"
           />
-          <ThemedSelect
+          <VisibilityToggle
             name="visibility"
-            label="Visibility"
             defaultValue={list.visibility}
             onChange={(value) => checkEditDirty(value)}
-          >
-            <option value="private">Private — only me</option>
-            <option value="public">Public — anyone with the link</option>
-          </ThemedSelect>
+          />
           <span className={styles.formActions}>
             <button
               type="submit"

@@ -12,6 +12,70 @@ import (
 	"github.com/google/uuid"
 )
 
+const countFilteredChangeHistory = `-- name: CountFilteredChangeHistory :one
+SELECT count(*)::bigint AS total
+FROM change_history
+WHERE (
+    $1::text = ''
+    OR actor_id = NULLIF($1::text, '')::uuid
+  )
+  AND (
+    $2::text = ''
+    OR action = $2::text
+  )
+  AND (
+    $3::text = ''
+    OR entity_type = $3::text
+  )
+  AND (
+    $4::text = ''
+    OR actor_username ILIKE $4::text ESCAPE '\'
+    OR coalesce(before_state->>'artist', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce(after_state->>'artist', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce(before_state->>'role', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce(after_state->>'role', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce(before_state->>'rating', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce(after_state->>'rating', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce(before_state->>'source_url', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce(after_state->>'source_url', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce((before_state->'tags')::text, '') ILIKE $4::text ESCAPE '\'
+    OR coalesce((after_state->'tags')::text, '') ILIKE $4::text ESCAPE '\'
+  )
+`
+
+type CountFilteredChangeHistoryParams struct {
+	ActorID string
+	Action  string
+	Entity  string
+	Query   string
+}
+
+func (q *Queries) CountFilteredChangeHistory(ctx context.Context, arg CountFilteredChangeHistoryParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countFilteredChangeHistory,
+		arg.ActorID,
+		arg.Action,
+		arg.Entity,
+		arg.Query,
+	)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
+const countMetaEditsByActor = `-- name: CountMetaEditsByActor :one
+SELECT count(*)::bigint AS total
+FROM change_history
+WHERE actor_id = $1
+  AND action = 'post.meta_updated'
+`
+
+func (q *Queries) CountMetaEditsByActor(ctx context.Context, actorID uuid.NullUUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countMetaEditsByActor, actorID)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
 const getChangeHistory = `-- name: GetChangeHistory :one
 SELECT id, entity_type, entity_id, actor_id, actor_username, action, before_state, after_state, rollback_of, created_at FROM change_history WHERE id=$1
 `
@@ -77,6 +141,23 @@ func (q *Queries) InsertChangeHistory(ctx context.Context, arg InsertChangeHisto
 	return i, err
 }
 
+const lastMetaEditor = `-- name: LastMetaEditor :one
+SELECT actor_username
+FROM change_history
+WHERE entity_type = 'post'
+  AND entity_id = $1
+  AND action = 'post.meta_updated'
+ORDER BY created_at DESC, id DESC
+LIMIT 1
+`
+
+func (q *Queries) LastMetaEditor(ctx context.Context, entityID uuid.UUID) (string, error) {
+	row := q.db.QueryRowContext(ctx, lastMetaEditor, entityID)
+	var actor_username string
+	err := row.Scan(&actor_username)
+	return actor_username, err
+}
+
 const listChangeHistoryByActor = `-- name: ListChangeHistoryByActor :many
 SELECT id, entity_type, entity_id, actor_id, actor_username, action, before_state, after_state, rollback_of, created_at FROM change_history WHERE actor_id=$1 ORDER BY created_at DESC, id DESC LIMIT $2
 `
@@ -132,6 +213,98 @@ type ListChangeHistoryForEntityParams struct {
 
 func (q *Queries) ListChangeHistoryForEntity(ctx context.Context, arg ListChangeHistoryForEntityParams) ([]ChangeHistory, error) {
 	rows, err := q.db.QueryContext(ctx, listChangeHistoryForEntity, arg.EntityType, arg.EntityID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ChangeHistory{}
+	for rows.Next() {
+		var i ChangeHistory
+		if err := rows.Scan(
+			&i.ID,
+			&i.EntityType,
+			&i.EntityID,
+			&i.ActorID,
+			&i.ActorUsername,
+			&i.Action,
+			&i.BeforeState,
+			&i.AfterState,
+			&i.RollbackOf,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listFilteredChangeHistory = `-- name: ListFilteredChangeHistory :many
+SELECT id, entity_type, entity_id, actor_id, actor_username, action, before_state, after_state, rollback_of, created_at
+FROM change_history
+WHERE (
+    $1::text = ''
+    OR actor_id = NULLIF($1::text, '')::uuid
+  )
+  AND (
+    $2::text = ''
+    OR action = $2::text
+  )
+  AND (
+    $3::text = ''
+    OR entity_type = $3::text
+  )
+  AND (
+    $4::text = ''
+    OR actor_username ILIKE $4::text ESCAPE '\'
+    OR coalesce(before_state->>'artist', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce(after_state->>'artist', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce(before_state->>'role', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce(after_state->>'role', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce(before_state->>'rating', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce(after_state->>'rating', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce(before_state->>'source_url', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce(after_state->>'source_url', '') ILIKE $4::text ESCAPE '\'
+    OR coalesce((before_state->'tags')::text, '') ILIKE $4::text ESCAPE '\'
+    OR coalesce((after_state->'tags')::text, '') ILIKE $4::text ESCAPE '\'
+  )
+ORDER BY
+  CASE WHEN $5::text = 'oldest' THEN created_at END ASC,
+  CASE WHEN $5::text <> 'oldest' THEN created_at END DESC,
+  CASE WHEN $5::text = 'oldest' THEN id END ASC,
+  CASE WHEN $5::text <> 'oldest' THEN id END DESC
+LIMIT $7 OFFSET $6
+`
+
+type ListFilteredChangeHistoryParams struct {
+	ActorID   string
+	Action    string
+	Entity    string
+	Query     string
+	Sort      string
+	RowOffset int32
+	RowLimit  int32
+}
+
+// Staff history page. The text search matches the actor and the snapshot
+// fields a person would type. It does not search the whole jsonb document:
+// keys such as hidden and deleted are on every post snapshot.
+func (q *Queries) ListFilteredChangeHistory(ctx context.Context, arg ListFilteredChangeHistoryParams) ([]ChangeHistory, error) {
+	rows, err := q.db.QueryContext(ctx, listFilteredChangeHistory,
+		arg.ActorID,
+		arg.Action,
+		arg.Entity,
+		arg.Query,
+		arg.Sort,
+		arg.RowOffset,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

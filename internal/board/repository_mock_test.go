@@ -114,6 +114,72 @@ func (_c *MockRepository_CountBoardMatches_Call) RunAndReturn(run func(ctx conte
 	return _c
 }
 
+// CountMetaEditsByActor provides a mock function for the type MockRepository
+func (_mock *MockRepository) CountMetaEditsByActor(ctx context.Context, actorID string) (int64, error) {
+	ret := _mock.Called(ctx, actorID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountMetaEditsByActor")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (int64, error)); ok {
+		return returnFunc(ctx, actorID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) int64); ok {
+		r0 = returnFunc(ctx, actorID)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, actorID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_CountMetaEditsByActor_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountMetaEditsByActor'
+type MockRepository_CountMetaEditsByActor_Call struct {
+	*mock.Call
+}
+
+// CountMetaEditsByActor is a helper method to define mock.On call
+//   - ctx context.Context
+//   - actorID string
+func (_e *MockRepository_Expecter) CountMetaEditsByActor(ctx any, actorID any) *MockRepository_CountMetaEditsByActor_Call {
+	return &MockRepository_CountMetaEditsByActor_Call{Call: _e.mock.On("CountMetaEditsByActor", ctx, actorID)}
+}
+
+func (_c *MockRepository_CountMetaEditsByActor_Call) Run(run func(ctx context.Context, actorID string)) *MockRepository_CountMetaEditsByActor_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_CountMetaEditsByActor_Call) Return(n int64, err error) *MockRepository_CountMetaEditsByActor_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockRepository_CountMetaEditsByActor_Call) RunAndReturn(run func(ctx context.Context, actorID string) (int64, error)) *MockRepository_CountMetaEditsByActor_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CountPostsByOwner provides a mock function for the type MockRepository
 func (_mock *MockRepository) CountPostsByOwner(ctx context.Context, ownerID string) (int64, error) {
 	ret := _mock.Called(ctx, ownerID)
@@ -248,6 +314,78 @@ func (_c *MockRepository_CountPostsByOwnerSince_Call) Return(n int64, err error)
 }
 
 func (_c *MockRepository_CountPostsByOwnerSince_Call) RunAndReturn(run func(ctx context.Context, ownerID string, within time.Duration) (int64, error)) *MockRepository_CountPostsByOwnerSince_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CountPublicPostsByOwner provides a mock function for the type MockRepository
+func (_mock *MockRepository) CountPublicPostsByOwner(ctx context.Context, ownerID string, includeNSFW bool) (int64, error) {
+	ret := _mock.Called(ctx, ownerID, includeNSFW)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountPublicPostsByOwner")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) (int64, error)); ok {
+		return returnFunc(ctx, ownerID, includeNSFW)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) int64); ok {
+		r0 = returnFunc(ctx, ownerID, includeNSFW)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
+		r1 = returnFunc(ctx, ownerID, includeNSFW)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_CountPublicPostsByOwner_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountPublicPostsByOwner'
+type MockRepository_CountPublicPostsByOwner_Call struct {
+	*mock.Call
+}
+
+// CountPublicPostsByOwner is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ownerID string
+//   - includeNSFW bool
+func (_e *MockRepository_Expecter) CountPublicPostsByOwner(ctx any, ownerID any, includeNSFW any) *MockRepository_CountPublicPostsByOwner_Call {
+	return &MockRepository_CountPublicPostsByOwner_Call{Call: _e.mock.On("CountPublicPostsByOwner", ctx, ownerID, includeNSFW)}
+}
+
+func (_c *MockRepository_CountPublicPostsByOwner_Call) Run(run func(ctx context.Context, ownerID string, includeNSFW bool)) *MockRepository_CountPublicPostsByOwner_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_CountPublicPostsByOwner_Call) Return(n int64, err error) *MockRepository_CountPublicPostsByOwner_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockRepository_CountPublicPostsByOwner_Call) RunAndReturn(run func(ctx context.Context, ownerID string, includeNSFW bool) (int64, error)) *MockRepository_CountPublicPostsByOwner_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -717,6 +855,72 @@ func (_c *MockRepository_InsertHistory_Call) RunAndReturn(run func(ctx context.C
 	return _c
 }
 
+// LastMetaEditor provides a mock function for the type MockRepository
+func (_mock *MockRepository) LastMetaEditor(ctx context.Context, postID string) (string, error) {
+	ret := _mock.Called(ctx, postID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LastMetaEditor")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return returnFunc(ctx, postID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = returnFunc(ctx, postID)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, postID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_LastMetaEditor_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LastMetaEditor'
+type MockRepository_LastMetaEditor_Call struct {
+	*mock.Call
+}
+
+// LastMetaEditor is a helper method to define mock.On call
+//   - ctx context.Context
+//   - postID string
+func (_e *MockRepository_Expecter) LastMetaEditor(ctx any, postID any) *MockRepository_LastMetaEditor_Call {
+	return &MockRepository_LastMetaEditor_Call{Call: _e.mock.On("LastMetaEditor", ctx, postID)}
+}
+
+func (_c *MockRepository_LastMetaEditor_Call) Run(run func(ctx context.Context, postID string)) *MockRepository_LastMetaEditor_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_LastMetaEditor_Call) Return(s string, err error) *MockRepository_LastMetaEditor_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockRepository_LastMetaEditor_Call) RunAndReturn(run func(ctx context.Context, postID string) (string, error)) *MockRepository_LastMetaEditor_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListImplications provides a mock function for the type MockRepository
 func (_mock *MockRepository) ListImplications(ctx context.Context) ([]model.TagImplication, error) {
 	ret := _mock.Called(ctx)
@@ -941,6 +1145,92 @@ func (_c *MockRepository_ListPostsByOwner_Call) Return(posts []model.Post, err e
 }
 
 func (_c *MockRepository_ListPostsByOwner_Call) RunAndReturn(run func(ctx context.Context, ownerID string, includeNSFW bool, limit int32, offset int32) ([]model.Post, error)) *MockRepository_ListPostsByOwner_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListPublicPostsByOwner provides a mock function for the type MockRepository
+func (_mock *MockRepository) ListPublicPostsByOwner(ctx context.Context, ownerID string, includeNSFW bool, limit int32, offset int32) ([]model.Post, error) {
+	ret := _mock.Called(ctx, ownerID, includeNSFW, limit, offset)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPublicPostsByOwner")
+	}
+
+	var r0 []model.Post
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, int32, int32) ([]model.Post, error)); ok {
+		return returnFunc(ctx, ownerID, includeNSFW, limit, offset)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, int32, int32) []model.Post); ok {
+		r0 = returnFunc(ctx, ownerID, includeNSFW, limit, offset)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]model.Post)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool, int32, int32) error); ok {
+		r1 = returnFunc(ctx, ownerID, includeNSFW, limit, offset)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_ListPublicPostsByOwner_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPublicPostsByOwner'
+type MockRepository_ListPublicPostsByOwner_Call struct {
+	*mock.Call
+}
+
+// ListPublicPostsByOwner is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ownerID string
+//   - includeNSFW bool
+//   - limit int32
+//   - offset int32
+func (_e *MockRepository_Expecter) ListPublicPostsByOwner(ctx any, ownerID any, includeNSFW any, limit any, offset any) *MockRepository_ListPublicPostsByOwner_Call {
+	return &MockRepository_ListPublicPostsByOwner_Call{Call: _e.mock.On("ListPublicPostsByOwner", ctx, ownerID, includeNSFW, limit, offset)}
+}
+
+func (_c *MockRepository_ListPublicPostsByOwner_Call) Run(run func(ctx context.Context, ownerID string, includeNSFW bool, limit int32, offset int32)) *MockRepository_ListPublicPostsByOwner_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		var arg3 int32
+		if args[3] != nil {
+			arg3 = args[3].(int32)
+		}
+		var arg4 int32
+		if args[4] != nil {
+			arg4 = args[4].(int32)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_ListPublicPostsByOwner_Call) Return(posts []model.Post, err error) *MockRepository_ListPublicPostsByOwner_Call {
+	_c.Call.Return(posts, err)
+	return _c
+}
+
+func (_c *MockRepository_ListPublicPostsByOwner_Call) RunAndReturn(run func(ctx context.Context, ownerID string, includeNSFW bool, limit int32, offset int32) ([]model.Post, error)) *MockRepository_ListPublicPostsByOwner_Call {
 	_c.Call.Return(run)
 	return _c
 }

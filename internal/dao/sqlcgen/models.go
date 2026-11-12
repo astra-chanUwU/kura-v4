@@ -63,6 +63,17 @@ type ListItem struct {
 	CreatedAt time.Time
 }
 
+type Notification struct {
+	ID          uuid.UUID
+	RecipientID uuid.UUID
+	ActorID     uuid.NullUUID
+	Kind        string
+	PostID      uuid.UUID
+	CommentID   uuid.NullUUID
+	CreatedAt   time.Time
+	ReadAt      sql.NullTime
+}
+
 type PasswordCredential struct {
 	UserID       uuid.UUID
 	PasswordHash string
@@ -169,6 +180,19 @@ type TagPage struct {
 	Description string
 	UpdatedBy   uuid.NullUUID
 	UpdatedAt   time.Time
+}
+
+type TagSuggestion struct {
+	ID         uuid.UUID
+	Kind       string
+	SourceTag  string
+	TargetTag  string
+	Reason     string
+	Status     string
+	AuthorID   uuid.UUID
+	ResolvedBy uuid.NullUUID
+	CreatedAt  time.Time
+	ResolvedAt sql.NullTime
 }
 
 type User struct {

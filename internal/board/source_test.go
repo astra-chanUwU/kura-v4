@@ -199,6 +199,16 @@ func (f *fakeRepo) EnsureArtistPage(_ context.Context, tag string) error {
 func (f *fakeRepo) ListImplications(context.Context) ([]model.TagImplication, error) {
 	return nil, nil
 }
+func (f *fakeRepo) CountPublicPostsByOwner(context.Context, string, bool) (int64, error) {
+	return 0, nil
+}
+func (f *fakeRepo) ListPublicPostsByOwner(context.Context, string, bool, int32, int32) ([]model.Post, error) {
+	return nil, nil
+}
+func (f *fakeRepo) CountMetaEditsByActor(context.Context, string) (int64, error) { return 0, nil }
+func (f *fakeRepo) LastMetaEditor(context.Context, string) (string, error) {
+	return "", sql.ErrNoRows
+}
 func (f *fakeRepo) TagAliasTargets(_ context.Context, tags []string) (map[string]string, error) {
 	out := map[string]string{}
 	for _, tag := range tags {

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useReportActions } from "../hooks/useReports";
+import { ThemedSelect } from "./ThemedSelect";
 import { shortError } from "./Toasts";
 import styles from "./PostReport.module.css";
 
@@ -39,15 +40,15 @@ export function PostReport({ postId, signedIn }: { postId: string; signedIn: boo
   return (
     <form className={styles.form} onSubmit={submit}>
       <h2>Report</h2>
-      <label>
+      <label className={styles.reason}>
         Reason
-        <select value={reason} onChange={(event) => setReason(event.target.value)}>
+        <ThemedSelect label="Reason" value={reason} onChange={setReason}>
           {REASONS.map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
           ))}
-        </select>
+        </ThemedSelect>
       </label>
       <label>
         Note

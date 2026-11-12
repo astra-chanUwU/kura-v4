@@ -5,22 +5,39 @@ import { IconEye, IconTrash } from "../components/icons";
 import { ThemedSelect } from "../components/ThemedSelect";
 import { shortError, useToasts } from "../components/Toasts";
 import { atLeast } from "../domain/roles";
-import { useHiddenPosts, useLoadMore, useMe, useStaffActions } from "../hooks/useKura";
+import {
+  useDebouncedValue,
+  useHiddenPosts,
+  useLoadMore,
+  useMe,
+  useStaffActions,
+} from "../hooks/useKura";
 import { StaffSection } from "./StaffLayout";
 import styles from "./HiddenPostsPage.module.css";
 import simple from "./Simple.module.css";
 
-type Filter = "all" | "hidden" | "deleted";
+type Kind = "all" | "hidden" | "deleted";
+type Rating = "" | "sfw" | "nsfw";
+type Sort = "newest" | "oldest";
+
+function matchLabel(total: number): string {
+  return total === 1 ? "1 match" : `${total} matches`;
+}
 
 export function HiddenPostsPage() {
   const { user } = useMe();
   const toasts = useToasts();
   const staff = useStaffActions();
-  const [filter, setFilter] = useState<Filter>("all");
+  const [kind, setKind] = useState<Kind>("all");
+  const [q, setQ] = useState("");
+  const [rating, setRating] = useState<Rating>("");
+  const [sort, setSort] = useState<Sort>("newest");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const debouncedQ = useDebouncedValue(q, 300);
+  const submittedQ = debouncedQ.trim();
   const isStaff = !!user && atLeast(user.role, "moderator");
   const isAdmin = !!user && atLeast(user.role, "admin");
-  const hidden = useHiddenPosts(isStaff, filter);
+  const hidden = useHiddenPosts(isStaff, { kind, q: submittedQ, rating, sort });
   const moreRef = useLoadMore(hidden.hasMore && !hidden.loadingMore, hidden.loadMore);
 
   if (!user) return null;
@@ -45,11 +62,29 @@ export function HiddenPostsPage() {
       }
     >
       <div className={styles.filterRow}>
-        <ThemedSelect label="Show" value={filter} onChange={(next) => setFilter(next as Filter)}>
+        <ThemedSelect label="Show" value={kind} onChange={(next) => setKind(next as Kind)}>
           <option value="all">All removed ({hidden.hidden + hidden.deleted})</option>
           <option value="hidden">Hidden only ({hidden.hidden})</option>
           <option value="deleted">Deleted only ({hidden.deleted})</option>
         </ThemedSelect>
+        <input
+          type="text"
+          className={styles.search}
+          value={q}
+          onChange={(event) => setQ(event.target.value)}
+          placeholder="Artist, tag, uploader, or who removed it"
+          aria-label="Search removed posts"
+        />
+        <ThemedSelect label="Rating" value={rating} onChange={(next) => setRating(next as Rating)}>
+          <option value="">Any rating</option>
+          <option value="sfw">SFW</option>
+          <option value="nsfw">NSFW</option>
+        </ThemedSelect>
+        <ThemedSelect label="Order" value={sort} onChange={(next) => setSort(next as Sort)}>
+          <option value="newest">Newest removal</option>
+          <option value="oldest">Oldest removal</option>
+        </ThemedSelect>
+        {!hidden.isPending && <p className={styles.matchCount}>{matchLabel(hidden.total)}</p>}
       </div>
       {hidden.isPending && <p className={simple.muted}>Loading…</p>}
       {hidden.error && (
@@ -58,7 +93,11 @@ export function HiddenPostsPage() {
         </p>
       )}
       {!hidden.isPending && shown.length === 0 && (
-        <p className={simple.muted}>Nothing here. The board is fully visible.</p>
+        <p className={simple.muted}>
+          {submittedQ !== "" || rating !== ""
+            ? "Nothing matches."
+            : "Nothing here. The board is fully visible."}
+        </p>
       )}
       <div className={simple.grid}>
         {shown.map((post) => (

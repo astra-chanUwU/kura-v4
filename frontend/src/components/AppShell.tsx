@@ -1,5 +1,6 @@
 import { Link, Outlet } from "@tanstack/react-router";
 import { useCallback } from "react";
+import { NotificationBell } from "./NotificationBell";
 import { ThemedSelect } from "./ThemedSelect";
 import { useAccountActions, useMe } from "../hooks/useKura";
 import { useAppearance } from "../hooks/useAppearance";
@@ -54,6 +55,7 @@ export function AppShell() {
                     Staff
                   </Link>
                 )}
+                <NotificationBell />
                 <Link
                   to="/me"
                   activeProps={{ className: styles.active }}

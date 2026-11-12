@@ -302,6 +302,34 @@ func (d *AccountsDAO) ListUsers(ctx context.Context) ([]model.User, error) {
 	}
 	return out, nil
 }
+
+func (d *AccountsDAO) ListFilteredUsers(ctx context.Context, query, role, sort string, limit, offset int32) ([]model.User, error) {
+	rows, err := d.q.ListFilteredUsers(ctx, sqlcgen.ListFilteredUsersParams{
+		Query: substringLike(query), Role: role, Sort: sort, RowLimit: limit, RowOffset: offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.User, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, userFrom(r.ID, r.Username, r.DisplayName, r.Bio, r.Location, r.Website, r.CreatedAt, r.AvatarKey, r.AvatarType, r.ShowNsfw, r.DefaultIncludeTags, r.DefaultExcludeTags, r.PreferredTheme, r.PreferredFont, r.TagSuggestionRows, r.Role))
+	}
+	return out, nil
+}
+
+func (d *AccountsDAO) CountFilteredUsers(ctx context.Context, query, role string) (int64, error) {
+	return d.q.CountFilteredUsers(ctx, sqlcgen.CountFilteredUsersParams{
+		Query: substringLike(query), Role: role,
+	})
+}
+
+func (d *AccountsDAO) CountUsersByRoles(ctx context.Context) (int64, int64, int64, int64, error) {
+	row, err := d.q.CountUsersByRoles(ctx)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+	return row.Member, row.Moderator, row.Admin, row.SuperAdmin, nil
+}
 func (d *AccountsDAO) UpdateUserRole(ctx context.Context, userID string, role model.Role) (model.User, error) {
 	uid, err := parseUUID(userID)
 	if err != nil {
@@ -319,4 +347,16 @@ func (d *AccountsDAO) CountUsersByRole(ctx context.Context, role model.Role) (in
 
 func (d *AccountsDAO) CountUsers(ctx context.Context) (int64, error) {
 	return d.q.CountUsers(ctx)
+}
+
+func (d *AccountsDAO) SearchUsernames(ctx context.Context, query string) ([]model.HistoryActor, error) {
+	rows, err := d.q.SearchUsernames(ctx, substringLike(query))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.HistoryActor, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, model.HistoryActor{ID: r.ID.String(), Username: r.Username})
+	}
+	return out, nil
 }

@@ -69,6 +69,18 @@ func MarshalRoleSnapshot(s RoleSnapshot) json.RawMessage {
 	return b
 }
 
+// HistoryPage is one filtered page of the staff change feed.
+type HistoryPage struct {
+	Total   int64
+	Entries []ChangeEntry
+}
+
+// HistoryActor is a username match for the history actor picker.
+type HistoryActor struct {
+	ID       string
+	Username string
+}
+
 // SnapshotOf captures a post's rollback-able state.
 func SnapshotOf(p Post) PostSnapshot {
 	tags := p.Tags

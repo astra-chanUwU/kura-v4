@@ -72,6 +72,11 @@
 .page a {
   color: var(--accent);
 }
+.uploads {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.6rem;
+}
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));

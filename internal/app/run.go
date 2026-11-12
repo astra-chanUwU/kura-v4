@@ -16,6 +16,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/db"
 	"github.com/astra-chanUwU/kura-v4/internal/jobs"
 	"github.com/astra-chanUwU/kura-v4/internal/moderation"
+	"github.com/astra-chanUwU/kura-v4/internal/notifications"
 	"github.com/astra-chanUwU/kura-v4/internal/reports"
 	"github.com/astra-chanUwU/kura-v4/internal/repository"
 	"github.com/astra-chanUwU/kura-v4/internal/searches"
@@ -52,6 +53,7 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	reportsSvc := reports.NewService(repository.NewReports(dao.NewReports(conn)))
 	searchesSvc := searches.NewService(repository.NewSavedSearches(dao.NewSavedSearches(conn)))
 	tagsSvc := tags.NewService(repository.NewTagPages(dao.NewTagPages(conn)))
+	notesSvc := notifications.NewService(repository.NewNotifications(dao.NewNotifications(conn)))
 	moderationSvc := moderation.NewService(repository.NewModeration(dao.NewAccounts(conn), postsRepo, dao.NewAudit(conn)))
 	jobsSvc := jobs.NewService(repository.NewJobs(dao.NewJobs(conn)))
 	// Fail clearly if migrations have not been applied.
@@ -61,7 +63,7 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	if err != nil {
 		return errors.New("site schema unavailable; run the migrate command before serve")
 	}
-	api := NewHTTP(HTTPDeps{Site: svc, Accounts: accountsSvc, Board: boardSvc, Collections: collectionsSvc, Moderation: moderationSvc, Jobs: jobsSvc, Comments: commentsSvc, Reports: reportsSvc, Searches: searchesSvc, Tags: tagsSvc, Ping: conn.PingContext, Assets: webui.Files(), Log: log, SecureCookie: strings.HasPrefix(cfg.PublicURL, "https://")})
+	api := NewHTTP(HTTPDeps{Site: svc, Accounts: accountsSvc, Board: boardSvc, Collections: collectionsSvc, Moderation: moderationSvc, Jobs: jobsSvc, Comments: commentsSvc, Reports: reportsSvc, Searches: searchesSvc, Tags: tagsSvc, Notifications: notesSvc, Ping: conn.PingContext, Assets: webui.Files(), Log: log, SecureCookie: strings.HasPrefix(cfg.PublicURL, "https://")})
 	workerCtx, stopWorkers := context.WithCancel(ctx)
 	workerDone := make(chan struct{})
 	sweepDone := make(chan struct{})

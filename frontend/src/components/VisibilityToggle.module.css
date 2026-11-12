@@ -1,0 +1,69 @@
+.toggle {
+  --thumb: 0;
+  position: relative;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  padding: 0.16rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.toggle:has(.option:last-child[aria-pressed="true"]) {
+  --thumb: 1;
+}
+
+.toggle::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 0.16rem;
+  bottom: 0.16rem;
+  left: 0.16rem;
+  width: calc((100% - 0.32rem) / 2);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  transform: translateX(calc(var(--thumb) * 100%));
+  transition: transform 160ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toggle::before {
+    transition: none;
+  }
+}
+
+.toggle .option {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: auto;
+  margin: 0;
+  padding: 0.48rem 0.8rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.toggle .option[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+.toggle .option:hover {
+  color: var(--text);
+}
+
+.toggle .option[aria-pressed="true"]:hover {
+  color: var(--accent);
+}

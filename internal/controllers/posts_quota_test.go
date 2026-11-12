@@ -87,6 +87,16 @@ func (r *quotaRepo) TagAliasTargets(context.Context, []string) (map[string]strin
 func (r *quotaRepo) ListImplications(context.Context) ([]model.TagImplication, error) {
 	return nil, nil
 }
+func (r *quotaRepo) CountPublicPostsByOwner(context.Context, string, bool) (int64, error) {
+	return 0, nil
+}
+func (r *quotaRepo) ListPublicPostsByOwner(context.Context, string, bool, int32, int32) ([]model.Post, error) {
+	return nil, nil
+}
+func (r *quotaRepo) CountMetaEditsByActor(context.Context, string) (int64, error) { return 0, nil }
+func (r *quotaRepo) LastMetaEditor(context.Context, string) (string, error) {
+	return "", nil
+}
 
 type quotaMedia struct{ stored bool }
 

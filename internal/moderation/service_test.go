@@ -2,6 +2,7 @@ package moderation
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/astra-chanUwU/kura-v4/internal/model"
@@ -122,19 +123,126 @@ func TestRollbackRoleReChecksHierarchy(t *testing.T) {
 
 func TestListHiddenPostsNeedsModerator(t *testing.T) {
 	repo := NewMockRepository(t)
-	_, err := NewService(repo).ListHiddenPosts(context.Background(), member, "all", 0, 0)
+	_, err := NewService(repo).ListHiddenPosts(context.Background(), member, "all", "", "", "", 0, 0)
 	require.ErrorIs(t, err, ErrForbidden)
 
 	repo2 := NewMockRepository(t)
 	want := []model.Post{{ID: "p1", Hidden: true, Deleted: true}, {ID: "p2", Hidden: true}}
 	repo2.EXPECT().CountRemovedPosts(mock.Anything).Return(int64(1), int64(1), nil)
-	repo2.EXPECT().ListHiddenPosts(mock.Anything, "all", int32(40), int32(0)).Return(want, nil)
-	got, err := NewService(repo2).ListHiddenPosts(context.Background(), moderator, "", 0, 0)
+	repo2.EXPECT().CountHiddenPosts(mock.Anything, "all", "", "").Return(int64(2), nil)
+	repo2.EXPECT().ListHiddenPosts(mock.Anything, "all", "", "", "", int32(40), int32(0)).Return(want, nil)
+	got, err := NewService(repo2).ListHiddenPosts(context.Background(), moderator, "", "", "", "", 0, 0)
 	require.NoError(t, err)
 	require.Equal(t, want, got.Posts)
 	require.Equal(t, int64(2), got.Total)
 	require.Equal(t, int64(1), got.Hidden)
 	require.Equal(t, int64(1), got.Deleted)
+}
+
+func TestListHiddenPostsRejectsRating(t *testing.T) {
+	repo := NewMockRepository(t)
+	_, err := NewService(repo).ListHiddenPosts(context.Background(), moderator, "hidden", "ada", "questionable", "newest", 10, 0)
+	var vErr *ValidationError
+	require.ErrorAs(t, err, &vErr)
+	require.EqualError(t, err, "rating must be sfw or nsfw")
+}
+
+func TestListHistoryRejectsAction(t *testing.T) {
+	repo := NewMockRepository(t)
+	_, err := NewService(repo).ListHistory(context.Background(), moderator, "", "ada", "nope", "post", "newest", 10, 0)
+	var vErr *ValidationError
+	require.ErrorAs(t, err, &vErr)
+	require.EqualError(t, err, "action is not a history action")
+}
+
+func TestListHistoryNeedsModerator(t *testing.T) {
+	repo := NewMockRepository(t)
+	_, err := NewService(repo).ListHistory(context.Background(), member, "", "", "", "", "", 0, 0)
+	require.ErrorIs(t, err, ErrForbidden)
+
+	repo2 := NewMockRepository(t)
+	repo2.EXPECT().CountHistory(mock.Anything, "", "", "", "").Return(int64(0), nil)
+	repo2.EXPECT().ListHistory(mock.Anything, "", "", "", "", "", int32(40), int32(0)).Return(nil, nil)
+	got, err := NewService(repo2).ListHistory(context.Background(), moderator, "", "  ", "", "", "", 0, 0)
+	require.NoError(t, err)
+	require.NotNil(t, got.Entries)
+	require.Empty(t, got.Entries)
+	require.Equal(t, int64(0), got.Total)
+}
+
+func TestListHistoryForwardsFilters(t *testing.T) {
+	repo := NewMockRepository(t)
+	want := []model.ChangeEntry{{ID: "h1", Action: "post.hidden", EntityType: "post"}}
+	repo.EXPECT().CountHistory(mock.Anything, "", "ada", "post.hidden", "post").Return(int64(4), nil)
+	repo.EXPECT().ListHistory(mock.Anything, "", "ada", "post.hidden", "post", "oldest", int32(20), int32(5)).Return(want, nil)
+	got, err := NewService(repo).ListHistory(context.Background(), moderator, "", "  ada  ", "post.hidden", "post", "oldest", 20, 5)
+	require.NoError(t, err)
+	require.Equal(t, want, got.Entries)
+	require.Equal(t, int64(4), got.Total)
+}
+
+func TestListHistoryRejectsFilters(t *testing.T) {
+	const id = "11111111-1111-4111-8111-111111111111"
+	cases := []struct {
+		name, actorID, query, action, entity, sort, msg string
+	}{
+		{name: "entity", entity: "comment", msg: "entity must be post or user"},
+		{name: "sort", sort: "popular", msg: "sort must be newest or oldest"},
+		{name: "actor", actorID: "ada", msg: "actor_id must be a user id"},
+		{name: "query", query: strings.Repeat("あ", 81), msg: "q must be 80 characters or fewer"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := NewMockRepository(t)
+			_, err := NewService(repo).ListHistory(context.Background(), moderator, tc.actorID, tc.query, tc.action, tc.entity, tc.sort, 10, 0)
+			require.EqualError(t, err, tc.msg)
+		})
+	}
+
+	repo := NewMockRepository(t)
+	repo.EXPECT().CountHistory(mock.Anything, id, "", "", "").Return(int64(1), nil)
+	repo.EXPECT().ListHistory(mock.Anything, id, "", "", "", "newest", int32(40), int32(0)).Return([]model.ChangeEntry{}, nil)
+	_, err := NewService(repo).ListHistory(context.Background(), moderator, strings.ToUpper(id), "", "", "", "newest", 0, 0)
+	require.NoError(t, err)
+}
+
+func TestSearchHistoryActorsNeedsModerator(t *testing.T) {
+	repo := NewMockRepository(t)
+	_, err := NewService(repo).SearchHistoryActors(context.Background(), member, "ada")
+	require.ErrorIs(t, err, ErrForbidden)
+
+	repo2 := NewMockRepository(t)
+	want := []model.HistoryActor{{ID: "u1", Username: "Ada"}}
+	repo2.EXPECT().SearchUsernames(mock.Anything, "ada").Return(want, nil)
+	got, err := NewService(repo2).SearchHistoryActors(context.Background(), moderator, "  ada  ")
+	require.NoError(t, err)
+	require.Equal(t, want, got)
+}
+
+func TestSearchHistoryActorsEmptySkipsQuery(t *testing.T) {
+	repo := NewMockRepository(t)
+	got, err := NewService(repo).SearchHistoryActors(context.Background(), moderator, "   ")
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Empty(t, got)
+
+	repo2 := NewMockRepository(t)
+	_, err = NewService(repo2).SearchHistoryActors(context.Background(), moderator, strings.Repeat("あ", 81))
+	require.EqualError(t, err, "q must be 80 characters or fewer")
+}
+
+func TestListHiddenPostsForwardsFilters(t *testing.T) {
+	repo := NewMockRepository(t)
+	want := []model.Post{{ID: "p9", Hidden: true, Artist: "catgirl"}}
+	repo.EXPECT().CountRemovedPosts(mock.Anything).Return(int64(8), int64(3), nil)
+	repo.EXPECT().CountHiddenPosts(mock.Anything, "all", "catgirl", "sfw").Return(int64(1), nil)
+	repo.EXPECT().ListHiddenPosts(mock.Anything, "all", "catgirl", "sfw", "oldest", int32(20), int32(5)).Return(want, nil)
+	got, err := NewService(repo).ListHiddenPosts(context.Background(), moderator, "all", "  catgirl  ", "sfw", "oldest", 20, 5)
+	require.NoError(t, err)
+	require.Equal(t, want, got.Posts)
+	require.Equal(t, int64(1), got.Total)
+	require.Equal(t, int64(8), got.Hidden)
+	require.Equal(t, int64(3), got.Deleted)
 }
 
 func TestAdminDeleteMarksDeletedAndRollbackRestoresIt(t *testing.T) {
@@ -162,4 +270,79 @@ func TestAdminDeleteMarksDeletedAndRollbackRestoresIt(t *testing.T) {
 	}), mock.Anything).Return(nil)
 	_, err = NewService(repo2).Rollback(context.Background(), moderator, "h-del")
 	require.NoError(t, err)
+}
+
+func TestListUserPageNeedsAdmin(t *testing.T) {
+	repo := NewMockRepository(t)
+	_, err := NewService(repo).ListUserPage(context.Background(), member, "", "owner", "newest", 10, 0)
+	require.ErrorIs(t, err, ErrForbidden)
+
+	repo2 := NewMockRepository(t)
+	_, err = NewService(repo2).ListUserPage(context.Background(), moderator, "ada", "member", "name", 10, 0)
+	require.ErrorIs(t, err, ErrForbidden)
+
+	repo3 := NewMockRepository(t)
+	want := []model.User{{ID: "u1", Username: "ada", Role: model.RoleMember}}
+	repo3.EXPECT().CountUsersByRoles(mock.Anything).Return(int64(4), int64(2), int64(1), int64(1), nil)
+	repo3.EXPECT().CountFilteredUsers(mock.Anything, "", "").Return(int64(8), nil)
+	repo3.EXPECT().ListFilteredUsers(mock.Anything, "", "", "name", int32(40), int32(0)).Return(want, nil)
+	got, err := NewService(repo3).ListUserPage(context.Background(), admin, "  ", "", "", 0, 0)
+	require.NoError(t, err)
+	require.Equal(t, want, got.Users)
+	require.Equal(t, int64(8), got.Total)
+	require.Equal(t, int64(4), got.Member)
+	require.Equal(t, int64(2), got.Moderator)
+	require.Equal(t, int64(1), got.Admin)
+	require.Equal(t, int64(1), got.SuperAdmin)
+}
+
+func TestListUserPageRejectsRoleBeforeQuery(t *testing.T) {
+	repo := NewMockRepository(t)
+	_, err := NewService(repo).ListUserPage(context.Background(), admin, "ada", "owner", "name", 10, 0)
+	require.EqualError(t, err, "role must be member, moderator, admin, or super_admin")
+}
+
+func TestListUserPageForwardsFilters(t *testing.T) {
+	repo := NewMockRepository(t)
+	want := []model.User{{ID: "u9", Username: "bea", DisplayName: "Bea", Role: model.RoleModerator}}
+	repo.EXPECT().CountUsersByRoles(mock.Anything).Return(int64(10), int64(3), int64(2), int64(1), nil)
+	repo.EXPECT().CountFilteredUsers(mock.Anything, "bea", "moderator").Return(int64(1), nil)
+	repo.EXPECT().ListFilteredUsers(mock.Anything, "bea", "moderator", "oldest", int32(20), int32(5)).Return(want, nil)
+	got, err := NewService(repo).ListUserPage(context.Background(), superAdmin, "  bea  ", "moderator", "oldest", 20, 5)
+	require.NoError(t, err)
+	require.Equal(t, want, got.Users)
+	require.Equal(t, int64(1), got.Total)
+	require.Equal(t, int64(10), got.Member)
+	require.Equal(t, int64(3), got.Moderator)
+	require.Equal(t, int64(2), got.Admin)
+	require.Equal(t, int64(1), got.SuperAdmin)
+}
+
+func TestListUserPageRejectsFilters(t *testing.T) {
+	cases := []struct {
+		name, query, role, sort, msg string
+	}{
+		{name: "query", query: strings.Repeat("あ", 81), msg: "q must be 80 characters or fewer"},
+		{name: "role", role: "visitor", msg: "role must be member, moderator, admin, or super_admin"},
+		{name: "sort", sort: "popular", msg: "sort must be name, newest, or oldest"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := NewMockRepository(t)
+			_, err := NewService(repo).ListUserPage(context.Background(), admin, tc.query, tc.role, tc.sort, 10, 0)
+			require.EqualError(t, err, tc.msg)
+		})
+	}
+}
+
+func TestListUserPageNilUsers(t *testing.T) {
+	repo := NewMockRepository(t)
+	repo.EXPECT().CountUsersByRoles(mock.Anything).Return(int64(0), int64(0), int64(0), int64(0), nil)
+	repo.EXPECT().CountFilteredUsers(mock.Anything, "", "super_admin").Return(int64(0), nil)
+	repo.EXPECT().ListFilteredUsers(mock.Anything, "", "super_admin", "newest", int32(100), int32(0)).Return(nil, nil)
+	got, err := NewService(repo).ListUserPage(context.Background(), admin, "", "super_admin", "newest", 500, -4)
+	require.NoError(t, err)
+	require.NotNil(t, got.Users)
+	require.Empty(t, got.Users)
+	require.Equal(t, int64(0), got.Total)
 }

@@ -74,13 +74,16 @@ type Comments interface {
 // Moderation is the subset of moderation.Service the CLI uses.
 type Moderation interface {
 	ListUsers(ctx context.Context, actor model.User) ([]model.User, error)
+	ListUserPage(ctx context.Context, actor model.User, query, role, sort string, limit, offset int) (model.UserPage, error)
 	SetRole(ctx context.Context, actor model.User, targetID string, newRole model.Role) (model.User, error)
 	SetPostHidden(ctx context.Context, actor model.User, postID string, hidden bool, deleted bool) (model.Post, error)
 	HistoryForPost(ctx context.Context, postID string, limit int32) ([]model.ChangeEntry, error)
 	RecentHistory(ctx context.Context, actor model.User, limit int32) ([]model.ChangeEntry, error)
 	HistoryByActor(ctx context.Context, actor model.User, actorID string, limit int32) ([]model.ChangeEntry, error)
+	ListHistory(ctx context.Context, actor model.User, actorID, query, action, entity, sort string, limit, offset int) (model.HistoryPage, error)
+	SearchHistoryActors(ctx context.Context, actor model.User, query string) ([]model.HistoryActor, error)
 	Rollback(ctx context.Context, actor model.User, historyID string) (model.ChangeEntry, error)
-	ListHiddenPosts(ctx context.Context, actor model.User, kind string, limit, offset int) (model.HiddenPage, error)
+	ListHiddenPosts(ctx context.Context, actor model.User, kind, query, rating, sort string, limit, offset int) (model.HiddenPage, error)
 }
 
 // Reports is the subset of reports.Service the CLI uses.

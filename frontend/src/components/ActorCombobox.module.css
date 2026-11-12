@@ -1,0 +1,163 @@
+.wrap {
+  position: relative;
+  flex: 1 1 12rem;
+  min-width: min(11rem, 100%);
+  max-width: 16rem;
+}
+
+.open {
+  z-index: 30;
+}
+
+.field {
+  display: grid;
+  width: 100%;
+}
+
+.input,
+.selected,
+.completion {
+  width: 100%;
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+.input,
+.completion {
+  grid-area: 1 / 1;
+}
+
+.completion {
+  overflow: hidden;
+  border-color: transparent;
+  background: transparent;
+  color: transparent;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.completionRest {
+  color: var(--muted);
+}
+
+.input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  padding-right: 0.35rem;
+}
+
+.username {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clear {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.clear:hover {
+  color: var(--text);
+}
+
+.menu,
+.empty {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  z-index: 30;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(18rem, calc(100vw - 2rem));
+  margin: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.menu {
+  padding: 0.25rem;
+  list-style: none;
+}
+
+.option {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.4rem 0.6rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+}
+
+.option:hover,
+.option[aria-selected="true"] {
+  color: var(--accent);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.hit {
+  background: none;
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.12em;
+}
+
+.empty {
+  padding: 0.45rem 0.7rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .wrap {
+    flex-basis: auto;
+    max-width: none;
+  }
+
+  .input,
+  .selected,
+  .completion {
+    font-size: 1rem;
+    min-height: 2.75rem;
+  }
+}

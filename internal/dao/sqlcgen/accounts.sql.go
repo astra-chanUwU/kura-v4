@@ -14,6 +14,32 @@ import (
 	"github.com/lib/pq"
 )
 
+const countFilteredUsers = `-- name: CountFilteredUsers :one
+SELECT count(*)::bigint AS total
+FROM users
+WHERE (
+    $1::text = ''
+    OR users.role = $1::text
+  )
+  AND (
+    $2::text = ''
+    OR username ILIKE $2::text ESCAPE '\'
+    OR display_name ILIKE $2::text ESCAPE '\'
+  )
+`
+
+type CountFilteredUsersParams struct {
+	Role  string
+	Query string
+}
+
+func (q *Queries) CountFilteredUsers(ctx context.Context, arg CountFilteredUsersParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countFilteredUsers, arg.Role, arg.Query)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
 const countUsers = `-- name: CountUsers :one
 SELECT count(*) FROM users
 `
@@ -34,6 +60,34 @@ func (q *Queries) CountUsersByRole(ctx context.Context, role string) (int64, err
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const countUsersByRoles = `-- name: CountUsersByRoles :one
+SELECT
+  count(*) FILTER (WHERE role = 'member')::bigint AS member,
+  count(*) FILTER (WHERE role = 'moderator')::bigint AS moderator,
+  count(*) FILTER (WHERE role = 'admin')::bigint AS admin,
+  count(*) FILTER (WHERE role = 'super_admin')::bigint AS super_admin
+FROM users
+`
+
+type CountUsersByRolesRow struct {
+	Member     int64
+	Moderator  int64
+	Admin      int64
+	SuperAdmin int64
+}
+
+func (q *Queries) CountUsersByRoles(ctx context.Context) (CountUsersByRolesRow, error) {
+	row := q.db.QueryRowContext(ctx, countUsersByRoles)
+	var i CountUsersByRolesRow
+	err := row.Scan(
+		&i.Member,
+		&i.Moderator,
+		&i.Admin,
+		&i.SuperAdmin,
+	)
+	return i, err
 }
 
 const createChallenge = `-- name: CreateChallenge :one
@@ -417,6 +471,98 @@ func (q *Queries) InsertWebauthnCredential(ctx context.Context, arg InsertWebaut
 	return id, err
 }
 
+const listFilteredUsers = `-- name: ListFilteredUsers :many
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, role
+FROM users
+WHERE (
+    $1::text = ''
+    OR users.role = $1::text
+  )
+  AND (
+    $2::text = ''
+    OR username ILIKE $2::text ESCAPE '\'
+    OR display_name ILIKE $2::text ESCAPE '\'
+  )
+ORDER BY
+  CASE WHEN $3::text = 'newest' THEN created_at END DESC,
+  CASE WHEN $3::text = 'oldest' THEN created_at END ASC,
+  username ASC
+LIMIT $5 OFFSET $4
+`
+
+type ListFilteredUsersParams struct {
+	Role      string
+	Query     string
+	Sort      string
+	RowOffset int32
+	RowLimit  int32
+}
+
+type ListFilteredUsersRow struct {
+	ID                 uuid.UUID
+	Username           string
+	DisplayName        string
+	Bio                string
+	Location           string
+	Website            string
+	CreatedAt          time.Time
+	AvatarKey          string
+	AvatarType         string
+	ShowNsfw           bool
+	DefaultIncludeTags []string
+	DefaultExcludeTags []string
+	PreferredTheme     string
+	PreferredFont      string
+	TagSuggestionRows  int32
+	Role               string
+}
+
+func (q *Queries) ListFilteredUsers(ctx context.Context, arg ListFilteredUsersParams) ([]ListFilteredUsersRow, error) {
+	rows, err := q.db.QueryContext(ctx, listFilteredUsers,
+		arg.Role,
+		arg.Query,
+		arg.Sort,
+		arg.RowOffset,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListFilteredUsersRow{}
+	for rows.Next() {
+		var i ListFilteredUsersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.DisplayName,
+			&i.Bio,
+			&i.Location,
+			&i.Website,
+			&i.CreatedAt,
+			&i.AvatarKey,
+			&i.AvatarType,
+			&i.ShowNsfw,
+			pq.Array(&i.DefaultIncludeTags),
+			pq.Array(&i.DefaultExcludeTags),
+			&i.PreferredTheme,
+			&i.PreferredFont,
+			&i.TagSuggestionRows,
+			&i.Role,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUsers = `-- name: ListUsers :many
 SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, role FROM users ORDER BY created_at, username
 `
@@ -511,6 +657,38 @@ func (q *Queries) ListWebauthnCredentials(ctx context.Context, userID uuid.UUID)
 			&i.CreatedAt,
 			&i.LastUsedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchUsernames = `-- name: SearchUsernames :many
+SELECT id, username FROM users WHERE $1::text <> '' AND username ILIKE $1::text ESCAPE '\' ORDER BY username LIMIT 8
+`
+
+type SearchUsernamesRow struct {
+	ID       uuid.UUID
+	Username string
+}
+
+func (q *Queries) SearchUsernames(ctx context.Context, query string) ([]SearchUsernamesRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchUsernames, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchUsernamesRow{}
+	for rows.Next() {
+		var i SearchUsernamesRow
+		if err := rows.Scan(&i.ID, &i.Username); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

@@ -32,3 +32,17 @@ type TagImplication struct {
 	Antecedent string
 	Consequent string
 }
+
+// TagSuggestion is a member's proposal for an alias or an implication.
+// Alias: SourceTag is the alternate name, TargetTag is the canonical tag.
+// Implication: SourceTag is the antecedent, TargetTag is the consequent.
+type TagSuggestion struct {
+	ID             string
+	Kind           string
+	SourceTag      string
+	TargetTag      string
+	Reason         string
+	Status         string
+	AuthorUsername string
+	CreatedAt      time.Time
+}

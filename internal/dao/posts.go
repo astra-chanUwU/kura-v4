@@ -195,6 +195,34 @@ func (d *PostsDAO) ListPostsByOwner(ctx context.Context, ownerID string, include
 	}
 	return out, nil
 }
+func (d *PostsDAO) CountPublicPostsByOwner(ctx context.Context, ownerID string, includeNSFW bool) (int64, error) {
+	uid, err := uuid.Parse(ownerID)
+	if err != nil {
+		return 0, err
+	}
+	return d.q.CountPublicPostsByOwner(ctx, sqlcgen.CountPublicPostsByOwnerParams{
+		OwnerID: uuid.NullUUID{UUID: uid, Valid: true}, IncludeNsfw: includeNSFW,
+	})
+}
+
+func (d *PostsDAO) ListPublicPostsByOwner(ctx context.Context, ownerID string, includeNSFW bool, limit, offset int32) ([]model.Post, error) {
+	uid, err := uuid.Parse(ownerID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := d.q.ListPublicPostsByOwner(ctx, sqlcgen.ListPublicPostsByOwnerParams{
+		OwnerID: uuid.NullUUID{UUID: uid, Valid: true}, IncludeNsfw: includeNSFW, RowLimit: limit, RowOffset: offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.Post, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, "", r.ThumbnailKey, r.SampleKey, r.TagsCsv, r.Width, r.Height, r.Rating, r.Hidden, r.Deleted, r.FavoriteCount))
+	}
+	return out, nil
+}
+
 func (d *PostsDAO) CountPostsByOwner(ctx context.Context, ownerID string) (int64, error) {
 	uid, err := uuid.Parse(ownerID)
 	if err != nil {
@@ -338,8 +366,16 @@ func (d *PostsDAO) TagAliasTargets(ctx context.Context, tags []string) (map[stri
 	return out, nil
 }
 
-func (d *PostsDAO) ListHiddenPosts(ctx context.Context, kind string, limit, offset int32) ([]model.Post, error) {
-	rows, err := d.q.ListHiddenPosts(ctx, sqlcgen.ListHiddenPostsParams{Kind: kind, RowLimit: limit, RowOffset: offset})
+func (d *PostsDAO) CountHiddenPosts(ctx context.Context, kind, query, rating string) (int64, error) {
+	return d.q.CountHiddenPosts(ctx, sqlcgen.CountHiddenPostsParams{
+		Kind: kind, Query: substringLike(query), Rating: rating,
+	})
+}
+
+func (d *PostsDAO) ListHiddenPosts(ctx context.Context, kind, query, rating, sort string, limit, offset int32) ([]model.Post, error) {
+	rows, err := d.q.ListHiddenPosts(ctx, sqlcgen.ListHiddenPostsParams{
+		Kind: kind, Query: substringLike(query), Rating: rating, Sort: sort, RowLimit: limit, RowOffset: offset,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -348,4 +384,14 @@ func (d *PostsDAO) ListHiddenPosts(ctx context.Context, kind string, limit, offs
 		out = append(out, postFrom(r.ID, r.OwnerID, r.OriginalName, r.StorageKey, r.ContentType, r.SizeBytes, r.CreatedAt, r.OwnerUsername, r.Artist, r.Source, r.SourceID, "", r.ThumbnailKey, r.SampleKey, r.TagsCsv, r.Width, r.Height, r.Rating, r.Hidden, r.Deleted, r.FavoriteCount))
 	}
 	return out, nil
+}
+
+// substringLike builds a case-insensitive substring pattern. An empty
+// query stays empty so the SQL predicate is skipped. Backslash, percent,
+// and underscore stay literal under ESCAPE '\'.
+func substringLike(s string) string {
+	if s == "" {
+		return ""
+	}
+	return "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s) + "%"
 }

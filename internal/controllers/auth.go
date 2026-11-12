@@ -424,9 +424,31 @@ func (h *Auth) publicProfile(c fiber.Ctx) error {
 		return writeError(c, err)
 	}
 	var contributions int64
+	var editCount int64
+	var uploadTotal int64
+	uploads := []model.Post{}
 	if h.board != nil {
 		contributions, _ = h.board.Contributions(c.Context(), user.ID)
+		var err error
+		editCount, err = h.board.EditCount(c.Context(), user.ID)
+		if err != nil {
+			return writeError(c, err)
+		}
+		uploads, uploadTotal, err = h.board.PublicByOwner(c.Context(), user.ID, viewerSeesNSFW(c), 24)
+		if err != nil {
+			return writeError(c, err)
+		}
+	}
+	favs := map[string]bool{}
+	if viewer := currentUser(c); viewer != nil && h.collections != nil {
+		if ids, err := h.collections.FavoriteIDs(c.Context(), viewer.ID); err == nil {
+			favs = ids
+		}
 	}
 	prefs := preferencesDTO(user)
-	return c.JSON(dto.Profile{User: userDTO(user), PublicLists: listsDTO(lists), Contributions: contributions, Theme: prefs.Theme, Font: prefs.Font})
+	return c.JSON(dto.Profile{
+		User: userDTO(user), PublicLists: listsDTO(lists), Contributions: contributions,
+		UploadTotal: uploadTotal, EditCount: editCount, Uploads: postsDTO(uploads, favs),
+		Theme: prefs.Theme, Font: prefs.Font,
+	})
 }

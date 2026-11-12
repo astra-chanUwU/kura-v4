@@ -18,6 +18,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/dto"
 	"github.com/astra-chanUwU/kura-v4/internal/jobs"
 	"github.com/astra-chanUwU/kura-v4/internal/moderation"
+	"github.com/astra-chanUwU/kura-v4/internal/notifications"
 	"github.com/astra-chanUwU/kura-v4/internal/reports"
 	"github.com/astra-chanUwU/kura-v4/internal/searches"
 	"github.com/astra-chanUwU/kura-v4/internal/site"
@@ -28,20 +29,21 @@ import (
 )
 
 type HTTPDeps struct {
-	Site         *site.Service
-	Accounts     *accounts.Service
-	Board        *board.Service
-	Collections  *collections.Service
-	Moderation   *moderation.Service
-	Jobs         *jobs.Service
-	Comments     *comments.Service
-	Reports      *reports.Service
-	Searches     *searches.Service
-	Tags         *tags.Service
-	Ping         func(context.Context) error
-	Assets       fs.FS
-	Log          *slog.Logger
-	SecureCookie bool
+	Site          *site.Service
+	Accounts      *accounts.Service
+	Board         *board.Service
+	Collections   *collections.Service
+	Moderation    *moderation.Service
+	Jobs          *jobs.Service
+	Comments      *comments.Service
+	Reports       *reports.Service
+	Notifications *notifications.Service
+	Searches      *searches.Service
+	Tags          *tags.Service
+	Ping          func(context.Context) error
+	Assets        fs.FS
+	Log           *slog.Logger
+	SecureCookie  bool
 }
 
 func NewHTTP(deps HTTPDeps) *fiber.App {
@@ -95,9 +97,21 @@ func NewHTTP(deps HTTPDeps) *fiber.App {
 		posts := controllers.NewPosts(deps.Board, deps.Collections)
 		posts.RegisterRoutes(api)
 		posts.RegisterMedia(media)
-		controllers.NewCollections(deps.Collections).RegisterRoutes(api)
+		collectionsCtrl := controllers.NewCollections(deps.Collections)
+		collectionsCtrl.RegisterRoutes(api)
+		var commentsCtrl *controllers.Comments
 		if deps.Comments != nil {
-			controllers.NewComments(deps.Comments).RegisterRoutes(api)
+			commentsCtrl = controllers.NewComments(deps.Comments)
+			commentsCtrl.RegisterRoutes(api)
+		}
+		if deps.Notifications != nil {
+			if collectionsCtrl != nil {
+				collectionsCtrl.SetNotifier(deps.Notifications)
+			}
+			if commentsCtrl != nil {
+				commentsCtrl.SetNotifier(deps.Notifications)
+			}
+			controllers.NewNotifications(deps.Notifications).RegisterRoutes(api)
 		}
 		if deps.Reports != nil {
 			controllers.NewReports(deps.Reports).RegisterRoutes(api)

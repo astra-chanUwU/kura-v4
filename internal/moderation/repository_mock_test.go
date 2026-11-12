@@ -188,6 +188,240 @@ func (_c *MockRepository_ApplyUserRole_Call) RunAndReturn(run func(ctx context.C
 	return _c
 }
 
+// CountFilteredUsers provides a mock function for the type MockRepository
+func (_mock *MockRepository) CountFilteredUsers(ctx context.Context, query string, role string) (int64, error) {
+	ret := _mock.Called(ctx, query, role)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountFilteredUsers")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (int64, error)); ok {
+		return returnFunc(ctx, query, role)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) int64); ok {
+		r0 = returnFunc(ctx, query, role)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, query, role)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_CountFilteredUsers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountFilteredUsers'
+type MockRepository_CountFilteredUsers_Call struct {
+	*mock.Call
+}
+
+// CountFilteredUsers is a helper method to define mock.On call
+//   - ctx context.Context
+//   - query string
+//   - role string
+func (_e *MockRepository_Expecter) CountFilteredUsers(ctx any, query any, role any) *MockRepository_CountFilteredUsers_Call {
+	return &MockRepository_CountFilteredUsers_Call{Call: _e.mock.On("CountFilteredUsers", ctx, query, role)}
+}
+
+func (_c *MockRepository_CountFilteredUsers_Call) Run(run func(ctx context.Context, query string, role string)) *MockRepository_CountFilteredUsers_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_CountFilteredUsers_Call) Return(n int64, err error) *MockRepository_CountFilteredUsers_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockRepository_CountFilteredUsers_Call) RunAndReturn(run func(ctx context.Context, query string, role string) (int64, error)) *MockRepository_CountFilteredUsers_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CountHiddenPosts provides a mock function for the type MockRepository
+func (_mock *MockRepository) CountHiddenPosts(ctx context.Context, kind string, query string, rating string) (int64, error) {
+	ret := _mock.Called(ctx, kind, query, rating)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountHiddenPosts")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string) (int64, error)); ok {
+		return returnFunc(ctx, kind, query, rating)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string) int64); ok {
+		r0 = returnFunc(ctx, kind, query, rating)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
+		r1 = returnFunc(ctx, kind, query, rating)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_CountHiddenPosts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountHiddenPosts'
+type MockRepository_CountHiddenPosts_Call struct {
+	*mock.Call
+}
+
+// CountHiddenPosts is a helper method to define mock.On call
+//   - ctx context.Context
+//   - kind string
+//   - query string
+//   - rating string
+func (_e *MockRepository_Expecter) CountHiddenPosts(ctx any, kind any, query any, rating any) *MockRepository_CountHiddenPosts_Call {
+	return &MockRepository_CountHiddenPosts_Call{Call: _e.mock.On("CountHiddenPosts", ctx, kind, query, rating)}
+}
+
+func (_c *MockRepository_CountHiddenPosts_Call) Run(run func(ctx context.Context, kind string, query string, rating string)) *MockRepository_CountHiddenPosts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_CountHiddenPosts_Call) Return(n int64, err error) *MockRepository_CountHiddenPosts_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockRepository_CountHiddenPosts_Call) RunAndReturn(run func(ctx context.Context, kind string, query string, rating string) (int64, error)) *MockRepository_CountHiddenPosts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CountHistory provides a mock function for the type MockRepository
+func (_mock *MockRepository) CountHistory(ctx context.Context, actorID string, query string, action string, entity string) (int64, error) {
+	ret := _mock.Called(ctx, actorID, query, action, entity)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountHistory")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string) (int64, error)); ok {
+		return returnFunc(ctx, actorID, query, action, entity)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string) int64); ok {
+		r0 = returnFunc(ctx, actorID, query, action, entity)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string, string) error); ok {
+		r1 = returnFunc(ctx, actorID, query, action, entity)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_CountHistory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountHistory'
+type MockRepository_CountHistory_Call struct {
+	*mock.Call
+}
+
+// CountHistory is a helper method to define mock.On call
+//   - ctx context.Context
+//   - actorID string
+//   - query string
+//   - action string
+//   - entity string
+func (_e *MockRepository_Expecter) CountHistory(ctx any, actorID any, query any, action any, entity any) *MockRepository_CountHistory_Call {
+	return &MockRepository_CountHistory_Call{Call: _e.mock.On("CountHistory", ctx, actorID, query, action, entity)}
+}
+
+func (_c *MockRepository_CountHistory_Call) Run(run func(ctx context.Context, actorID string, query string, action string, entity string)) *MockRepository_CountHistory_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_CountHistory_Call) Return(n int64, err error) *MockRepository_CountHistory_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockRepository_CountHistory_Call) RunAndReturn(run func(ctx context.Context, actorID string, query string, action string, entity string) (int64, error)) *MockRepository_CountHistory_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CountRemovedPosts provides a mock function for the type MockRepository
 func (_mock *MockRepository) CountRemovedPosts(ctx context.Context) (int64, int64, error) {
 	ret := _mock.Called(ctx)
@@ -310,6 +544,84 @@ func (_c *MockRepository_CountSuperAdmins_Call) Return(n int64, err error) *Mock
 }
 
 func (_c *MockRepository_CountSuperAdmins_Call) RunAndReturn(run func(ctx context.Context) (int64, error)) *MockRepository_CountSuperAdmins_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CountUsersByRoles provides a mock function for the type MockRepository
+func (_mock *MockRepository) CountUsersByRoles(ctx context.Context) (int64, int64, int64, int64, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountUsersByRoles")
+	}
+
+	var r0 int64
+	var r1 int64
+	var r2 int64
+	var r3 int64
+	var r4 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (int64, int64, int64, int64, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) int64); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) int64); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Get(1).(int64)
+	}
+	if returnFunc, ok := ret.Get(2).(func(context.Context) int64); ok {
+		r2 = returnFunc(ctx)
+	} else {
+		r2 = ret.Get(2).(int64)
+	}
+	if returnFunc, ok := ret.Get(3).(func(context.Context) int64); ok {
+		r3 = returnFunc(ctx)
+	} else {
+		r3 = ret.Get(3).(int64)
+	}
+	if returnFunc, ok := ret.Get(4).(func(context.Context) error); ok {
+		r4 = returnFunc(ctx)
+	} else {
+		r4 = ret.Error(4)
+	}
+	return r0, r1, r2, r3, r4
+}
+
+// MockRepository_CountUsersByRoles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountUsersByRoles'
+type MockRepository_CountUsersByRoles_Call struct {
+	*mock.Call
+}
+
+// CountUsersByRoles is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockRepository_Expecter) CountUsersByRoles(ctx any) *MockRepository_CountUsersByRoles_Call {
+	return &MockRepository_CountUsersByRoles_Call{Call: _e.mock.On("CountUsersByRoles", ctx)}
+}
+
+func (_c *MockRepository_CountUsersByRoles_Call) Run(run func(ctx context.Context)) *MockRepository_CountUsersByRoles_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_CountUsersByRoles_Call) Return(member int64, moderator int64, admin int64, superAdmin int64, err error) *MockRepository_CountUsersByRoles_Call {
+	_c.Call.Return(member, moderator, admin, superAdmin, err)
+	return _c
+}
+
+func (_c *MockRepository_CountUsersByRoles_Call) RunAndReturn(run func(ctx context.Context) (int64, int64, int64, int64, error)) *MockRepository_CountUsersByRoles_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -569,9 +881,101 @@ func (_c *MockRepository_GetUser_Call) RunAndReturn(run func(ctx context.Context
 	return _c
 }
 
+// ListFilteredUsers provides a mock function for the type MockRepository
+func (_mock *MockRepository) ListFilteredUsers(ctx context.Context, query string, role string, sort string, limit int32, offset int32) ([]model.User, error) {
+	ret := _mock.Called(ctx, query, role, sort, limit, offset)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListFilteredUsers")
+	}
+
+	var r0 []model.User
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, int32, int32) ([]model.User, error)); ok {
+		return returnFunc(ctx, query, role, sort, limit, offset)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, int32, int32) []model.User); ok {
+		r0 = returnFunc(ctx, query, role, sort, limit, offset)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]model.User)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string, int32, int32) error); ok {
+		r1 = returnFunc(ctx, query, role, sort, limit, offset)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_ListFilteredUsers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListFilteredUsers'
+type MockRepository_ListFilteredUsers_Call struct {
+	*mock.Call
+}
+
+// ListFilteredUsers is a helper method to define mock.On call
+//   - ctx context.Context
+//   - query string
+//   - role string
+//   - sort string
+//   - limit int32
+//   - offset int32
+func (_e *MockRepository_Expecter) ListFilteredUsers(ctx any, query any, role any, sort any, limit any, offset any) *MockRepository_ListFilteredUsers_Call {
+	return &MockRepository_ListFilteredUsers_Call{Call: _e.mock.On("ListFilteredUsers", ctx, query, role, sort, limit, offset)}
+}
+
+func (_c *MockRepository_ListFilteredUsers_Call) Run(run func(ctx context.Context, query string, role string, sort string, limit int32, offset int32)) *MockRepository_ListFilteredUsers_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 int32
+		if args[4] != nil {
+			arg4 = args[4].(int32)
+		}
+		var arg5 int32
+		if args[5] != nil {
+			arg5 = args[5].(int32)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_ListFilteredUsers_Call) Return(users []model.User, err error) *MockRepository_ListFilteredUsers_Call {
+	_c.Call.Return(users, err)
+	return _c
+}
+
+func (_c *MockRepository_ListFilteredUsers_Call) RunAndReturn(run func(ctx context.Context, query string, role string, sort string, limit int32, offset int32) ([]model.User, error)) *MockRepository_ListFilteredUsers_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListHiddenPosts provides a mock function for the type MockRepository
-func (_mock *MockRepository) ListHiddenPosts(ctx context.Context, kind string, limit int32, offset int32) ([]model.Post, error) {
-	ret := _mock.Called(ctx, kind, limit, offset)
+func (_mock *MockRepository) ListHiddenPosts(ctx context.Context, kind string, query string, rating string, sort string, limit int32, offset int32) ([]model.Post, error) {
+	ret := _mock.Called(ctx, kind, query, rating, sort, limit, offset)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListHiddenPosts")
@@ -579,18 +983,18 @@ func (_mock *MockRepository) ListHiddenPosts(ctx context.Context, kind string, l
 
 	var r0 []model.Post
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, int32, int32) ([]model.Post, error)); ok {
-		return returnFunc(ctx, kind, limit, offset)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, int32, int32) ([]model.Post, error)); ok {
+		return returnFunc(ctx, kind, query, rating, sort, limit, offset)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, int32, int32) []model.Post); ok {
-		r0 = returnFunc(ctx, kind, limit, offset)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, int32, int32) []model.Post); ok {
+		r0 = returnFunc(ctx, kind, query, rating, sort, limit, offset)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]model.Post)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, int32, int32) error); ok {
-		r1 = returnFunc(ctx, kind, limit, offset)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string, string, int32, int32) error); ok {
+		r1 = returnFunc(ctx, kind, query, rating, sort, limit, offset)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -605,13 +1009,16 @@ type MockRepository_ListHiddenPosts_Call struct {
 // ListHiddenPosts is a helper method to define mock.On call
 //   - ctx context.Context
 //   - kind string
+//   - query string
+//   - rating string
+//   - sort string
 //   - limit int32
 //   - offset int32
-func (_e *MockRepository_Expecter) ListHiddenPosts(ctx any, kind any, limit any, offset any) *MockRepository_ListHiddenPosts_Call {
-	return &MockRepository_ListHiddenPosts_Call{Call: _e.mock.On("ListHiddenPosts", ctx, kind, limit, offset)}
+func (_e *MockRepository_Expecter) ListHiddenPosts(ctx any, kind any, query any, rating any, sort any, limit any, offset any) *MockRepository_ListHiddenPosts_Call {
+	return &MockRepository_ListHiddenPosts_Call{Call: _e.mock.On("ListHiddenPosts", ctx, kind, query, rating, sort, limit, offset)}
 }
 
-func (_c *MockRepository_ListHiddenPosts_Call) Run(run func(ctx context.Context, kind string, limit int32, offset int32)) *MockRepository_ListHiddenPosts_Call {
+func (_c *MockRepository_ListHiddenPosts_Call) Run(run func(ctx context.Context, kind string, query string, rating string, sort string, limit int32, offset int32)) *MockRepository_ListHiddenPosts_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -621,19 +1028,34 @@ func (_c *MockRepository_ListHiddenPosts_Call) Run(run func(ctx context.Context,
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
-		var arg2 int32
+		var arg2 string
 		if args[2] != nil {
-			arg2 = args[2].(int32)
+			arg2 = args[2].(string)
 		}
-		var arg3 int32
+		var arg3 string
 		if args[3] != nil {
-			arg3 = args[3].(int32)
+			arg3 = args[3].(string)
+		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
+		var arg5 int32
+		if args[5] != nil {
+			arg5 = args[5].(int32)
+		}
+		var arg6 int32
+		if args[6] != nil {
+			arg6 = args[6].(int32)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4,
+			arg5,
+			arg6,
 		)
 	})
 	return _c
@@ -644,7 +1066,111 @@ func (_c *MockRepository_ListHiddenPosts_Call) Return(posts []model.Post, err er
 	return _c
 }
 
-func (_c *MockRepository_ListHiddenPosts_Call) RunAndReturn(run func(ctx context.Context, kind string, limit int32, offset int32) ([]model.Post, error)) *MockRepository_ListHiddenPosts_Call {
+func (_c *MockRepository_ListHiddenPosts_Call) RunAndReturn(run func(ctx context.Context, kind string, query string, rating string, sort string, limit int32, offset int32) ([]model.Post, error)) *MockRepository_ListHiddenPosts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListHistory provides a mock function for the type MockRepository
+func (_mock *MockRepository) ListHistory(ctx context.Context, actorID string, query string, action string, entity string, sort string, limit int32, offset int32) ([]model.ChangeEntry, error) {
+	ret := _mock.Called(ctx, actorID, query, action, entity, sort, limit, offset)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListHistory")
+	}
+
+	var r0 []model.ChangeEntry
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, int32, int32) ([]model.ChangeEntry, error)); ok {
+		return returnFunc(ctx, actorID, query, action, entity, sort, limit, offset)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, int32, int32) []model.ChangeEntry); ok {
+		r0 = returnFunc(ctx, actorID, query, action, entity, sort, limit, offset)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]model.ChangeEntry)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string, string, string, int32, int32) error); ok {
+		r1 = returnFunc(ctx, actorID, query, action, entity, sort, limit, offset)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_ListHistory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListHistory'
+type MockRepository_ListHistory_Call struct {
+	*mock.Call
+}
+
+// ListHistory is a helper method to define mock.On call
+//   - ctx context.Context
+//   - actorID string
+//   - query string
+//   - action string
+//   - entity string
+//   - sort string
+//   - limit int32
+//   - offset int32
+func (_e *MockRepository_Expecter) ListHistory(ctx any, actorID any, query any, action any, entity any, sort any, limit any, offset any) *MockRepository_ListHistory_Call {
+	return &MockRepository_ListHistory_Call{Call: _e.mock.On("ListHistory", ctx, actorID, query, action, entity, sort, limit, offset)}
+}
+
+func (_c *MockRepository_ListHistory_Call) Run(run func(ctx context.Context, actorID string, query string, action string, entity string, sort string, limit int32, offset int32)) *MockRepository_ListHistory_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
+		var arg5 string
+		if args[5] != nil {
+			arg5 = args[5].(string)
+		}
+		var arg6 int32
+		if args[6] != nil {
+			arg6 = args[6].(int32)
+		}
+		var arg7 int32
+		if args[7] != nil {
+			arg7 = args[7].(int32)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+			arg7,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_ListHistory_Call) Return(changeEntrys []model.ChangeEntry, err error) *MockRepository_ListHistory_Call {
+	_c.Call.Return(changeEntrys, err)
+	return _c
+}
+
+func (_c *MockRepository_ListHistory_Call) RunAndReturn(run func(ctx context.Context, actorID string, query string, action string, entity string, sort string, limit int32, offset int32) ([]model.ChangeEntry, error)) *MockRepository_ListHistory_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -929,6 +1455,74 @@ func (_c *MockRepository_ListUsers_Call) Return(users []model.User, err error) *
 }
 
 func (_c *MockRepository_ListUsers_Call) RunAndReturn(run func(ctx context.Context) ([]model.User, error)) *MockRepository_ListUsers_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SearchUsernames provides a mock function for the type MockRepository
+func (_mock *MockRepository) SearchUsernames(ctx context.Context, query string) ([]model.HistoryActor, error) {
+	ret := _mock.Called(ctx, query)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SearchUsernames")
+	}
+
+	var r0 []model.HistoryActor
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]model.HistoryActor, error)); ok {
+		return returnFunc(ctx, query)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []model.HistoryActor); ok {
+		r0 = returnFunc(ctx, query)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]model.HistoryActor)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, query)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_SearchUsernames_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SearchUsernames'
+type MockRepository_SearchUsernames_Call struct {
+	*mock.Call
+}
+
+// SearchUsernames is a helper method to define mock.On call
+//   - ctx context.Context
+//   - query string
+func (_e *MockRepository_Expecter) SearchUsernames(ctx any, query any) *MockRepository_SearchUsernames_Call {
+	return &MockRepository_SearchUsernames_Call{Call: _e.mock.On("SearchUsernames", ctx, query)}
+}
+
+func (_c *MockRepository_SearchUsernames_Call) Run(run func(ctx context.Context, query string)) *MockRepository_SearchUsernames_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_SearchUsernames_Call) Return(historyActors []model.HistoryActor, err error) *MockRepository_SearchUsernames_Call {
+	_c.Call.Return(historyActors, err)
+	return _c
+}
+
+func (_c *MockRepository_SearchUsernames_Call) RunAndReturn(run func(ctx context.Context, query string) ([]model.HistoryActor, error)) *MockRepository_SearchUsernames_Call {
 	_c.Call.Return(run)
 	return _c
 }

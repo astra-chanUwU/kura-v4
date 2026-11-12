@@ -2,6 +2,7 @@ package tags
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"regexp"
 	"sort"
@@ -12,9 +13,10 @@ import (
 )
 
 const (
-	maxDescription  = 2000
-	categoryMessage = "Category must be general, artist, character, copyright, or meta."
-	tagMessage      = "That tag name is not valid."
+	maxDescription      = 2000
+	maxSuggestionReason = 300
+	categoryMessage     = "Category must be general, artist, character, copyright, or meta."
+	tagMessage          = "That tag name is not valid."
 )
 
 var (
@@ -46,6 +48,12 @@ type Repository interface {
 	// that already have the antecedent. The caller chooses those tags.
 	CreateImplication(ctx context.Context, antecedent, consequent, userID string, backfill []string) error
 	DeleteImplication(ctx context.Context, antecedent, consequent string) (int64, error)
+	CreateSuggestion(ctx context.Context, kind, sourceTag, targetTag, reason, authorID string) (model.TagSuggestion, error)
+	GetSuggestion(ctx context.Context, id string) (model.TagSuggestion, error)
+	ListSuggestions(ctx context.Context, status string) ([]model.TagSuggestion, error)
+	// ResolveSuggestion marks a pending row accepted or rejected. A row that
+	// is not pending is sql.ErrNoRows.
+	ResolveSuggestion(ctx context.Context, id, resolverID, status string) (model.TagSuggestion, error)
 }
 
 type Service struct{ repo Repository }
@@ -317,6 +325,129 @@ func (s *Service) RemoveImplication(ctx context.Context, actor model.User, antec
 		return model.TagPage{}, ErrNotFound
 	}
 	return s.page(ctx, &actor, antecedent)
+}
+
+// Suggest records a proposal from any signed-in member. anchor is the tag
+// in the URL. For an alias, anchor is the canonical name and other is the
+// alternate. For an implication, anchor is the antecedent and other is the
+// consequent. A second pending proposal for the same pair is rejected.
+func (s *Service) Suggest(ctx context.Context, actor model.User, anchorRaw, kind, otherRaw, reason string) (model.TagSuggestion, error) {
+	if actor.ID == "" {
+		return model.TagSuggestion{}, ErrForbidden
+	}
+	kind = strings.ToLower(strings.TrimSpace(kind))
+	if kind != "alias" && kind != "implication" {
+		return model.TagSuggestion{}, invalid("Kind must be alias or implication.")
+	}
+	reason = strings.TrimSpace(reason)
+	if utf8.RuneCountInString(reason) > maxSuggestionReason {
+		return model.TagSuggestion{}, invalid("Reason must be 300 characters or fewer.")
+	}
+	anchor, err := oneTag(anchorRaw)
+	if err != nil {
+		return model.TagSuggestion{}, err
+	}
+	other, err := oneTag(otherRaw)
+	if err != nil {
+		return model.TagSuggestion{}, err
+	}
+	source, target := other, anchor
+	if kind == "implication" {
+		source, target = anchor, other
+	}
+	if source == target {
+		if kind == "alias" {
+			return model.TagSuggestion{}, invalid("A tag can't be an alias of itself.")
+		}
+		return model.TagSuggestion{}, invalid("A tag can't imply itself.")
+	}
+	created, err := s.repo.CreateSuggestion(ctx, kind, source, target, reason, actor.ID)
+	if isUnique(err) {
+		return model.TagSuggestion{}, invalid("That suggestion is already pending.")
+	}
+	if err != nil {
+		return model.TagSuggestion{}, err
+	}
+	if created.AuthorUsername == "" {
+		created.AuthorUsername = actor.Username
+	}
+	return created, nil
+}
+
+// ListSuggestions is the moderator queue. An empty status means pending.
+func (s *Service) ListSuggestions(ctx context.Context, actor model.User, status string) ([]model.TagSuggestion, error) {
+	if actor.ID == "" || !actor.Role.AtLeast(model.RoleModerator) {
+		return nil, ErrForbidden
+	}
+	status = strings.ToLower(strings.TrimSpace(status))
+	if status == "" {
+		status = "pending"
+	}
+	switch status {
+	case "pending", "accepted", "rejected":
+	default:
+		return nil, invalid("Status must be pending, accepted, or rejected.")
+	}
+	items, err := s.repo.ListSuggestions(ctx, status)
+	if err != nil {
+		return nil, err
+	}
+	if items == nil {
+		items = []model.TagSuggestion{}
+	}
+	return items, nil
+}
+
+// AcceptSuggestion applies a pending alias or implication with AddAlias or
+// AddImplication, then records the moderator. A row that is not pending is
+// not found. The tag rules and post updates are the same as adding it directly.
+func (s *Service) AcceptSuggestion(ctx context.Context, actor model.User, id string) (model.TagSuggestion, error) {
+	if actor.ID == "" || !actor.Role.AtLeast(model.RoleModerator) {
+		return model.TagSuggestion{}, ErrForbidden
+	}
+	current, err := s.repo.GetSuggestion(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return model.TagSuggestion{}, ErrNotFound
+	}
+	if err != nil {
+		return model.TagSuggestion{}, err
+	}
+	if current.Status != "pending" {
+		return model.TagSuggestion{}, ErrNotFound
+	}
+	switch current.Kind {
+	case "alias":
+		if _, err := s.AddAlias(ctx, actor, current.TargetTag, current.SourceTag); err != nil {
+			return model.TagSuggestion{}, err
+		}
+	case "implication":
+		if _, err := s.AddImplication(ctx, actor, current.SourceTag, current.TargetTag); err != nil {
+			return model.TagSuggestion{}, err
+		}
+	default:
+		return model.TagSuggestion{}, invalid("Kind must be alias or implication.")
+	}
+	resolved, err := s.repo.ResolveSuggestion(ctx, id, actor.ID, "accepted")
+	if errors.Is(err, sql.ErrNoRows) {
+		return model.TagSuggestion{}, ErrNotFound
+	}
+	return resolved, err
+}
+
+// RejectSuggestion closes a pending suggestion. It does not change tags.
+func (s *Service) RejectSuggestion(ctx context.Context, actor model.User, id string) (model.TagSuggestion, error) {
+	if actor.ID == "" || !actor.Role.AtLeast(model.RoleModerator) {
+		return model.TagSuggestion{}, ErrForbidden
+	}
+	resolved, err := s.repo.ResolveSuggestion(ctx, id, actor.ID, "rejected")
+	if errors.Is(err, sql.ErrNoRows) {
+		return model.TagSuggestion{}, ErrNotFound
+	}
+	return resolved, err
+}
+
+func isUnique(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "23505")
 }
 
 func (s *Service) implicationPair(ctx context.Context, antecedentRaw, consequentRaw string) (string, string, error) {

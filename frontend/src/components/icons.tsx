@@ -68,6 +68,25 @@ export function IconShield() {
   );
 }
 
+export function IconKey() {
+  return (
+    <Base>
+      <circle cx="8" cy="12" r="3.2" />
+      <path d="M11.1 12H20" />
+      <path d="M16.2 12v2.5M18.8 12v1.8" />
+    </Base>
+  );
+}
+
+export function IconCrown() {
+  return (
+    <Base>
+      <path d="M4 16.5 6.2 8.2 12 12.4 17.8 8.2 20 16.5" />
+      <path d="M5 16.5h14v2.4H5Z" />
+    </Base>
+  );
+}
+
 export function IconLink() {
   return (
     <Base>
@@ -109,6 +128,25 @@ export function IconCamera() {
     <Base>
       <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h1L8 4.8A1.5 1.5 0 0 1 9.3 4h5.4A1.5 1.5 0 0 1 16 4.8L17.5 7h1A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5v-9Z" />
       <circle cx="12" cy="12.5" r="3.2" />
+    </Base>
+  );
+}
+
+export function IconLock() {
+  return (
+    <Base>
+      <rect x="5" y="11" width="14" height="9" rx="1.6" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </Base>
+  );
+}
+
+export function IconGlobe() {
+  return (
+    <Base>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M4 12h16" />
+      <path d="M12 4c2.2 2.4 3.3 5.1 3.3 8s-1.1 5.6-3.3 8c-2.2-2.4-3.3-5.1-3.3-8S9.8 6.4 12 4Z" />
     </Base>
   );
 }

@@ -29,11 +29,13 @@ export function PostRow({
   onTagClick,
   search,
   onOpen,
+  fromBoard,
 }: {
   post: Post;
   onTagClick?: (tag: string) => void;
   search?: BoardSearch;
   onOpen?: () => void;
+  fromBoard?: boolean;
 }) {
   const prefetch = usePrefetchPost(post);
   const type = TYPE_LABEL[post.content_type] ?? post.content_type;
@@ -44,6 +46,7 @@ export function PostRow({
         to="/posts/$id"
         params={{ id: post.id }}
         search={search}
+        state={fromBoard ? { fromBoard: true } : undefined}
         className={styles.media}
         aria-label="Open post"
         onMouseDown={onOpen}

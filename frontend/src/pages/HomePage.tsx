@@ -845,6 +845,7 @@ export function HomePage() {
                   onTagClick={addTag}
                   search={postSearch}
                   onOpen={commitStaged}
+                  fromBoard
                 />
               </div>
             ))}
@@ -853,7 +854,7 @@ export function HomePage() {
           <div className={styles.grid}>
             {shownPosts.map((post) => (
               <div key={post.id} ref={(el) => observePost(el, post.id)} data-post-id={post.id}>
-                <PostCard post={post} search={postSearch} onOpen={commitStaged} />
+                <PostCard post={post} search={postSearch} onOpen={commitStaged} fromBoard />
               </div>
             ))}
           </div>

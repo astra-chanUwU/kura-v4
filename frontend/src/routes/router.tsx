@@ -9,7 +9,9 @@ import { AdminPage } from "../pages/AdminPage";
 import { HiddenPostsPage } from "../pages/HiddenPostsPage";
 import { FailedJobsPage } from "../pages/FailedJobsPage";
 import { HistoryPage } from "../pages/HistoryPage";
+import { NotificationsPage } from "../pages/NotificationsPage";
 import { ReportsPage } from "../pages/ReportsPage";
+import { SuggestionsPage } from "../pages/SuggestionsPage";
 import { PostPage } from "../pages/PostPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { TagPage } from "../pages/TagPage";
@@ -80,6 +82,16 @@ const jobsRoute = createRoute({
   path: "jobs",
   component: FailedJobsPage,
 });
+const suggestionsRoute = createRoute({
+  getParentRoute: () => staffRoute,
+  path: "suggestions",
+  component: SuggestionsPage,
+});
+const notificationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/notifications",
+  component: NotificationsPage,
+});
 const recoverRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/recover",
@@ -128,7 +140,15 @@ export const router = createRouter({
     registerRoute,
     recoverRoute,
     meRoute,
-    staffRoute.addChildren([staffPeopleRoute, hiddenRoute, historyRoute, reportsRoute, jobsRoute]),
+    staffRoute.addChildren([
+      staffPeopleRoute,
+      hiddenRoute,
+      historyRoute,
+      reportsRoute,
+      jobsRoute,
+      suggestionsRoute,
+    ]),
+    notificationsRoute,
     postRoute,
     profileRoute,
     tagRoute,
@@ -142,6 +162,9 @@ declare module "@tanstack/react-router" {
     // restores this tab's remembered board, or the saved defaults when
     // this tab has not opened the board yet.
     boardCleared?: boolean;
+    // Set on a picture opened from the board. Prev/Next replace this
+    // entry, so ← Board can return to that same board and its scroll.
+    fromBoard?: boolean;
   }
   interface Register {
     router: typeof router;

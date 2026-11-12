@@ -2,6 +2,9 @@ package tags
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -19,6 +22,7 @@ type fakeRepo struct {
 	edges       []model.TagImplication
 	postTags    map[string]bool
 	backfilled  []string
+	suggestions []model.TagSuggestion
 }
 
 func (f *fakeRepo) GetPage(_ context.Context, tag string) (model.TagWiki, bool, error) {
@@ -95,6 +99,46 @@ func (f *fakeRepo) DeleteImplication(_ context.Context, antecedent, consequent s
 	}
 	f.edges = kept
 	return n, nil
+}
+func (f *fakeRepo) CreateSuggestion(_ context.Context, kind, source, target, reason, authorID string) (model.TagSuggestion, error) {
+	for _, item := range f.suggestions {
+		if item.Status == "pending" && item.Kind == kind && item.SourceTag == source && item.TargetTag == target {
+			return model.TagSuggestion{}, errors.New("duplicate key value violates unique constraint 23505")
+		}
+	}
+	item := model.TagSuggestion{
+		ID: fmt.Sprintf("s%d", len(f.suggestions)+1), Kind: kind, SourceTag: source, TargetTag: target,
+		Reason: reason, Status: "pending", AuthorUsername: authorID, CreatedAt: time.Unix(10, 0).UTC(),
+	}
+	f.suggestions = append(f.suggestions, item)
+	return item, nil
+}
+func (f *fakeRepo) GetSuggestion(_ context.Context, id string) (model.TagSuggestion, error) {
+	for _, item := range f.suggestions {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return model.TagSuggestion{}, sql.ErrNoRows
+}
+func (f *fakeRepo) ListSuggestions(_ context.Context, status string) ([]model.TagSuggestion, error) {
+	out := []model.TagSuggestion{}
+	for _, item := range f.suggestions {
+		if item.Status == status {
+			out = append(out, item)
+		}
+	}
+	return out, nil
+}
+func (f *fakeRepo) ResolveSuggestion(_ context.Context, id, _, status string) (model.TagSuggestion, error) {
+	for i, item := range f.suggestions {
+		if item.ID == id && item.Status == "pending" {
+			item.Status = status
+			f.suggestions[i] = item
+			return item, nil
+		}
+	}
+	return model.TagSuggestion{}, sql.ErrNoRows
 }
 func (f *fakeRepo) DeleteAlias(_ context.Context, alias, target string) (int64, error) {
 	if f.aliases[alias] != target {
@@ -276,6 +320,40 @@ func TestAddImplicationBackfillsTheChain(t *testing.T) {
 	require.NotContains(t, repo.backfilled, "school_uniform")
 	require.NotContains(t, repo.backfilled, "other_uniform")
 	require.NotContains(t, repo.backfilled, "uniform")
+}
+
+func TestSuggestAndAccept(t *testing.T) {
+	member := model.User{ID: "mem", Username: "hana", Role: model.RoleMember}
+	mod := model.User{ID: "mod", Username: "kiri", Role: model.RoleModerator}
+	repo := &fakeRepo{}
+	svc := NewService(repo)
+
+	_, err := svc.Suggest(context.Background(), model.User{}, "silver_hair", "alias", "silverhair", "")
+	require.ErrorIs(t, err, ErrForbidden)
+
+	item, err := svc.Suggest(context.Background(), member, "silver_hair", "alias", "silverhair", "Same hair.")
+	require.NoError(t, err)
+	require.Equal(t, "alias", item.Kind)
+	require.Equal(t, "silverhair", item.SourceTag)
+	require.Equal(t, "silver_hair", item.TargetTag)
+
+	_, err = svc.Suggest(context.Background(), member, "silver_hair", "alias", "silverhair", "again")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "already pending")
+
+	_, err = svc.AcceptSuggestion(context.Background(), member, item.ID)
+	require.ErrorIs(t, err, ErrForbidden)
+
+	accepted, err := svc.AcceptSuggestion(context.Background(), mod, item.ID)
+	require.NoError(t, err)
+	require.Equal(t, "accepted", accepted.Status)
+	require.Equal(t, "silver_hair", repo.aliases["silverhair"])
+
+	_, err = svc.ListSuggestions(context.Background(), member, "pending")
+	require.ErrorIs(t, err, ErrForbidden)
+	pending, err := svc.ListSuggestions(context.Background(), mod, "")
+	require.NoError(t, err)
+	require.Empty(t, pending)
 }
 
 func stringsOf(n int) string {

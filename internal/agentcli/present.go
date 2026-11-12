@@ -71,6 +71,13 @@ func presentUsers(users []model.User) []dto.User {
 	return out
 }
 
+func presentUserPage(page model.UserPage) dto.UserPage {
+	return dto.UserPage{
+		Total: page.Total, Member: page.Member, Moderator: page.Moderator,
+		Admin: page.Admin, SuperAdmin: page.SuperAdmin, Users: presentUsers(page.Users),
+	}
+}
+
 func presentList(l model.List) dto.List {
 	return dto.List{
 		ID: l.ID, OwnerUsername: l.OwnerUsername, Title: l.Title, Description: l.Description,
@@ -116,6 +123,18 @@ func presentHistories(entries []model.ChangeEntry) []dto.ChangeEntry {
 	out := make([]dto.ChangeEntry, 0, len(entries))
 	for _, entry := range entries {
 		out = append(out, presentHistory(entry))
+	}
+	return out
+}
+
+func presentHistoryPage(page model.HistoryPage) dto.HistoryPage {
+	return dto.HistoryPage{Total: page.Total, Entries: presentHistories(page.Entries)}
+}
+
+func presentHistoryActors(actors []model.HistoryActor) []dto.HistoryActor {
+	out := make([]dto.HistoryActor, 0, len(actors))
+	for _, actor := range actors {
+		out = append(out, dto.HistoryActor{ID: actor.ID, Username: actor.Username})
 	}
 	return out
 }

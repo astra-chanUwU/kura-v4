@@ -20,7 +20,9 @@ export function ReportsPage() {
           {shortError(error)}
         </p>
       )}
-      {!loading && reports.length === 0 && <p className={simple.muted}>No open reports.</p>}
+      {!loading && !error && reports.length === 0 && (
+        <p className={simple.muted}>No open reports.</p>
+      )}
       <ul className={simple.grid}>
         {reports.map((report) => (
           <li key={report.id}>

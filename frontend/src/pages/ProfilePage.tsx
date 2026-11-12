@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { PostCard } from "../components/PostCard";
 import { ShareProfileButton } from "../components/ShareProfileButton";
 import { useProfile } from "../hooks/useKura";
 import styles from "./Profile.module.css";
@@ -10,6 +11,9 @@ export function ProfilePage({ username }: { username: string }) {
   if (isPending) return <p>Loading…</p>;
   if (error || !data) return <p role="alert">That profile could not be found.</p>;
   const { user, public_lists: lists, contributions } = data;
+  const uploadTotal = data.upload_total ?? 0;
+  const editCount = data.edit_count ?? 0;
+  const uploads = data.uploads ?? [];
   const theme = normalizeTheme(data.theme);
   const font = normalizeFont(data.font);
   return (
@@ -37,8 +41,9 @@ export function ProfilePage({ username }: { username: string }) {
             {THEME_LABELS[theme]} · {FONT_LABELS[font]}
           </p>
           <p className={styles.stats}>
-            <strong>{contributions}</strong> contribution{contributions === 1 ? "" : "s"} ·{" "}
-            <strong>{lists.length}</strong> public list{lists.length === 1 ? "" : "s"} · joined{" "}
+            <strong>{uploadTotal}</strong> {uploadTotal === 1 ? "upload" : "uploads"} ·{" "}
+            <strong>{editCount}</strong> {editCount === 1 ? "tag edit" : "tag edits"} ·{" "}
+            <strong>{lists.length}</strong> {lists.length === 1 ? "public list" : "public lists"} · joined{" "}
             {new Date(user.created_at).toLocaleDateString()}
           </p>
         </div>
@@ -54,6 +59,20 @@ export function ProfilePage({ username }: { username: string }) {
           </a>
         </p>
       )}
+      <div>
+        <h2>Uploads</h2>
+        {uploads.length === 0 && <p className={styles.muted}>No pictures on the board yet.</p>}
+        <div className={styles.uploads}>
+          {uploads.map((post) => (
+            <PostCard key={post.id} post={post} />
+          ))}
+        </div>
+        {uploadTotal > uploads.length && (
+          <p className={styles.muted}>
+            {uploadTotal} on the board. {contributions - uploadTotal > 0 ? "Hidden pictures stay off this page." : ""}
+          </p>
+        )}
+      </div>
       <div>
         <h2>Public lists</h2>
         {lists.length === 0 && <p className={styles.muted}>No public lists yet.</p>}

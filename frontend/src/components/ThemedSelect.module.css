@@ -3,6 +3,9 @@
   display: inline-flex;
   align-items: center;
 }
+.open {
+  z-index: 30;
+}
 
 .button {
   appearance: none;

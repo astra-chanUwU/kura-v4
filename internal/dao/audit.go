@@ -100,6 +100,26 @@ func (d *AuditDAO) ListRecentChangeHistory(ctx context.Context, limit int32) ([]
 	return out, nil
 }
 
+func (d *AuditDAO) ListHistory(ctx context.Context, actorID, query, action, entity, sort string, limit, offset int32) ([]model.ChangeEntry, error) {
+	rows, err := d.q.ListFilteredChangeHistory(ctx, sqlcgen.ListFilteredChangeHistoryParams{
+		ActorID: actorID, Action: action, Entity: entity, Query: substringLike(query), Sort: sort, RowLimit: limit, RowOffset: offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.ChangeEntry, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, entryFrom(r))
+	}
+	return out, nil
+}
+
+func (d *AuditDAO) CountHistory(ctx context.Context, actorID, query, action, entity string) (int64, error) {
+	return d.q.CountFilteredChangeHistory(ctx, sqlcgen.CountFilteredChangeHistoryParams{
+		ActorID: actorID, Action: action, Entity: entity, Query: substringLike(query),
+	})
+}
+
 func (d *AuditDAO) ListChangeHistoryByActor(ctx context.Context, actorID string, limit int32) ([]model.ChangeEntry, error) {
 	uid, err := uuid.Parse(actorID)
 	if err != nil {
@@ -114,4 +134,20 @@ func (d *AuditDAO) ListChangeHistoryByActor(ctx context.Context, actorID string,
 		out = append(out, entryFrom(r))
 	}
 	return out, nil
+}
+
+func (d *AuditDAO) CountMetaEditsByActor(ctx context.Context, actorID string) (int64, error) {
+	uid, err := uuid.Parse(actorID)
+	if err != nil {
+		return 0, err
+	}
+	return d.q.CountMetaEditsByActor(ctx, uuid.NullUUID{UUID: uid, Valid: true})
+}
+
+func (d *AuditDAO) LastMetaEditor(ctx context.Context, postID string) (string, error) {
+	id, err := uuid.Parse(postID)
+	if err != nil {
+		return "", err
+	}
+	return d.q.LastMetaEditor(ctx, id)
 }

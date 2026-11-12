@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/astra-chanUwU/kura-v4/internal/model"
+	"github.com/google/uuid"
 )
 
 var (
@@ -20,6 +23,9 @@ func invalid(msg string) error           { return &ValidationError{Message: msg}
 
 type Repository interface {
 	ListUsers(ctx context.Context) ([]model.User, error)
+	ListFilteredUsers(ctx context.Context, query, role, sort string, limit, offset int32) ([]model.User, error)
+	CountFilteredUsers(ctx context.Context, query, role string) (int64, error)
+	CountUsersByRoles(ctx context.Context) (member, moderator, admin, superAdmin int64, err error)
 	GetUser(ctx context.Context, id string) (model.User, error)
 	GetPost(ctx context.Context, id string) (model.Post, error)
 	CountSuperAdmins(ctx context.Context) (int64, error)
@@ -27,12 +33,16 @@ type Repository interface {
 	ApplyPostSnapshot(ctx context.Context, p model.Post, entry model.ChangeEntry) error
 	EnsureArtistPage(ctx context.Context, tag string) error
 	SetPostHidden(ctx context.Context, postID string, hidden, deleted bool, actorID string, entry model.ChangeEntry) error
-	ListHiddenPosts(ctx context.Context, kind string, limit, offset int32) ([]model.Post, error)
+	ListHiddenPosts(ctx context.Context, kind, query, rating, sort string, limit, offset int32) ([]model.Post, error)
+	CountHiddenPosts(ctx context.Context, kind, query, rating string) (int64, error)
 	CountRemovedPosts(ctx context.Context) (int64, int64, error)
 	GetHistory(ctx context.Context, id string) (model.ChangeEntry, error)
 	ListHistoryForEntity(ctx context.Context, entityType, entityID string, limit int32) ([]model.ChangeEntry, error)
 	ListRecentHistory(ctx context.Context, limit int32) ([]model.ChangeEntry, error)
 	ListHistoryByActor(ctx context.Context, actorID string, limit int32) ([]model.ChangeEntry, error)
+	ListHistory(ctx context.Context, actorID, query, action, entity, sort string, limit, offset int32) ([]model.ChangeEntry, error)
+	CountHistory(ctx context.Context, actorID, query, action, entity string) (int64, error)
+	SearchUsernames(ctx context.Context, query string) ([]model.HistoryActor, error)
 }
 
 type Service struct{ repo Repository }
@@ -61,6 +71,50 @@ func (s *Service) ListUsers(ctx context.Context, actor model.User) ([]model.User
 		users = []model.User{}
 	}
 	return users, err
+}
+
+// ListUserPage is one page of the staff people directory (admin+).
+// query is a case-insensitive substring of username or display name;
+// blank matches everything. role blank is every role. sort blank is name.
+// Member, Moderator, Admin, and SuperAdmin are the full role counts,
+// ignoring query and role. Total is how many rows match query and role.
+func (s *Service) ListUserPage(ctx context.Context, actor model.User, query, role, sort string, limit, offset int) (model.UserPage, error) {
+	if !actor.Role.AtLeast(model.RoleAdmin) {
+		return model.UserPage{}, ErrForbidden
+	}
+	query = strings.TrimSpace(query)
+	if utf8.RuneCountInString(query) > 80 {
+		return model.UserPage{}, invalid("q must be 80 characters or fewer")
+	}
+	if role != "" && !model.Role(role).Valid() {
+		return model.UserPage{}, invalid("role must be member, moderator, admin, or super_admin")
+	}
+	switch sort {
+	case "", "name":
+		sort = "name"
+	case "newest", "oldest":
+	default:
+		return model.UserPage{}, invalid("sort must be name, newest, or oldest")
+	}
+	lim, off := model.PageBounds(limit, offset)
+	members, moderators, admins, superAdmins, err := s.repo.CountUsersByRoles(ctx)
+	if err != nil {
+		return model.UserPage{}, err
+	}
+	total, err := s.repo.CountFilteredUsers(ctx, query, role)
+	if err != nil {
+		return model.UserPage{}, err
+	}
+	users, err := s.repo.ListFilteredUsers(ctx, query, role, sort, lim, off)
+	if err != nil {
+		return model.UserPage{}, err
+	}
+	if users == nil {
+		users = []model.User{}
+	}
+	return model.UserPage{
+		Total: total, Member: members, Moderator: moderators, Admin: admins, SuperAdmin: superAdmins, Users: users,
+	}, nil
 }
 
 // SetRole changes target's role and records it. Hierarchy (model.CanManageRole):
@@ -178,6 +232,94 @@ func (s *Service) HistoryByActor(ctx context.Context, actor model.User, actorID 
 	return entries, err
 }
 
+// ListHistory is one filtered page of the staff change feed (moderator+).
+// query matches an actor name or an artist, role, rating, source link, or
+// tag list on either snapshot; blank matches everything. actorID blank is
+// every actor. A non-empty actorID must already be a user id and is not
+// looked up. action and entity blank match every value. sort blank is newest.
+func (s *Service) ListHistory(ctx context.Context, actor model.User, actorID, query, action, entity, sort string, limit, offset int) (model.HistoryPage, error) {
+	if !actor.Role.AtLeast(model.RoleModerator) {
+		return model.HistoryPage{}, ErrForbidden
+	}
+	query, err := historyQuery(query)
+	if err != nil {
+		return model.HistoryPage{}, err
+	}
+	if actorID != "" {
+		id, err := uuid.Parse(actorID)
+		if err != nil {
+			return model.HistoryPage{}, invalid("actor_id must be a user id")
+		}
+		actorID = id.String()
+	}
+	if err := historyAction(action); err != nil {
+		return model.HistoryPage{}, err
+	}
+	switch entity {
+	case "", "post", "user":
+	default:
+		return model.HistoryPage{}, invalid("entity must be post or user")
+	}
+	switch sort {
+	case "", "newest", "oldest":
+	default:
+		return model.HistoryPage{}, invalid("sort must be newest or oldest")
+	}
+	lim, off := model.PageBounds(limit, offset)
+	total, err := s.repo.CountHistory(ctx, actorID, query, action, entity)
+	if err != nil {
+		return model.HistoryPage{}, err
+	}
+	entries, err := s.repo.ListHistory(ctx, actorID, query, action, entity, sort, lim, off)
+	if err != nil {
+		return model.HistoryPage{}, err
+	}
+	if entries == nil {
+		entries = []model.ChangeEntry{}
+	}
+	return model.HistoryPage{Total: total, Entries: entries}, nil
+}
+
+// SearchHistoryActors returns up to eight usernames for the history actor
+// picker (moderator+). A blank query returns nothing and does not query.
+func (s *Service) SearchHistoryActors(ctx context.Context, actor model.User, query string) ([]model.HistoryActor, error) {
+	if !actor.Role.AtLeast(model.RoleModerator) {
+		return nil, ErrForbidden
+	}
+	query, err := historyQuery(query)
+	if err != nil {
+		return nil, err
+	}
+	if query == "" {
+		return []model.HistoryActor{}, nil
+	}
+	actors, err := s.repo.SearchUsernames(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	if actors == nil {
+		actors = []model.HistoryActor{}
+	}
+	return actors, nil
+}
+
+func historyQuery(q string) (string, error) {
+	q = strings.TrimSpace(q)
+	if utf8.RuneCountInString(q) > 80 {
+		return "", invalid("q must be 80 characters or fewer")
+	}
+	return q, nil
+}
+
+func historyAction(action string) error {
+	switch action {
+	case "", "post.created", "post.meta_updated", "post.hidden", "post.unhidden", "post.deleted", "user.role_changed", "rollback":
+		return nil
+	default:
+		return invalid("action is not a history action")
+	}
+}
+
 // Rollback restores the before_state of one history row and records the
 // rollback as a new row (the log is append-only, never rewritten). This
 // covers both rogue-staff cleanup and changing your mind after a change.
@@ -279,10 +421,13 @@ func (s *Service) rollbackUser(ctx context.Context, actor model.User, entry mode
 	return rb, nil
 }
 
-// ListHiddenPosts is one page of the staff review queue, newest removal
-// first (moderator+). kind is all, hidden, or deleted. Hidden and
-// Deleted are the full queue counts, not the length of this page.
-func (s *Service) ListHiddenPosts(ctx context.Context, actor model.User, kind string, limit, offset int) (model.HiddenPage, error) {
+// ListHiddenPosts is one page of the staff review queue (moderator+).
+// kind is all, hidden, or deleted. query is a case-insensitive substring
+// of the artist, uploader, remover, or any tag; blank matches everything.
+// rating is sfw, nsfw, or blank. sort is newest or oldest removal time,
+// and blank is newest. Hidden and Deleted are the full queue counts.
+// Total is how many rows match kind, query, and rating.
+func (s *Service) ListHiddenPosts(ctx context.Context, actor model.User, kind, query, rating, sort string, limit, offset int) (model.HiddenPage, error) {
 	if !actor.Role.AtLeast(model.RoleModerator) {
 		return model.HiddenPage{}, ErrForbidden
 	}
@@ -293,24 +438,35 @@ func (s *Service) ListHiddenPosts(ctx context.Context, actor model.User, kind st
 	default:
 		return model.HiddenPage{}, invalid("kind must be all, hidden, or deleted")
 	}
+	query = strings.TrimSpace(query)
+	if utf8.RuneCountInString(query) > 80 {
+		return model.HiddenPage{}, invalid("q must be 80 characters or fewer")
+	}
+	switch rating {
+	case "", "sfw", "nsfw":
+	default:
+		return model.HiddenPage{}, invalid("rating must be sfw or nsfw")
+	}
+	switch sort {
+	case "", "newest", "oldest":
+	default:
+		return model.HiddenPage{}, invalid("sort must be newest or oldest")
+	}
 	lim, off := model.PageBounds(limit, offset)
 	hidden, deleted, err := s.repo.CountRemovedPosts(ctx)
 	if err != nil {
 		return model.HiddenPage{}, err
 	}
-	posts, err := s.repo.ListHiddenPosts(ctx, kind, lim, off)
+	total, err := s.repo.CountHiddenPosts(ctx, kind, query, rating)
+	if err != nil {
+		return model.HiddenPage{}, err
+	}
+	posts, err := s.repo.ListHiddenPosts(ctx, kind, query, rating, sort, lim, off)
 	if err != nil {
 		return model.HiddenPage{}, err
 	}
 	if posts == nil {
 		posts = []model.Post{}
-	}
-	total := hidden + deleted
-	if kind == "hidden" {
-		total = hidden
-	}
-	if kind == "deleted" {
-		total = deleted
 	}
 	return model.HiddenPage{Total: total, Hidden: hidden, Deleted: deleted, Posts: posts}, nil
 }

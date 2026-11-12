@@ -365,7 +365,7 @@ func (e *Engine) postsHidden(ctx context.Context, args []string) int {
 	if !ok {
 		return 1
 	}
-	parsed, code, argsOK := e.postsArgs(args, cmd, 0, "kind", "limit", "offset")
+	parsed, code, argsOK := e.postsArgs(args, cmd, 0, "kind", "q", "rating", "sort", "limit", "offset")
 	if !argsOK {
 		return code
 	}
@@ -379,7 +379,7 @@ func (e *Engine) postsHidden(ctx context.Context, args []string) int {
 	if e.deps.Moderation == nil {
 		return e.fail(cmd, "internal", "Something went wrong. Please try again.")
 	}
-	page, err := e.deps.Moderation.ListHiddenPosts(ctx, user, parsed.Get("kind"), limit, offset)
+	page, err := e.deps.Moderation.ListHiddenPosts(ctx, user, parsed.Get("kind"), parsed.Get("q"), parsed.Get("rating"), parsed.Get("sort"), limit, offset)
 	if err != nil {
 		return e.failErr(cmd, err)
 	}

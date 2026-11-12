@@ -5,6 +5,10 @@ import { PostPage } from "./PostPage";
 
 const updatePostMeta = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const navigate = vi.hoisted(() => vi.fn());
+const historyBack = vi.hoisted(() => vi.fn());
+const routerState = vi.hoisted(() => ({
+  current: { location: { state: {} as { fromBoard?: boolean } } },
+}));
 const neighbors = vi.hoisted(() => ({
   current: { index: -1, total: 0, ready: false } as {
     index: number;
@@ -43,6 +47,7 @@ vi.mock("@tanstack/react-router", async () => {
       params,
       search,
       replace: _replace,
+      state: _state,
       children,
       ...props
     }: {
@@ -50,6 +55,7 @@ vi.mock("@tanstack/react-router", async () => {
       params?: Record<string, string>;
       search?: Record<string, string | undefined>;
       replace?: boolean;
+      state?: { fromBoard?: boolean };
       children?: React.ReactNode;
     }) => {
       let href = to;
@@ -61,6 +67,10 @@ vi.mock("@tanstack/react-router", async () => {
       return React.createElement("a", { href, ...props }, children);
     },
     useNavigate: () => navigate,
+    useRouter: () => ({ history: { back: historyBack } }),
+    useRouterState: (opts?: {
+      select?: (state: { location: { state: { fromBoard?: boolean } } }) => unknown;
+    }) => (opts?.select ? opts.select(routerState.current) : routerState.current),
   };
 });
 vi.mock("../hooks/usePrefetchPost", () => ({ usePrefetchNeighbors: () => undefined }));
@@ -221,6 +231,31 @@ describe("PostPage staged editing", () => {
     expect(navigate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Discard and leave" }));
     expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ params: { id: "p2" } }));
+  });
+
+  it("returns to the board history entry when the picture was opened from the board", () => {
+    routerState.current = { location: { state: { fromBoard: true } } };
+    neighbors.current = { index: 1, total: 3, ready: true, next: { id: "p2" } };
+    historyBack.mockClear();
+    navigate.mockClear();
+    try {
+      render(<PostPage id="p1" search={{ tags: "yuri" }} />);
+      fireEvent.click(screen.getByRole("link", { name: /Board/ }));
+      expect(historyBack).toHaveBeenCalledOnce();
+      expect(navigate).not.toHaveBeenCalled();
+
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+      expect(navigate).toHaveBeenCalledWith({
+        to: "/posts/$id",
+        params: { id: "p2" },
+        search: { tags: "yuri" },
+        replace: true,
+        state: { fromBoard: true },
+      });
+    } finally {
+      routerState.current = { location: { state: {} } };
+      neighbors.current = { index: -1, total: 0, ready: false };
+    }
   });
 
   it("links the picture and a Full size link to the raw file in a new tab", () => {

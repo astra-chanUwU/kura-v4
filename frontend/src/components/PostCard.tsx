@@ -10,7 +10,7 @@ import {
   useToggleFavorite,
 } from "../hooks/useKura";
 import { usePrefetchPost } from "../hooks/usePrefetchPost";
-import { ThemedSelect } from "./ThemedSelect";
+import { VisibilityToggle } from "./VisibilityToggle";
 import { shortError, useToasts } from "./Toasts";
 import styles from "./PostCard.module.css";
 
@@ -157,14 +157,11 @@ export function PostActions({ post }: { post: Post }) {
                 aria-label="New list name"
                 maxLength={80}
               />
-              <ThemedSelect
+              <VisibilityToggle
                 label="New list visibility"
                 value={newVisibility}
                 onChange={setNewVisibility}
-              >
-                <option value="private">Private</option>
-                <option value="public">Public</option>
-              </ThemedSelect>
+              />
               <button type="submit" disabled={!newTitle.trim() || creating}>
                 {creating ? "Creating…" : "Create & add"}
               </button>
@@ -189,10 +186,12 @@ export function PostCard({
   post,
   search,
   onOpen,
+  fromBoard,
 }: {
   post: Post;
   search?: BoardSearch;
   onOpen?: () => void;
+  fromBoard?: boolean;
 }) {
   const prefetch = usePrefetchPost(post);
   return (
@@ -201,6 +200,7 @@ export function PostCard({
         to="/posts/$id"
         params={{ id: post.id }}
         search={search}
+        state={fromBoard ? { fromBoard: true } : undefined}
         className={styles.media}
         aria-label="Open post"
         onMouseDown={onOpen}

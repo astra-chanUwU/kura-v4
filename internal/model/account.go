@@ -26,6 +26,19 @@ type User struct {
 	DefaultExcludeTags []string
 }
 
+// UserPage is one page of the staff people directory.
+// Member, Moderator, Admin, and SuperAdmin are global role counts
+// (they ignore the search and role filter). Total is how many accounts
+// match that filter. Users is one page.
+type UserPage struct {
+	Total      int64
+	Member     int64
+	Moderator  int64
+	Admin      int64
+	SuperAdmin int64
+	Users      []User
+}
+
 type Passkey struct {
 	ID         string
 	Name       string
@@ -65,27 +78,28 @@ type AccountSecurity struct {
 }
 
 type Post struct {
-	ID            string
-	OwnerID       *string
-	OwnerUsername string
-	OriginalName  string
-	StorageKey    string
-	ContentType   string
-	SizeBytes     int64
-	CreatedAt     time.Time
-	Artist        string
-	Source        string // e.g. "twitter"
-	SourceID      string // e.g. the tweet id
-	SourceURL     string // member-set http(s) link; empty when unset
-	ThumbnailKey  string
-	SampleKey     string // medium JPEG; empty until post.derive stores one
-	Tags          []string
-	Width         int
-	Height        int
-	Rating        string // sfw | nsfw
-	Hidden        bool   // hidden by a moderator/admin; restorable via history
-	Deleted       bool   // soft-deleted by an admin (hidden, and flagged deleted)
-	FavoriteCount int64  // public number of favorites
+	ID                 string
+	OwnerID            *string
+	OwnerUsername      string
+	OriginalName       string
+	StorageKey         string
+	ContentType        string
+	SizeBytes          int64
+	CreatedAt          time.Time
+	Artist             string
+	Source             string // e.g. "twitter"
+	SourceID           string // e.g. the tweet id
+	SourceURL          string // member-set http(s) link; empty when unset
+	ThumbnailKey       string
+	SampleKey          string // medium JPEG; empty until post.derive stores one
+	Tags               []string
+	Width              int
+	Height             int
+	Rating             string // sfw | nsfw
+	Hidden             bool   // hidden by a moderator/admin; restorable via history
+	Deleted            bool   // soft-deleted by an admin (hidden, and flagged deleted)
+	FavoriteCount      int64  // public number of favorites
+	LastTaggerUsername string // latest post.meta_updated actor; empty when nobody has retagged
 }
 
 type List struct {

@@ -147,3 +147,11 @@ func (r *Posts) ApplyPostSnapshotAudited(ctx context.Context, p model.Post, entr
 func (r *Posts) EnsureArtistPage(ctx context.Context, tag string) error {
 	return dao.NewTagPages(r.DB()).EnsureArtistCategory(ctx, tag)
 }
+
+func (r *Posts) CountMetaEditsByActor(ctx context.Context, actorID string) (int64, error) {
+	return r.audit.CountMetaEditsByActor(ctx, actorID)
+}
+
+func (r *Posts) LastMetaEditor(ctx context.Context, postID string) (string, error) {
+	return r.audit.LastMetaEditor(ctx, postID)
+}

@@ -11,9 +11,14 @@ import (
 
 const commentTime = "2006-01-02T15:04:05Z07:00"
 
-type Comments struct{ service *comments.Service }
+type Comments struct {
+	service  *comments.Service
+	notifier Notifier
+}
 
 func NewComments(s *comments.Service) *Comments { return &Comments{service: s} }
+
+func (h *Comments) SetNotifier(n Notifier) { h.notifier = n }
 
 func (h *Comments) RegisterRoutes(api fiber.Router) {
 	api.Get("/posts/:id/comments", h.list)
@@ -44,6 +49,7 @@ func (h *Comments) create(c fiber.Ctx) error {
 	if err != nil {
 		return writeCommentError(c, err)
 	}
+	notifyUploader(c, h.notifier, user.ID, model.NotificationComment, comment.PostID, comment.ID)
 	return c.Status(201).JSON(commentDTO(comment, user))
 }
 

@@ -197,6 +197,10 @@ func (h *Posts) get(c fiber.Ctx) error {
 	if !canReadPost(c, post) {
 		return writeError(c, board.ErrNotFound)
 	}
+	post, err = h.board.WithLastTagger(c.Context(), post)
+	if err != nil {
+		return writeError(c, err)
+	}
 	return c.JSON(postDTO(post, h.favs(c)))
 }
 

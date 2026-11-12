@@ -159,7 +159,7 @@ export function ThemedSelect({
   return (
     <div
       ref={wrapRef}
-      className={styles.wrap}
+      className={open ? `${styles.wrap} ${styles.open}` : styles.wrap}
       onBlur={(e) => {
         if (open && (!e.relatedTarget || !wrapRef.current?.contains(e.relatedTarget as Node))) {
           setOpen(false);

@@ -10,6 +10,7 @@ import {
 } from "../components/icons";
 import { PostCard } from "../components/PostCard";
 import { ThemedSelect } from "../components/ThemedSelect";
+import { VisibilityToggle } from "../components/VisibilityToggle";
 import { RecoveryKeyPanel } from "../components/RecoveryKeyPanel";
 import { SavedSearchList } from "../components/SavedSearches";
 import { ShareProfileButton } from "../components/ShareProfileButton";
@@ -593,7 +594,7 @@ export function MePage() {
 
       {tab === "favorites" && (
         <div>
-          <p className={styles.muted}>Private — only you can see your favorites.</p>
+          <p className={styles.favoritesNote}>Private — only you can see your favorites.</p>
           <PagedPosts
             posts={favorites.posts}
             pending={favorites.isPending}
@@ -636,10 +637,7 @@ export function MePage() {
               placeholder="Description (optional)"
               aria-label="List description"
             />
-            <ThemedSelect name="visibility" label="Visibility" defaultValue="private">
-              <option value="private">Private</option>
-              <option value="public">Public</option>
-            </ThemedSelect>
+            <VisibilityToggle name="visibility" defaultValue="private" />
             <button type="submit">Create list</button>
           </form>
           {(myLists.data ?? []).length > 5 && (

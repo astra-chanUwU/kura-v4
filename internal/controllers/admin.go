@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"encoding/json"
-	"strconv"
 
 	"github.com/astra-chanUwU/kura-v4/internal/dto"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
@@ -22,6 +21,7 @@ func NewAdmin(mod *moderation.Service) *Admin { return &Admin{mod: mod} }
 func (h *Admin) RegisterRoutes(api fiber.Router) {
 	api.Get("/admin/users", h.listUsers)
 	api.Patch("/admin/users/:id/role", h.setRole)
+	api.Get("/admin/history-actors", h.historyActors)
 	api.Get("/admin/history", h.recentHistory)
 	api.Get("/admin/hidden-posts", h.hiddenPosts)
 	api.Get("/posts/:id/history", h.postHistory)
@@ -65,15 +65,19 @@ func (h *Admin) listUsers(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	users, err := h.mod.ListUsers(c.Context(), *user)
+	limit, offset := queryPage(c)
+	page, err := h.mod.ListUserPage(c.Context(), *user, c.Query("q"), c.Query("role"), c.Query("sort"), limit, offset)
 	if err != nil {
 		return writeError(c, err)
 	}
-	out := make([]dto.User, 0, len(users))
-	for _, u := range users {
-		out = append(out, userDTO(u))
+	users := make([]dto.User, 0, len(page.Users))
+	for _, u := range page.Users {
+		users = append(users, userDTO(u))
 	}
-	return c.JSON(out)
+	return c.JSON(dto.UserPage{
+		Total: page.Total, Member: page.Member, Moderator: page.Moderator,
+		Admin: page.Admin, SuperAdmin: page.SuperAdmin, Users: users,
+	})
 }
 
 func (h *Admin) setRole(c fiber.Ctx) error {
@@ -97,22 +101,28 @@ func (h *Admin) recentHistory(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	limit := int32(50)
-	if v, err := strconv.Atoi(c.Query("limit")); err == nil && v > 0 {
-		limit = int32(v)
-	}
-	if actorID := c.Query("actor_id"); actorID != "" {
-		entries, err := h.mod.HistoryByActor(c.Context(), *user, actorID, limit)
-		if err != nil {
-			return writeError(c, err)
-		}
-		return c.JSON(historiesDTO(entries))
-	}
-	entries, err := h.mod.RecentHistory(c.Context(), *user, limit)
+	limit, offset := queryPage(c)
+	page, err := h.mod.ListHistory(c.Context(), *user, c.Query("actor_id"), c.Query("q"), c.Query("action"), c.Query("entity"), c.Query("sort"), limit, offset)
 	if err != nil {
 		return writeError(c, err)
 	}
-	return c.JSON(historiesDTO(entries))
+	return c.JSON(dto.HistoryPage{Total: page.Total, Entries: historiesDTO(page.Entries)})
+}
+
+func (h *Admin) historyActors(c fiber.Ctx) error {
+	user, err := requireUser(c)
+	if err != nil {
+		return err
+	}
+	actors, err := h.mod.SearchHistoryActors(c.Context(), *user, c.Query("q"))
+	if err != nil {
+		return writeError(c, err)
+	}
+	out := make([]dto.HistoryActor, 0, len(actors))
+	for _, actor := range actors {
+		out = append(out, dto.HistoryActor{ID: actor.ID, Username: actor.Username})
+	}
+	return c.JSON(out)
 }
 
 func (h *Admin) postHistory(c fiber.Ctx) error {
@@ -162,7 +172,7 @@ func (h *Admin) hiddenPosts(c fiber.Ctx) error {
 		return err
 	}
 	limit, offset := queryPage(c)
-	page, err := h.mod.ListHiddenPosts(c.Context(), *user, c.Query("kind"), limit, offset)
+	page, err := h.mod.ListHiddenPosts(c.Context(), *user, c.Query("kind"), c.Query("q"), c.Query("rating"), c.Query("sort"), limit, offset)
 	if err != nil {
 		return writeError(c, err)
 	}

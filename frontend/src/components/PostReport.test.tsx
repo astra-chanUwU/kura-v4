@@ -46,9 +46,13 @@ describe("PostReport", () => {
 
   it("sends the chosen reason and note", async () => {
     renderReport(true);
+    fireEvent.click(screen.getByRole("button", { name: "Reason" }));
+    fireEvent.click(screen.getByRole("option", { name: /Wrong rating/ }));
     fireEvent.change(screen.getByLabelText("Note"), { target: { value: "duplicate" } });
     fireEvent.click(screen.getByRole("button", { name: "Send report" }));
-    await waitFor(() => expect(createPostReport).toHaveBeenCalledWith("p1", "spam", "duplicate"));
+    await waitFor(() =>
+      expect(createPostReport).toHaveBeenCalledWith("p1", "wrong_rating", "duplicate"),
+    );
     expect(await screen.findByText(/Report sent/)).toBeInTheDocument();
   });
 });

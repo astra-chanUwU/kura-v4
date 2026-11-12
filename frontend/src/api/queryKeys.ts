@@ -34,10 +34,13 @@ export const queryKeys = {
   myLists: () => ["my-lists"] as const,
   list: (id: string) => ["list", id] as const,
   profile: (username: string) => ["profile", username] as const,
-  adminUsers: () => ["admin-users"] as const,
+  adminUsers: (q: string, role: string, sort: string) => ["admin-users", q, role, sort] as const,
   postHistory: (id: string) => ["post-history", id] as const,
-  hiddenPosts: (kind: string) => ["hidden-posts", kind] as const,
-  adminHistory: (actorId?: string) => ["admin-history", actorId ?? ""] as const,
+  hiddenPosts: (kind: string, q: string, rating: string, sort: string) =>
+    ["hidden-posts", kind, q, rating, sort] as const,
+  adminHistory: (actorId: string, q: string, action: string, entity: string, sort: string) =>
+    ["admin-history", actorId, q, action, entity, sort] as const,
+  historyActors: (q: string) => ["history-actors", q] as const,
   openReports: () => ["open-reports"] as const,
   failedJobs: (offset?: number) =>
     offset === undefined ? (["failed-jobs"] as const) : (["failed-jobs", offset] as const),

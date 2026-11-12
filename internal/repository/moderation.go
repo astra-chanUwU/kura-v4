@@ -23,6 +23,15 @@ func NewModeration(accountsDAO *dao.AccountsDAO, posts *Posts, audit *dao.AuditD
 func (r *Moderation) ListUsers(ctx context.Context) ([]model.User, error) {
 	return r.accounts.ListUsers(ctx)
 }
+func (r *Moderation) ListFilteredUsers(ctx context.Context, query, role, sort string, limit, offset int32) ([]model.User, error) {
+	return r.accounts.ListFilteredUsers(ctx, query, role, sort, limit, offset)
+}
+func (r *Moderation) CountFilteredUsers(ctx context.Context, query, role string) (int64, error) {
+	return r.accounts.CountFilteredUsers(ctx, query, role)
+}
+func (r *Moderation) CountUsersByRoles(ctx context.Context) (int64, int64, int64, int64, error) {
+	return r.accounts.CountUsersByRoles(ctx)
+}
 func (r *Moderation) GetUser(ctx context.Context, id string) (model.User, error) {
 	return r.accounts.GetUserByID(ctx, id)
 }
@@ -59,8 +68,11 @@ func (r *Moderation) ApplyPostSnapshot(ctx context.Context, p model.Post, entry 
 func (r *Moderation) SetPostHidden(ctx context.Context, postID string, hidden, deleted bool, actorID string, entry model.ChangeEntry) error {
 	return r.posts.SetPostHiddenAudited(ctx, postID, hidden, deleted, actorID, entry)
 }
-func (r *Moderation) ListHiddenPosts(ctx context.Context, kind string, limit, offset int32) ([]model.Post, error) {
-	return r.posts.ListHiddenPosts(ctx, kind, limit, offset)
+func (r *Moderation) ListHiddenPosts(ctx context.Context, kind, query, rating, sort string, limit, offset int32) ([]model.Post, error) {
+	return r.posts.ListHiddenPosts(ctx, kind, query, rating, sort, limit, offset)
+}
+func (r *Moderation) CountHiddenPosts(ctx context.Context, kind, query, rating string) (int64, error) {
+	return r.posts.CountHiddenPosts(ctx, kind, query, rating)
 }
 func (r *Moderation) CountRemovedPosts(ctx context.Context) (int64, int64, error) {
 	return r.posts.CountRemovedPosts(ctx)
@@ -76,6 +88,15 @@ func (r *Moderation) ListRecentHistory(ctx context.Context, limit int32) ([]mode
 }
 func (r *Moderation) ListHistoryByActor(ctx context.Context, actorID string, limit int32) ([]model.ChangeEntry, error) {
 	return r.audit.ListChangeHistoryByActor(ctx, actorID, limit)
+}
+func (r *Moderation) ListHistory(ctx context.Context, actorID, query, action, entity, sort string, limit, offset int32) ([]model.ChangeEntry, error) {
+	return r.audit.ListHistory(ctx, actorID, query, action, entity, sort, limit, offset)
+}
+func (r *Moderation) CountHistory(ctx context.Context, actorID, query, action, entity string) (int64, error) {
+	return r.audit.CountHistory(ctx, actorID, query, action, entity)
+}
+func (r *Moderation) SearchUsernames(ctx context.Context, query string) ([]model.HistoryActor, error) {
+	return r.accounts.SearchUsernames(ctx, query)
 }
 
 func (r *Moderation) EnsureArtistPage(ctx context.Context, tag string) error {

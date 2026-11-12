@@ -28,10 +28,130 @@
   color: var(--muted);
   white-space: nowrap;
 }
+.roleControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.roleGroup {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+.roleOption {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.roleOption[aria-checked="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.changedDot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: none;
+}
+.roleBar {
+  display: flex;
+  justify-content: flex-end;
+}
+.saveRoles {
+  margin: 0;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+}
+.saveRoles:disabled {
+  cursor: default;
+}
+.saveRolesDirty {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.roleChanges {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+  color: var(--text);
+}
+.roleChanges li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.roleMark {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.member {
+  color: var(--muted);
+}
+.moderator {
+  color: var(--success);
+}
+.admin {
+  color: var(--accent-soft);
+}
+.super_admin {
+  color: var(--accent);
+}
 .filterRow {
   display: flex;
-  gap: 0.6rem;
   align-items: center;
   flex-wrap: wrap;
-  margin-bottom: 0.8rem;
+  gap: 0.6rem;
+  margin: 0.8rem 0 1rem;
+}
+.search {
+  flex: 1 1 22rem;
+  min-width: min(12rem, 100%);
+  max-width: 100%;
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+.search::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+.matchCount {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .search {
+    flex-basis: 100%;
+    font-size: 1rem;
+    min-height: 2.75rem;
+  }
 }

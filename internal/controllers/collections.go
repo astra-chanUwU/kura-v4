@@ -3,12 +3,19 @@ package controllers
 import (
 	"github.com/astra-chanUwU/kura-v4/internal/collections"
 	"github.com/astra-chanUwU/kura-v4/internal/dto"
+	"github.com/astra-chanUwU/kura-v4/internal/model"
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 )
 
-type Collections struct{ service *collections.Service }
+type Collections struct {
+	service  *collections.Service
+	notifier Notifier
+}
 
 func NewCollections(s *collections.Service) *Collections { return &Collections{service: s} }
+
+func (h *Collections) SetNotifier(n Notifier) { h.notifier = n }
 
 func (h *Collections) RegisterRoutes(api fiber.Router) {
 	api.Get("/me/favorites", h.favorites)
@@ -46,8 +53,22 @@ func (h *Collections) favorite(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	if err := h.service.Favorite(c.Context(), user.ID, c.Params("postId")); err != nil {
+	postID := c.Params("postId")
+	if parsed, parseErr := uuid.Parse(postID); parseErr == nil {
+		postID = parsed.String()
+	}
+	// AddFavorite is ON CONFLICT DO NOTHING, so a repeat click is not a
+	// new favorite. If the check fails, still save the favorite and skip
+	// the notice rather than announcing one that already existed.
+	fresh := false
+	if existing, idsErr := h.service.FavoriteIDs(c.Context(), user.ID); idsErr == nil {
+		fresh = !existing[postID]
+	}
+	if err := h.service.Favorite(c.Context(), user.ID, postID); err != nil {
 		return writeError(c, err)
+	}
+	if fresh {
+		notifyUploader(c, h.notifier, user.ID, model.NotificationFavorite, postID, "")
 	}
 	return c.SendStatus(204)
 }

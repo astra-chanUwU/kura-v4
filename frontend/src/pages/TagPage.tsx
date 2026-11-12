@@ -5,7 +5,9 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { shortError, useToasts } from "../components/Toasts";
 import { atLeast } from "../domain/roles";
 import { useMe } from "../hooks/useKura";
+import { useSuggestTag } from "../hooks/useSuggestions";
 import { useTagPage, useTagPageActions } from "../hooks/useTagPage";
+import type { SuggestionKind } from "../types/suggestion";
 import { TAG_CATEGORIES, TAG_CATEGORY_LABELS, type TagCategory } from "../types/tagPage";
 import styles from "./TagPage.module.css";
 
@@ -232,6 +234,8 @@ export function TagPage({ name }: { name: string }) {
         )}
       </section>
 
+      {signedIn && <SuggestForm tag={canonical} />}
+
       {signedIn && (
         <form className={styles.form} onSubmit={save}>
           <label>
@@ -294,5 +298,66 @@ export function TagPage({ name }: { name: string }) {
         }}
       />
     </section>
+  );
+}
+
+function SuggestForm({ tag }: { tag: string }) {
+  const [kind, setKind] = useState<SuggestionKind>("alias");
+  const [other, setOther] = useState("");
+  const [reason, setReason] = useState("");
+  const suggest = useSuggestTag(tag);
+  const toasts = useToasts();
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const next = other.trim();
+    if (!next) return;
+    suggest.mutate(
+      { kind, other: next, reason: reason.trim() },
+      {
+        onSuccess: () => {
+          setOther("");
+          setReason("");
+          toasts.push("Suggestion sent. A moderator can accept it.", "success");
+        },
+        onError: (error: unknown) => toasts.push(shortError(error), "error"),
+      },
+    );
+  };
+  return (
+    <form className={styles.form} onSubmit={submit}>
+      <h2>Suggest a change</h2>
+      <p className={styles.muted}>
+        {kind === "alias"
+          ? `Another name for ${tag}. A moderator accepts it before it applies.`
+          : `${tag} would also add the other tag. A moderator accepts it before it applies.`}
+      </p>
+      <div className={styles.row}>
+        <select
+          aria-label="Suggestion kind"
+          value={kind}
+          onChange={(event) => setKind(event.target.value === "implication" ? "implication" : "alias")}
+        >
+          <option value="alias">Alias</option>
+          <option value="implication">Implication</option>
+        </select>
+        <input
+          value={other}
+          onChange={(event) => setOther(event.target.value)}
+          placeholder={kind === "alias" ? "Alternate name" : "Tag this one implies"}
+          aria-label={kind === "alias" ? "Alternate name" : "Implied tag"}
+          maxLength={40}
+        />
+        <input
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          placeholder="Why (optional)"
+          aria-label="Reason"
+          maxLength={300}
+        />
+        <button type="submit" disabled={!other.trim() || suggest.isPending}>
+          Suggest
+        </button>
+      </div>
+    </form>
   );
 }

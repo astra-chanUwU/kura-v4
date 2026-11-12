@@ -7,6 +7,12 @@
   display: grid;
   gap: 0.35rem;
 }
+.reason > div {
+  width: 100%;
+}
+.reason > div > button {
+  width: 100%;
+}
 .error {
   color: var(--danger);
   margin: 0;

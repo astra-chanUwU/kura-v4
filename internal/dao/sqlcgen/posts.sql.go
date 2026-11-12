@@ -13,6 +13,46 @@ import (
 	"github.com/google/uuid"
 )
 
+const countHiddenPosts = `-- name: CountHiddenPosts :one
+SELECT count(*)::bigint AS total
+FROM posts p
+LEFT JOIN users u ON u.id = p.owner_id
+LEFT JOIN users remover ON remover.id = p.hidden_by
+WHERE p.hidden_at IS NOT NULL
+  AND (
+    $1::text = 'all'
+    OR ($1::text = 'hidden' AND p.deleted_at IS NULL)
+    OR ($1::text = 'deleted' AND p.deleted_at IS NOT NULL)
+  )
+  AND (
+    $2::text = ''
+    OR p.rating = $2::text
+  )
+  AND (
+    $3::text = ''
+    OR p.artist ILIKE $3::text ESCAPE '\'
+    OR u.username ILIKE $3::text ESCAPE '\'
+    OR remover.username ILIKE $3::text ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM post_tags t
+      WHERE t.post_id = p.id AND t.tag ILIKE $3::text ESCAPE '\'
+    )
+  )
+`
+
+type CountHiddenPostsParams struct {
+	Kind   string
+	Rating string
+	Query  string
+}
+
+func (q *Queries) CountHiddenPosts(ctx context.Context, arg CountHiddenPostsParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countHiddenPosts, arg.Kind, arg.Rating, arg.Query)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
 const countPostsByOwner = `-- name: CountPostsByOwner :one
 SELECT count(*) FROM posts WHERE owner_id=$1
 `
@@ -39,6 +79,27 @@ type CountPostsByOwnerSinceParams struct {
 // Hidden and soft-deleted posts count. Deleting one does not free a slot.
 func (q *Queries) CountPostsByOwnerSince(ctx context.Context, arg CountPostsByOwnerSinceParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countPostsByOwnerSince, arg.OwnerID, arg.WithinSeconds)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
+const countPublicPostsByOwner = `-- name: CountPublicPostsByOwner :one
+SELECT count(*)::bigint AS total
+FROM posts
+WHERE owner_id = $1
+  AND hidden_at IS NULL
+  AND deleted_at IS NULL
+  AND ($2::bool OR rating = 'sfw')
+`
+
+type CountPublicPostsByOwnerParams struct {
+	OwnerID     uuid.NullUUID
+	IncludeNsfw bool
+}
+
+func (q *Queries) CountPublicPostsByOwner(ctx context.Context, arg CountPublicPostsByOwnerParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countPublicPostsByOwner, arg.OwnerID, arg.IncludeNsfw)
 	var total int64
 	err := row.Scan(&total)
 	return total, err
@@ -317,19 +378,42 @@ SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_
   p.artist, p.source, p.source_id, p.thumbnail_key, COALESCE(p.sample_key, '')::text AS sample_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
-FROM posts p LEFT JOIN users u ON u.id=p.owner_id
+FROM posts p
+LEFT JOIN users u ON u.id = p.owner_id
+LEFT JOIN users remover ON remover.id = p.hidden_by
 WHERE p.hidden_at IS NOT NULL
   AND (
     $1::text = 'all'
     OR ($1::text = 'hidden' AND p.deleted_at IS NULL)
     OR ($1::text = 'deleted' AND p.deleted_at IS NOT NULL)
   )
-ORDER BY p.hidden_at DESC, p.id DESC
-LIMIT $3 OFFSET $2
+  AND (
+    $2::text = ''
+    OR p.rating = $2::text
+  )
+  AND (
+    $3::text = ''
+    OR p.artist ILIKE $3::text ESCAPE '\'
+    OR u.username ILIKE $3::text ESCAPE '\'
+    OR remover.username ILIKE $3::text ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM post_tags t
+      WHERE t.post_id = p.id AND t.tag ILIKE $3::text ESCAPE '\'
+    )
+  )
+ORDER BY
+  CASE WHEN $4::text = 'oldest' THEN p.hidden_at END ASC,
+  CASE WHEN $4::text <> 'oldest' THEN p.hidden_at END DESC,
+  CASE WHEN $4::text = 'oldest' THEN p.id END ASC,
+  CASE WHEN $4::text <> 'oldest' THEN p.id END DESC
+LIMIT $6 OFFSET $5
 `
 
 type ListHiddenPostsParams struct {
 	Kind      string
+	Rating    string
+	Query     string
+	Sort      string
 	RowOffset int32
 	RowLimit  int32
 }
@@ -358,7 +442,14 @@ type ListHiddenPostsRow struct {
 }
 
 func (q *Queries) ListHiddenPosts(ctx context.Context, arg ListHiddenPostsParams) ([]ListHiddenPostsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listHiddenPosts, arg.Kind, arg.RowOffset, arg.RowLimit)
+	rows, err := q.db.QueryContext(ctx, listHiddenPosts,
+		arg.Kind,
+		arg.Rating,
+		arg.Query,
+		arg.Sort,
+		arg.RowOffset,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -538,6 +629,99 @@ func (q *Queries) ListPostsByOwner(ctx context.Context, arg ListPostsByOwnerPara
 	items := []ListPostsByOwnerRow{}
 	for rows.Next() {
 		var i ListPostsByOwnerRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OwnerID,
+			&i.OriginalName,
+			&i.StorageKey,
+			&i.ContentType,
+			&i.SizeBytes,
+			&i.CreatedAt,
+			&i.Artist,
+			&i.Source,
+			&i.SourceID,
+			&i.ThumbnailKey,
+			&i.SampleKey,
+			&i.Width,
+			&i.Height,
+			&i.Rating,
+			&i.FavoriteCount,
+			&i.Hidden,
+			&i.Deleted,
+			&i.OwnerUsername,
+			&i.TagsCsv,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicPostsByOwner = `-- name: ListPublicPostsByOwner :many
+SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
+  p.artist, p.source, p.source_id, p.thumbnail_key, COALESCE(p.sample_key, '')::text AS sample_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  COALESCE(u.username,'')::text AS owner_username,
+  COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
+FROM posts p LEFT JOIN users u ON u.id=p.owner_id
+WHERE p.owner_id = $1
+  AND p.hidden_at IS NULL
+  AND p.deleted_at IS NULL
+  AND ($2::bool OR p.rating = 'sfw')
+ORDER BY p.created_at DESC, p.id DESC
+LIMIT $4 OFFSET $3
+`
+
+type ListPublicPostsByOwnerParams struct {
+	OwnerID     uuid.NullUUID
+	IncludeNsfw bool
+	RowOffset   int32
+	RowLimit    int32
+}
+
+type ListPublicPostsByOwnerRow struct {
+	ID            uuid.UUID
+	OwnerID       uuid.NullUUID
+	OriginalName  string
+	StorageKey    string
+	ContentType   string
+	SizeBytes     int64
+	CreatedAt     time.Time
+	Artist        string
+	Source        string
+	SourceID      string
+	ThumbnailKey  string
+	SampleKey     string
+	Width         int32
+	Height        int32
+	Rating        string
+	FavoriteCount int32
+	Hidden        bool
+	Deleted       bool
+	OwnerUsername string
+	TagsCsv       string
+}
+
+func (q *Queries) ListPublicPostsByOwner(ctx context.Context, arg ListPublicPostsByOwnerParams) ([]ListPublicPostsByOwnerRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPublicPostsByOwner,
+		arg.OwnerID,
+		arg.IncludeNsfw,
+		arg.RowOffset,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPublicPostsByOwnerRow{}
+	for rows.Next() {
+		var i ListPublicPostsByOwnerRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.OwnerID,

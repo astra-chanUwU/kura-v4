@@ -10,7 +10,7 @@ import {
 } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEntry, Post, SearchPage } from "../types/api";
-import type { Role } from "../domain/roles";
+import { isRole, type Role } from "../domain/roles";
 import {
   isFilterActive,
   normalizeTagToken,
@@ -478,18 +478,60 @@ export function useAccountActions() {
   };
 }
 
-export function useAdminUsers(enabled: boolean) {
-  return useQuery({
-    queryKey: queryKeys.adminUsers(),
-    queryFn: ({ signal }) => api.adminUsers(signal),
+export type AdminUsersFilter = {
+  q?: string;
+  role?: string;
+  sort?: "name" | "newest" | "oldest";
+};
+
+export function useAdminUsers(enabled: boolean, filter: AdminUsersFilter = {}) {
+  const q = (filter.q ?? "").trim();
+  const requestedRole = filter.role ?? "";
+  const role = isRole(requestedRole) ? requestedRole : "";
+  const sort = filter.sort === "newest" || filter.sort === "oldest" ? filter.sort : "name";
+  const query = useInfiniteQuery({
+    queryKey: queryKeys.adminUsers(q, role, sort),
+    queryFn: ({ pageParam, signal }) =>
+      api.adminUsers({ offset: pageParam, q, role, sort }, signal),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((n, page) => n + page.users.length, 0);
+      return nextOffset(loaded, lastPage.total);
+    },
     enabled,
   });
+  const first = query.data?.pages[0];
+  return {
+    users: query.data?.pages.flatMap((page) => page.users) ?? [],
+    total: first?.total ?? 0,
+    member: first?.member ?? 0,
+    moderator: first?.moderator ?? 0,
+    admin: first?.admin ?? 0,
+    superAdmin: first?.super_admin ?? 0,
+    isPending: query.isPending,
+    error: query.error,
+    hasMore: (query.hasNextPage ?? false) && enabled,
+    loadingMore: query.isFetchingNextPage,
+    loadMore: () => void query.fetchNextPage(),
+  };
 }
 
-export function useHiddenPosts(enabled: boolean, kind: "all" | "hidden" | "deleted" = "all") {
+export type HiddenQueueFilter = {
+  kind?: "all" | "hidden" | "deleted";
+  q?: string;
+  rating?: "" | "sfw" | "nsfw";
+  sort?: "newest" | "oldest";
+};
+
+export function useHiddenPosts(enabled: boolean, filter: HiddenQueueFilter = {}) {
+  const kind = filter.kind ?? "all";
+  const q = (filter.q ?? "").trim();
+  const rating = filter.rating === "sfw" || filter.rating === "nsfw" ? filter.rating : "";
+  const sort = filter.sort === "oldest" ? "oldest" : "newest";
   const query = useInfiniteQuery({
-    queryKey: queryKeys.hiddenPosts(kind),
-    queryFn: ({ pageParam, signal }) => api.hiddenPosts(kind, pageParam, signal),
+    queryKey: queryKeys.hiddenPosts(kind, q, rating, sort),
+    queryFn: ({ pageParam, signal }) =>
+      api.hiddenPosts({ kind, offset: pageParam, q, rating, sort }, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => {
       const loaded = allPages.reduce((n, page) => n + page.posts.length, 0);
@@ -511,11 +553,50 @@ export function useHiddenPosts(enabled: boolean, kind: "all" | "hidden" | "delet
   };
 }
 
-export function useRecentHistory(actorId: string | undefined, enabled: boolean) {
-  return useQuery({
-    queryKey: queryKeys.adminHistory(actorId),
-    queryFn: ({ signal }) => api.recentHistory(actorId, signal),
+export type HistoryFilter = {
+  q?: string;
+  actorId?: string;
+  action?: string;
+  entity?: string;
+  sort?: "newest" | "oldest";
+};
+
+export function useRecentHistory(enabled: boolean, filter: HistoryFilter = {}) {
+  const q = (filter.q ?? "").trim();
+  const actorId = (filter.actorId ?? "").trim();
+  const action = (filter.action ?? "").trim();
+  const entity = (filter.entity ?? "").trim();
+  const sort = filter.sort === "oldest" ? "oldest" : "newest";
+  const query = useInfiniteQuery({
+    queryKey: queryKeys.adminHistory(actorId, q, action, entity, sort),
+    queryFn: ({ pageParam, signal }) =>
+      api.recentHistory({ offset: pageParam, q, actorId, action, entity, sort }, signal),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((n, page) => n + page.entries.length, 0);
+      return nextOffset(loaded, lastPage.total);
+    },
     enabled,
+  });
+  const pages = query.data?.pages ?? [];
+  return {
+    entries: pages.flatMap((page) => page.entries),
+    total: pages.at(-1)?.total ?? 0,
+    isPending: query.isPending,
+    error: query.error,
+    hasMore: (query.hasNextPage ?? false) && enabled,
+    loadingMore: query.isFetchingNextPage,
+    loadMore: () => void query.fetchNextPage(),
+  };
+}
+
+export function useHistoryActors(q: string, enabled: boolean) {
+  const text = q.trim();
+  return useQuery({
+    queryKey: queryKeys.historyActors(text),
+    queryFn: ({ signal }) => api.historyActors(text, signal),
+    // An empty box means "everyone" — never ask for a list of people.
+    enabled: enabled && text !== "",
   });
 }
 
@@ -539,14 +620,14 @@ export function useStaffActions() {
   return {
     setUserRole: (userId: string, role: Role) =>
       api.setUserRole(userId, role).then((u) => {
-        void client.invalidateQueries({ queryKey: queryKeys.adminUsers() });
+        void client.invalidateQueries({ queryKey: ["admin-users"] });
         void client.invalidateQueries({ queryKey: ["admin-history"] });
         return u;
       }),
     rollback: (entry: ChangeEntry) =>
       api.rollback(entry.id).then((created) => {
         if (entry.entity_type === "post") refreshPost(entry.entity_id);
-        void client.invalidateQueries({ queryKey: queryKeys.adminUsers() });
+        void client.invalidateQueries({ queryKey: ["admin-users"] });
         void client.invalidateQueries({ queryKey: ["admin-history"] });
         return created;
       }),

@@ -2,6 +2,8 @@ import type {
   ChangeEntry,
   FailedJobPage,
   HiddenPage,
+  HistoryActor,
+  HistoryPage,
   ListDetail,
   ListSummary,
   Me,
@@ -11,10 +13,11 @@ import type {
   SearchPage,
   TagCount,
   User,
+  UserPage,
   WebAuthnCeremony,
 } from "../types/api";
 import type { BoardFilter } from "../domain/boardFilter";
-import type { Role } from "../domain/roles";
+import { isRole, type Role } from "../domain/roles";
 import { getJSON, sendJSON, sendRaw } from "./client";
 import { createPasskey, getPasskey } from "./webauthn";
 
@@ -35,6 +38,69 @@ function boardParams(filter: BoardFilter): URLSearchParams {
   if (filter.q.trim() !== "") params.set("q", filter.q.trim());
   if (filter.sort === "oldest" || filter.sort === "favorites") params.set("sort", filter.sort);
   return params;
+}
+
+type HiddenPostsQuery = {
+  kind: "all" | "hidden" | "deleted";
+  offset: number;
+  q?: string;
+  rating?: "" | "sfw" | "nsfw";
+  sort?: "newest" | "oldest";
+};
+
+function hiddenPostsPath(query: HiddenPostsQuery): string {
+  const params = new URLSearchParams();
+  params.set("kind", query.kind);
+  params.set("limit", "40");
+  params.set("offset", String(query.offset));
+  const q = query.q?.trim() ?? "";
+  if (q !== "") params.set("q", q);
+  if (query.rating === "sfw" || query.rating === "nsfw") params.set("rating", query.rating);
+  params.set("sort", query.sort === "oldest" ? "oldest" : "newest");
+  return `/admin/hidden-posts?${params.toString()}`;
+}
+
+type HistoryQuery = {
+  offset: number;
+  q?: string;
+  actorId?: string;
+  action?: string;
+  entity?: string;
+  sort?: "newest" | "oldest";
+};
+
+function historyPath(query: HistoryQuery): string {
+  const params = new URLSearchParams();
+  params.set("limit", "40");
+  params.set("offset", String(query.offset));
+  params.set("sort", query.sort === "oldest" ? "oldest" : "newest");
+  const q = query.q?.trim() ?? "";
+  if (q !== "") params.set("q", q);
+  const actorId = query.actorId?.trim() ?? "";
+  if (actorId !== "") params.set("actor_id", actorId);
+  const action = query.action?.trim() ?? "";
+  if (action !== "") params.set("action", action);
+  const entity = query.entity?.trim() ?? "";
+  if (entity !== "") params.set("entity", entity);
+  return `/admin/history?${params.toString()}`;
+}
+
+type AdminUsersQuery = {
+  offset: number;
+  q?: string;
+  role?: "" | Role;
+  sort?: "name" | "newest" | "oldest";
+};
+
+function adminUsersPath(query: AdminUsersQuery): string {
+  const params = new URLSearchParams();
+  params.set("limit", "40");
+  params.set("offset", String(query.offset));
+  params.set("sort", query.sort === "newest" || query.sort === "oldest" ? query.sort : "name");
+  const q = query.q?.trim() ?? "";
+  if (q !== "") params.set("q", q);
+  if (query.role && isRole(query.role)) params.set("role", query.role);
+  return `/admin/users?${params.toString()}`;
 }
 
 export const api = {
@@ -106,20 +172,23 @@ export const api = {
   setTagSuggestionRows: (rows: number) =>
     sendJSON<Me>("/me/tag-suggestion-rows", "PATCH", { rows }),
   setPassword: (password: string) => sendJSON<Me>("/me/password", "POST", { password }),
-  adminUsers: (signal?: AbortSignal) => getJSON<User[]>("/admin/users", signal),
+  adminUsers: (query: AdminUsersQuery, signal?: AbortSignal) =>
+    getJSON<UserPage>(adminUsersPath(query), signal),
   setUserRole: (userId: string, role: Role) =>
     sendJSON<User>(`/admin/users/${userId}/role`, "PATCH", { role }),
-  recentHistory: (actorId?: string, signal?: AbortSignal) =>
-    getJSON<ChangeEntry[]>(
-      actorId ? `/admin/history?actor_id=${actorId}` : "/admin/history",
-      signal,
-    ),
+  recentHistory: (query: HistoryQuery, signal?: AbortSignal) =>
+    getJSON<HistoryPage>(historyPath(query), signal),
+  historyActors: (q: string, signal?: AbortSignal) => {
+    const params = new URLSearchParams();
+    params.set("q", q.trim());
+    return getJSON<HistoryActor[]>(`/admin/history-actors?${params.toString()}`, signal);
+  },
   postHistory: (postId: string, signal?: AbortSignal) =>
     getJSON<ChangeEntry[]>(`/posts/${postId}/history`, signal),
   rollback: (historyId: string) =>
     sendJSON<ChangeEntry>(`/admin/history/${historyId}/rollback`, "POST"),
-  hiddenPosts: (kind: "all" | "hidden" | "deleted", offset: number, signal?: AbortSignal) =>
-    getJSON<HiddenPage>(`/admin/hidden-posts?kind=${kind}&limit=40&offset=${offset}`, signal),
+  hiddenPosts: (query: HiddenPostsQuery, signal?: AbortSignal) =>
+    getJSON<HiddenPage>(hiddenPostsPath(query), signal),
   hidePost: (postId: string) => sendJSON<Post>(`/posts/${postId}/hide`, "POST"),
   unhidePost: (postId: string) => sendJSON<Post>(`/posts/${postId}/unhide`, "POST"),
   deletePost: (postId: string) => sendJSON<Post>(`/posts/${postId}/delete`, "POST"),

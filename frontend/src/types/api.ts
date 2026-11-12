@@ -23,6 +23,15 @@ export interface User {
   created_at: string;
   avatar_url: string;
 }
+/** One filtered page of accounts. Role counts are global; `total` is how many match the filter. */
+export interface UserPage {
+  total: number;
+  member: number;
+  moderator: number;
+  admin: number;
+  super_admin: number;
+  users: User[];
+}
 export interface Post {
   id: string;
   owner_username: string;
@@ -42,6 +51,8 @@ export interface Post {
   height: number;
   source_url: string;
   tags: string[];
+  /** Latest person who saved tags, artist, rating, or source. Empty when nobody has. */
+  last_tagger_username?: string;
 }
 export interface SearchPage {
   total: number;
@@ -94,6 +105,11 @@ export interface Profile {
   user: User;
   public_lists: ListSummary[];
   contributions: number;
+  /** Posts this visitor can see. Hidden and deleted posts are omitted. */
+  upload_total: number;
+  /** Saves of tags, artist, rating, or source. */
+  edit_count: number;
+  uploads: Post[];
   theme: ThemeId;
   font: FontId;
 }
@@ -162,4 +178,16 @@ export interface ChangeEntry {
   after: Record<string, unknown>;
   rollback_of: string | null;
   created_at: string;
+}
+
+/** One filtered page of the staff change log. `total` counts every match, not just this page. */
+export interface HistoryPage {
+  total: number;
+  entries: ChangeEntry[];
+}
+
+/** A person match for the staff history filter. The server returns at most eight. */
+export interface HistoryActor {
+  id: string;
+  username: string;
 }

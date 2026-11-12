@@ -14,10 +14,27 @@ type User struct {
 	AvatarURL   string `json:"avatar_url"`
 }
 
+// UserPage is one page of the staff people directory.
+// member, moderator, admin, and super_admin are global role counts.
+// total is how many accounts match the search and role filter.
+type UserPage struct {
+	Total      int64  `json:"total"`
+	Member     int64  `json:"member"`
+	Moderator  int64  `json:"moderator"`
+	Admin      int64  `json:"admin"`
+	SuperAdmin int64  `json:"super_admin"`
+	Users      []User `json:"users"`
+}
+
 type Profile struct {
 	User          User   `json:"user"`
 	PublicLists   []List `json:"public_lists"`
 	Contributions int64  `json:"contributions"`
+	// UploadTotal counts posts a visitor of this profile can see.
+	// Hidden and deleted posts are left out. NSFW follows the viewer.
+	UploadTotal int64  `json:"upload_total"`
+	EditCount   int64  `json:"edit_count"`
+	Uploads     []Post `json:"uploads"`
 	// The owner's default appearance; the public profile page renders
 	// in it (scoped to that page).
 	Theme string `json:"theme"`
@@ -25,24 +42,25 @@ type Profile struct {
 }
 
 type Post struct {
-	ID            string   `json:"id"`
-	OwnerUsername string   `json:"owner_username"`
-	ContentType   string   `json:"content_type"`
-	SizeBytes     int64    `json:"size_bytes"`
-	CreatedAt     string   `json:"created_at"`
-	IsFavorite    bool     `json:"is_favorite"`
-	MediaURL      string   `json:"media_url"`
-	ThumbnailURL  string   `json:"thumbnail_url"`
-	SampleURL     string   `json:"sample_url,omitempty"`
-	Artist        string   `json:"artist"`
-	Width         int      `json:"width"`
-	Height        int      `json:"height"`
-	Rating        string   `json:"rating"`
-	Hidden        bool     `json:"hidden"`
-	Deleted       bool     `json:"deleted"`
-	SourceURL     string   `json:"source_url"`
-	Tags          []string `json:"tags"`
-	FavoriteCount int64    `json:"favorite_count"`
+	ID                 string   `json:"id"`
+	OwnerUsername      string   `json:"owner_username"`
+	ContentType        string   `json:"content_type"`
+	SizeBytes          int64    `json:"size_bytes"`
+	CreatedAt          string   `json:"created_at"`
+	IsFavorite         bool     `json:"is_favorite"`
+	MediaURL           string   `json:"media_url"`
+	ThumbnailURL       string   `json:"thumbnail_url"`
+	SampleURL          string   `json:"sample_url,omitempty"`
+	Artist             string   `json:"artist"`
+	Width              int      `json:"width"`
+	Height             int      `json:"height"`
+	Rating             string   `json:"rating"`
+	Hidden             bool     `json:"hidden"`
+	Deleted            bool     `json:"deleted"`
+	SourceURL          string   `json:"source_url"`
+	Tags               []string `json:"tags"`
+	FavoriteCount      int64    `json:"favorite_count"`
+	LastTaggerUsername string   `json:"last_tagger_username"`
 }
 
 // SearchPage is one page of a board search and the full match count.
@@ -214,4 +232,16 @@ type ChangeEntry struct {
 	After         map[string]any `json:"after"`
 	RollbackOf    *string        `json:"rollback_of"`
 	CreatedAt     string         `json:"created_at"`
+}
+
+// HistoryPage is one filtered page of the staff change feed.
+type HistoryPage struct {
+	Total   int64         `json:"total"`
+	Entries []ChangeEntry `json:"entries"`
+}
+
+// HistoryActor is one username match for the history actor picker.
+type HistoryActor struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
 }

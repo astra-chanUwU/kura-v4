@@ -11,6 +11,10 @@
   color: var(--muted);
   margin: 0;
 }
+.favoritesNote {
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
 .hint {
   color: var(--accent-soft);
   margin: 0;

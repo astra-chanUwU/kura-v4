@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { PostComments } from "../components/PostComments";
@@ -57,6 +57,10 @@ function FieldTitle({ name, changed }: { name: string; changed: boolean }) {
 
 type PendingNav = { to: "board" } | { to: "post"; id: string };
 
+function isPlainLeftClick(event: ReactMouseEvent): boolean {
+  return event.button === 0 && !event.metaKey && !event.altKey && !event.ctrlKey && !event.shiftKey;
+}
+
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   // Arrow keys belong to text fields, selects and video seeking.
@@ -69,6 +73,10 @@ function isTypingTarget(target: EventTarget | null): boolean {
 export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch }) {
   const { data: post, isPending, error } = usePost(id);
   const navigate = useNavigate();
+  const router = useRouter();
+  // Pictures opened from the board sit on that history entry. Stepping
+  // replaces this one, so ← Board can pop back to the same scroll.
+  const fromBoard = useRouterState({ select: (s) => s.location.state.fromBoard === true });
   const filter = filterFromSearch(search);
   const nav = usePostNeighbors(id, filter);
   usePrefetchNeighbors(nav.prev?.id, nav.next?.id);
@@ -116,9 +124,31 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
 
   // Stepping replaces the history entry, so browser Back still returns
   // to the board instead of walking back through every picture.
+  const stepState = fromBoard ? { fromBoard: true as const } : undefined;
   const follow = (target: PendingNav) => {
-    if (target.to === "board") void navigate({ to: "/", search });
-    else void navigate({ to: "/posts/$id", params: { id: target.id }, search, replace: true });
+    if (target.to === "board") {
+      if (fromBoard) router.history.back();
+      else void navigate({ to: "/", search });
+      return;
+    }
+    void navigate({
+      to: "/posts/$id",
+      params: { id: target.id },
+      search,
+      replace: true,
+      ...(stepState ? { state: stepState } : {}),
+    });
+  };
+  const backToBoard = (event: ReactMouseEvent) => {
+    if (!isPlainLeftClick(event)) return;
+    if (dirty) {
+      event.preventDefault();
+      setPendingNav({ to: "board" });
+      return;
+    }
+    if (!fromBoard) return;
+    event.preventDefault();
+    router.history.back();
   };
   const requestNav = (target: PendingNav) => {
     if (dirty) setPendingNav(target);
@@ -196,7 +226,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
           to="/"
           search={search}
           className={styles.backLink}
-          onClick={guardLink({ to: "board" })}
+          onClick={backToBoard}
         >
           ← Board
           {isFilterActive(filter) && (
@@ -211,6 +241,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
               to="/posts/$id"
               params={{ id: nav.prev.id }}
               search={search}
+              state={stepState}
               replace
               className={styles.stepButton}
               aria-label="Previous picture"
@@ -238,6 +269,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
               to="/posts/$id"
               params={{ id: nav.next.id }}
               search={search}
+              state={stepState}
               replace
               className={styles.stepButton}
               aria-label="Next picture"
@@ -300,6 +332,14 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
                 by{" "}
                 <Link to="/u/$username" params={{ username: post.owner_username }}>
                   @{post.owner_username}
+                </Link>
+              </span>
+            )}
+            {post.last_tagger_username && (
+              <span>
+                tagged by{" "}
+                <Link to="/u/$username" params={{ username: post.last_tagger_username }}>
+                  @{post.last_tagger_username}
                 </Link>
               </span>
             )}

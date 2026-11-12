@@ -24,6 +24,10 @@ func (h *Tags) RegisterRoutes(api fiber.Router) {
 	api.Delete("/tag/:name/aliases/:alias", h.removeAlias)
 	api.Post("/tag/:name/implications", h.addImplication)
 	api.Delete("/tag/:name/implications/:consequent", h.removeImplication)
+	api.Post("/tag/:name/suggestions", h.suggest)
+	api.Get("/tag-suggestions", h.listSuggestions)
+	api.Post("/tag-suggestions/:id/accept", h.acceptSuggestion)
+	api.Post("/tag-suggestions/:id/reject", h.rejectSuggestion)
 }
 
 func (h *Tags) get(c fiber.Ctx) error {
@@ -104,6 +108,70 @@ func (h *Tags) removeImplication(c fiber.Ctx) error {
 		return writeTagError(c, err)
 	}
 	return c.JSON(tagPageDTO(page))
+}
+
+func (h *Tags) suggest(c fiber.Ctx) error {
+	user, err := requireUser(c)
+	if err != nil {
+		return err
+	}
+	var in dto.CreateTagSuggestion
+	if err := c.Bind().Body(&in); err != nil {
+		return fiber.NewError(400, "That suggestion could not be read.")
+	}
+	item, err := h.service.Suggest(c.Context(), *user, c.Params("name"), in.Kind, in.Other, in.Reason)
+	if err != nil {
+		return writeTagError(c, err)
+	}
+	return c.Status(201).JSON(suggestionDTO(item))
+}
+
+func (h *Tags) listSuggestions(c fiber.Ctx) error {
+	user, err := requireUser(c)
+	if err != nil {
+		return err
+	}
+	items, err := h.service.ListSuggestions(c.Context(), *user, c.Query("status"))
+	if err != nil {
+		return writeTagError(c, err)
+	}
+	out := make([]dto.TagSuggestion, 0, len(items))
+	for _, item := range items {
+		out = append(out, suggestionDTO(item))
+	}
+	return c.JSON(out)
+}
+
+func (h *Tags) acceptSuggestion(c fiber.Ctx) error {
+	user, err := requireUser(c)
+	if err != nil {
+		return err
+	}
+	item, err := h.service.AcceptSuggestion(c.Context(), *user, c.Params("id"))
+	if err != nil {
+		return writeTagError(c, err)
+	}
+	return c.JSON(suggestionDTO(item))
+}
+
+func (h *Tags) rejectSuggestion(c fiber.Ctx) error {
+	user, err := requireUser(c)
+	if err != nil {
+		return err
+	}
+	item, err := h.service.RejectSuggestion(c.Context(), *user, c.Params("id"))
+	if err != nil {
+		return writeTagError(c, err)
+	}
+	return c.JSON(suggestionDTO(item))
+}
+
+func suggestionDTO(item model.TagSuggestion) dto.TagSuggestion {
+	return dto.TagSuggestion{
+		ID: item.ID, Kind: item.Kind, SourceTag: item.SourceTag, TargetTag: item.TargetTag,
+		Reason: item.Reason, Status: item.Status, AuthorUsername: item.AuthorUsername,
+		CreatedAt: item.CreatedAt.UTC().Format(tagTime),
+	}
 }
 
 func writeTagError(c fiber.Ctx, err error) error {

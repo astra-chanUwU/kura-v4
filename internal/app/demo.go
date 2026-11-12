@@ -15,13 +15,16 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/accounts"
 	"github.com/astra-chanUwU/kura-v4/internal/board"
 	"github.com/astra-chanUwU/kura-v4/internal/collections"
+	"github.com/astra-chanUwU/kura-v4/internal/comments"
 	"github.com/astra-chanUwU/kura-v4/internal/config"
 	"github.com/astra-chanUwU/kura-v4/internal/dao"
 	"github.com/astra-chanUwU/kura-v4/internal/db"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
 	"github.com/astra-chanUwU/kura-v4/internal/moderation"
+	"github.com/astra-chanUwU/kura-v4/internal/notifications"
 	"github.com/astra-chanUwU/kura-v4/internal/repository"
 	"github.com/astra-chanUwU/kura-v4/internal/storage"
+	"github.com/astra-chanUwU/kura-v4/internal/tags"
 )
 
 // demoPassword is shared by every demo account. The password policy
@@ -101,6 +104,9 @@ type demoEnv struct {
 	accounts    *accounts.Service
 	board       *board.Service
 	collections *collections.Service
+	comments    *comments.Service
+	notes       *notifications.Service
+	tags        *tags.Service
 	moderation  *moderation.Service
 	roleRepo    *repository.Moderation
 	store       *storage.Local
@@ -116,6 +122,9 @@ type demoStats struct {
 	NSFW            int
 	TagEdits        int
 	Favorites       int
+	Notices         int
+	Comments        int
+	Suggestions     int
 	Lists           int
 	Reordered       bool
 	Hidden          int
@@ -191,6 +200,9 @@ func Demo(ctx context.Context, cfg config.Config, dirs []string, log *slog.Logge
 	env := &demoEnv{
 		log: log, accounts: accountsSvc, board: boardSvc,
 		collections: collections.NewService(repository.NewCollections(dao.NewCollections(conn))),
+		comments:    comments.NewService(repository.NewComments(dao.NewComments(conn))),
+		notes:       notifications.NewService(repository.NewNotifications(dao.NewNotifications(conn))),
+		tags:        tags.NewService(repository.NewTagPages(dao.NewTagPages(conn))),
 		roleRepo:    repository.NewModeration(accountsDAO, postsRepo, dao.NewAudit(conn)),
 		store:       store, rng: demoRand(),
 	}
@@ -226,6 +238,12 @@ func Demo(ctx context.Context, cfg config.Config, dirs []string, log *slog.Logge
 	if err := favoriteDemoPosts(ctx, env, users, posts, stats); err != nil {
 		return err
 	}
+	if err := commentDemoPosts(ctx, env, users, posts, stats); err != nil {
+		return err
+	}
+	if err := suggestDemoTags(ctx, env, users, stats); err != nil {
+		return err
+	}
 	if err := listDemoPosts(ctx, env, users, posts, stats); err != nil {
 		return err
 	}
@@ -253,6 +271,9 @@ func Demo(ctx context.Context, cfg config.Config, dirs []string, log *slog.Logge
 		"nsfw", stats.NSFW,
 		"tag_edits", stats.TagEdits,
 		"favorites", stats.Favorites,
+		"notices", stats.Notices,
+		"comments", stats.Comments,
+		"suggestions", stats.Suggestions,
 		"lists", stats.Lists,
 		"reordered", stats.Reordered,
 		"hidden", stats.Hidden,
@@ -589,11 +610,105 @@ func favoriteDemoPosts(ctx context.Context, env *demoEnv, users []model.User, po
 			want = len(posts)
 		}
 		for _, idx := range pickIndexes(want, len(posts), env.rng) {
-			if err := env.collections.Favorite(ctx, users[i].ID, posts[idx].Post.ID); err != nil {
+			post := posts[idx].Post
+			if err := env.collections.Favorite(ctx, users[i].ID, post.ID); err != nil {
 				return fmt.Errorf("demo: favorite for %s: %w", spec.Username, err)
 			}
 			stats.Favorites++
+			if stats.Notices >= 16 || post.OwnerID == nil || *post.OwnerID == "" || *post.OwnerID == users[i].ID {
+				continue
+			}
+			if err := env.notes.Notify(ctx, *post.OwnerID, users[i].ID, model.NotificationFavorite, post.ID, ""); err != nil {
+				return fmt.Errorf("demo: favorite notice: %w", err)
+			}
+			stats.Notices++
 		}
+	}
+	return nil
+}
+
+var demoCommentBodies = []string{
+	"The hair tag was missing. I put it on.",
+	"This is the one I keep coming back to.",
+	"Artist credit looks right. The source link is the part I would check.",
+	"Quiet picture. The tags should stay quiet too.",
+	"Saved this for the lighting, not the costume.",
+	"If the rating is wrong, say so. The rest of the tags look fine.",
+	"The second girl is easy to miss. Worth a tag.",
+	"Leaving this here so the uploader sees it.",
+}
+
+func commentDemoPosts(ctx context.Context, env *demoEnv, users []model.User, posts []demoPost, stats *demoStats) error {
+	if len(posts) == 0 {
+		return nil
+	}
+	mika, err := demoUser(users, "mika")
+	if err != nil {
+		return err
+	}
+	ren, err := demoUser(users, "ren")
+	if err != nil {
+		return err
+	}
+	speakers := []model.User{mika, ren}
+	want := 8
+	if want > len(posts) {
+		want = len(posts)
+	}
+	for _, idx := range pickIndexes(len(posts), len(posts), env.rng) {
+		if stats.Comments >= want {
+			break
+		}
+		post := posts[idx].Post
+		if post.OwnerID == nil || *post.OwnerID == "" {
+			continue
+		}
+		actor := speakers[stats.Comments%len(speakers)]
+		if actor.ID == *post.OwnerID {
+			actor = speakers[(stats.Comments+1)%len(speakers)]
+		}
+		if actor.ID == *post.OwnerID {
+			continue
+		}
+		comment, err := env.comments.Create(ctx, actor, post.ID, demoCommentBodies[stats.Comments%len(demoCommentBodies)])
+		if err != nil {
+			return fmt.Errorf("demo: comment: %w", err)
+		}
+		if err := env.notes.Notify(ctx, *post.OwnerID, actor.ID, model.NotificationComment, post.ID, comment.ID); err != nil {
+			return fmt.Errorf("demo: comment notice: %w", err)
+		}
+		stats.Comments++
+		stats.Notices++
+	}
+	if len(posts) >= want && stats.Comments != want {
+		return fmt.Errorf("demo: comments %d, want %d", stats.Comments, want)
+	}
+	return nil
+}
+
+func suggestDemoTags(ctx context.Context, env *demoEnv, users []model.User, stats *demoStats) error {
+	type proposal struct {
+		username string
+		anchor   string
+		kind     string
+		other    string
+		reason   string
+	}
+	proposals := []proposal{
+		{"hana", "silver_hair", "alias", "silverhair", "Same hair, without the underscore."},
+		{"yuki", "long_hair", "alias", "longhair", "People type it as one word."},
+		{"sora", "smile", "implication", "open_mouth", "A smile in this set usually opens the mouth."},
+		{"ren", "1girl", "implication", "solo", "One girl is the solo framing."},
+	}
+	for _, item := range proposals {
+		actor, err := demoUser(users, item.username)
+		if err != nil {
+			return err
+		}
+		if _, err := env.tags.Suggest(ctx, actor, item.anchor, item.kind, item.other, item.reason); err != nil {
+			return fmt.Errorf("demo: suggestion %s: %w", item.anchor, err)
+		}
+		stats.Suggestions++
 	}
 	return nil
 }

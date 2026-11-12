@@ -71,6 +71,27 @@ WHERE p.owner_id = sqlc.arg(owner_id)
 ORDER BY p.created_at DESC, p.id DESC
 LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
 
+-- name: CountPublicPostsByOwner :one
+SELECT count(*)::bigint AS total
+FROM posts
+WHERE owner_id = sqlc.arg(owner_id)
+  AND hidden_at IS NULL
+  AND deleted_at IS NULL
+  AND (sqlc.arg(include_nsfw)::bool OR rating = 'sfw');
+
+-- name: ListPublicPostsByOwner :many
+SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_bytes, p.created_at,
+  p.artist, p.source, p.source_id, p.thumbnail_key, COALESCE(p.sample_key, '')::text AS sample_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
+  COALESCE(u.username,'')::text AS owner_username,
+  COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
+FROM posts p LEFT JOIN users u ON u.id=p.owner_id
+WHERE p.owner_id = sqlc.arg(owner_id)
+  AND p.hidden_at IS NULL
+  AND p.deleted_at IS NULL
+  AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw')
+ORDER BY p.created_at DESC, p.id DESC
+LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
+
 -- name: SetPostHidden :exec
 UPDATE posts SET hidden_at = CASE WHEN $2::bool THEN now() ELSE NULL END, deleted_at = CASE WHEN $2::bool AND $3::bool THEN now() ELSE NULL END, hidden_by = CASE WHEN $2::bool THEN $4::uuid ELSE NULL END WHERE id=$1;
 
@@ -86,12 +107,58 @@ SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_
   p.artist, p.source, p.source_id, p.thumbnail_key, COALESCE(p.sample_key, '')::text AS sample_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
-FROM posts p LEFT JOIN users u ON u.id=p.owner_id
+FROM posts p
+LEFT JOIN users u ON u.id = p.owner_id
+LEFT JOIN users remover ON remover.id = p.hidden_by
 WHERE p.hidden_at IS NOT NULL
   AND (
     sqlc.arg(kind)::text = 'all'
     OR (sqlc.arg(kind)::text = 'hidden' AND p.deleted_at IS NULL)
     OR (sqlc.arg(kind)::text = 'deleted' AND p.deleted_at IS NOT NULL)
   )
-ORDER BY p.hidden_at DESC, p.id DESC
+  AND (
+    sqlc.arg(rating)::text = ''
+    OR p.rating = sqlc.arg(rating)::text
+  )
+  AND (
+    sqlc.arg(query)::text = ''
+    OR p.artist ILIKE sqlc.arg(query)::text ESCAPE '\'
+    OR u.username ILIKE sqlc.arg(query)::text ESCAPE '\'
+    OR remover.username ILIKE sqlc.arg(query)::text ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM post_tags t
+      WHERE t.post_id = p.id AND t.tag ILIKE sqlc.arg(query)::text ESCAPE '\'
+    )
+  )
+ORDER BY
+  CASE WHEN sqlc.arg(sort)::text = 'oldest' THEN p.hidden_at END ASC,
+  CASE WHEN sqlc.arg(sort)::text <> 'oldest' THEN p.hidden_at END DESC,
+  CASE WHEN sqlc.arg(sort)::text = 'oldest' THEN p.id END ASC,
+  CASE WHEN sqlc.arg(sort)::text <> 'oldest' THEN p.id END DESC
 LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
+
+-- name: CountHiddenPosts :one
+SELECT count(*)::bigint AS total
+FROM posts p
+LEFT JOIN users u ON u.id = p.owner_id
+LEFT JOIN users remover ON remover.id = p.hidden_by
+WHERE p.hidden_at IS NOT NULL
+  AND (
+    sqlc.arg(kind)::text = 'all'
+    OR (sqlc.arg(kind)::text = 'hidden' AND p.deleted_at IS NULL)
+    OR (sqlc.arg(kind)::text = 'deleted' AND p.deleted_at IS NOT NULL)
+  )
+  AND (
+    sqlc.arg(rating)::text = ''
+    OR p.rating = sqlc.arg(rating)::text
+  )
+  AND (
+    sqlc.arg(query)::text = ''
+    OR p.artist ILIKE sqlc.arg(query)::text ESCAPE '\'
+    OR u.username ILIKE sqlc.arg(query)::text ESCAPE '\'
+    OR remover.username ILIKE sqlc.arg(query)::text ESCAPE '\'
+    OR EXISTS (
+      SELECT 1 FROM post_tags t
+      WHERE t.post_id = p.id AND t.tag ILIKE sqlc.arg(query)::text ESCAPE '\'
+    )
+  );
