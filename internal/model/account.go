@@ -20,7 +20,9 @@ type User struct {
 	// How many rows of on-screen tag suggestions the board shows.
 	// 0 hides the strip. Default 1 matches the single scrolling row.
 	TagSuggestionRows int
-	Role              Role
+	// How many posts the board shows per page. Default 40; allowed 12–100.
+	PostsPerPage int
+	Role         Role
 	// Default board tag filters, applied when the board loads.
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string

@@ -12,12 +12,14 @@ export interface BoardFilter {
   sort?: BoardSort;
 }
 
-/** The same filter as URL search params (?tags=a,b&exclude=c&q=x). */
+/** The same filter as URL search params (?tags=a,b&exclude=c&q=x&page=2). */
 export interface BoardSearch {
   tags?: string;
   exclude?: string;
   q?: string;
   sort?: BoardSort;
+  /** 1-based board page. Omitted when 1 (the default). */
+  page?: number;
 }
 
 export const EMPTY_FILTER: BoardFilter = { tags: [], exclude: [], q: "" };
@@ -101,6 +103,19 @@ export function boardSort(value: unknown): BoardSort {
   return "newest";
 }
 
+/** Positive integers only; strings must be whole digits (no floats). */
+function parseBoardPage(value: unknown): number | undefined {
+  if (typeof value === "number") {
+    if (!Number.isInteger(value) || value < 1) return undefined;
+    return value;
+  }
+  if (typeof value === "string") {
+    if (!/^[1-9]\d*$/.test(value)) return undefined;
+    return Number(value);
+  }
+  return undefined;
+}
+
 export function validateBoardSearch(search: Record<string, unknown>): BoardSearch {
   const out: BoardSearch = {
     tags: nonEmptyString(search.tags),
@@ -109,7 +124,14 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardSearc
   };
   if (search.sort === "oldest") out.sort = "oldest";
   if (search.sort === "favorites") out.sort = "favorites";
+  const page = parseBoardPage(search.page);
+  if (page !== undefined && page !== 1) out.page = page;
   return out;
+}
+
+/** 1-based board page from validated search; missing means page 1. */
+export function boardPageFromSearch(search: BoardSearch): number {
+  return search.page ?? 1;
 }
 
 export function filterFromSearch(search: BoardSearch): BoardFilter {

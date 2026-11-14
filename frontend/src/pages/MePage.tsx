@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   IconCamera,
   IconHeart,
@@ -8,6 +8,7 @@ import {
   IconUpload,
   IconUser,
 } from "../components/icons";
+import { Pager } from "../components/Pager";
 import { PostCard } from "../components/PostCard";
 import { ThemedSelect } from "../components/ThemedSelect";
 import { VisibilityToggle } from "../components/VisibilityToggle";
@@ -20,7 +21,6 @@ import {
   useAccountActions,
   useAuthActions,
   useFavorites,
-  useLoadMore,
   useInvalidate,
   useListActions,
   useMe,
@@ -28,6 +28,8 @@ import {
   useMyPosts,
 } from "../hooks/useKura";
 import { mergeTagEdit, sameTagSet, splitTagInput } from "../domain/boardFilter";
+import { clampPage, clampPostsPerPage, pageCount, resolvePageSize } from "../domain/paging";
+import { usePrefetchPage } from "../hooks/usePrefetchPage";
 import { ROLE_LABELS } from "../domain/roles";
 import {
   FONT_LABELS,
@@ -42,6 +44,7 @@ import type { Post } from "../types/api";
 import styles from "./Simple.module.css";
 
 const DISMISS_KEY = "kura-passkey-tip-dismissed";
+const POSTS_PER_PAGE_CHOICES = [12, 24, 36, 40, 48, 60, 72, 84, 96] as const;
 
 export function MePage() {
   const { me, loading } = useMe();
@@ -63,9 +66,13 @@ export function MePage() {
         : "profile";
     },
   );
+  const [contributionsPage, setContributionsPage] = useState(1);
+  const [favoritesPage, setFavoritesPage] = useState(1);
   const changeTab = (name: typeof tab) => {
     setTab(name);
     localStorage.setItem("kura-me-tab", name);
+    if (name === "contributions") setContributionsPage(1);
+    if (name === "favorites") setFavoritesPage(1);
   };
   const [listFilter, setListFilter] = useState("");
   const [error, setError] = useState("");
@@ -78,14 +85,67 @@ export function MePage() {
   const [shownKey, setShownKey] = useState("");
   const [themeDraft, setThemeDraft] = useState<string | null>(null);
   const [fontDraft, setFontDraft] = useState<string | null>(null);
+  const [postsPerPageDraft, setPostsPerPageDraft] = useState<number | null>(null);
   const [includeDraft, setIncludeDraft] = useState<string[] | null>(null);
   const [excludeDraft, setExcludeDraft] = useState<string[] | null>(null);
   const [includeInput, setIncludeInput] = useState("");
   const [excludeInput, setExcludeInput] = useState("");
   const [showAgeGate, setShowAgeGate] = useState(false);
   const [tipDismissed, setTipDismissed] = useState(() => localStorage.getItem(DISMISS_KEY) === "1");
-  const favorites = useFavorites(tab === "favorites");
-  const myPosts = useMyPosts(tab === "contributions");
+  const pageSize = resolvePageSize(me);
+  const lastPageSize = useRef(pageSize);
+  useEffect(() => {
+    if (lastPageSize.current === pageSize) return;
+    lastPageSize.current = pageSize;
+    setContributionsPage(1);
+    setFavoritesPage(1);
+  }, [pageSize]);
+  const favorites = useFavorites(tab === "favorites", favoritesPage, pageSize);
+  const myPosts = useMyPosts(tab === "contributions", contributionsPage, pageSize);
+  usePrefetchPage(
+    favorites.prefetchPage,
+    favoritesPage,
+    pageCount(favorites.total, pageSize),
+    favorites.isSuccess && tab === "favorites",
+  );
+  usePrefetchPage(
+    myPosts.prefetchPage,
+    contributionsPage,
+    pageCount(myPosts.total, pageSize),
+    myPosts.isSuccess && tab === "contributions",
+  );
+  useEffect(() => {
+    if (!myPosts.isSuccess || tab !== "contributions") return;
+    const clamped = clampPage(contributionsPage, myPosts.total, pageSize);
+    if (clamped !== contributionsPage) setContributionsPage(clamped);
+  }, [myPosts.isSuccess, myPosts.total, contributionsPage, pageSize, tab]);
+  useEffect(() => {
+    if (!favorites.isSuccess || tab !== "favorites") return;
+    const clamped = clampPage(favoritesPage, favorites.total, pageSize);
+    if (clamped !== favoritesPage) setFavoritesPage(clamped);
+  }, [favorites.isSuccess, favorites.total, favoritesPage, pageSize, tab]);
+  const listRef = useRef<HTMLDivElement>(null);
+  const lastContributionsPage = useRef(contributionsPage);
+  const lastFavoritesPage = useRef(favoritesPage);
+  const scrollListIntoView = () => {
+    if (listRef.current) {
+      listRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  useEffect(() => {
+    if (lastContributionsPage.current === contributionsPage) return;
+    lastContributionsPage.current = contributionsPage;
+    if (tab !== "contributions") return;
+    scrollListIntoView();
+  }, [contributionsPage, tab]);
+  useEffect(() => {
+    if (lastFavoritesPage.current === favoritesPage) return;
+    lastFavoritesPage.current = favoritesPage;
+    if (tab !== "favorites") return;
+    scrollListIntoView();
+  }, [favoritesPage, tab]);
   const myLists = useMyLists(tab === "lists" || tab === "profile");
 
   if (loading) return <p>Loading…</p>;
@@ -110,9 +170,17 @@ export function MePage() {
     (websiteDraft !== null && websiteDraft !== user.website);
   const savedTheme = normalizeTheme(preferences.theme);
   const savedFont = normalizeFont(preferences.font);
+  const savedPostsPerPage = clampPostsPerPage(preferences.posts_per_page);
+  const postsPerPageChoices = POSTS_PER_PAGE_CHOICES.includes(
+    savedPostsPerPage as (typeof POSTS_PER_PAGE_CHOICES)[number],
+  )
+    ? [...POSTS_PER_PAGE_CHOICES]
+    : [...POSTS_PER_PAGE_CHOICES, savedPostsPerPage].sort((a, b) => a - b);
   const appearanceDirty =
     (themeDraft !== null && normalizeTheme(themeDraft) !== savedTheme) ||
-    (fontDraft !== null && normalizeFont(fontDraft) !== savedFont);
+    (fontDraft !== null && normalizeFont(fontDraft) !== savedFont) ||
+    (postsPerPageDraft !== null &&
+      clampPostsPerPage(postsPerPageDraft) !== savedPostsPerPage);
   const savedIncludeTags = preferences.default_include_tags ?? [];
   const savedExcludeTags = preferences.default_exclude_tags ?? [];
   const tagsDirty =
@@ -401,6 +469,21 @@ export function MePage() {
                 ))}
               </ThemedSelect>
             </label>
+            <label className={styles.choice}>
+              Pictures per page
+              <ThemedSelect
+                label="Pictures per page"
+                value={String(postsPerPageDraft ?? savedPostsPerPage)}
+                onChange={(value) => setPostsPerPageDraft(Number(value))}
+              >
+                {postsPerPageChoices.map((n) => (
+                  <option key={n} value={String(n)}>
+                    {n}
+                  </option>
+                ))}
+              </ThemedSelect>
+            </label>
+            <p className={styles.muted}>How many pictures each page loads.</p>
             <div
               className={styles.preview}
               data-theme={normalizeTheme(themeDraft ?? savedTheme)}
@@ -417,15 +500,21 @@ export function MePage() {
                 type="button"
                 className={appearanceDirty ? styles.saveDirty : undefined}
                 onClick={() => {
+                  const nextTheme = normalizeTheme(themeDraft ?? savedTheme);
+                  const nextFont = normalizeFont(fontDraft ?? savedFont);
+                  const nextPostsPerPage = clampPostsPerPage(
+                    postsPerPageDraft ?? savedPostsPerPage,
+                  );
                   run(
-                    account.setAppearance(
-                      normalizeTheme(themeDraft ?? savedTheme),
-                      normalizeFont(fontDraft ?? savedFont),
-                    ),
+                    Promise.all([
+                      account.setAppearance(nextTheme, nextFont),
+                      account.setPostsPerPage(nextPostsPerPage),
+                    ]),
                     "Appearance saved.",
                   );
                   setThemeDraft(null);
                   setFontDraft(null);
+                  setPostsPerPageDraft(null);
                 }}
               >
                 Save appearance
@@ -439,30 +528,6 @@ export function MePage() {
               A fresh homepage opens on this filter. Tags you set on the board are written into the
               address bar, so Back from a picture returns to them. The Kura logo starts from this
               filter again. Type <code>-tag</code> to exclude.
-            </p>
-            <label className={styles.choice}>
-              Tag suggestion rows
-              <ThemedSelect
-                label="Tag suggestion rows"
-                value={String(preferences.tag_suggestion_rows ?? 1)}
-                onChange={(value) => {
-                  const rows = Number(value);
-                  run(
-                    account.setTagSuggestionRows(rows),
-                    rows === 0 ? "Tag suggestions hidden." : "Tag suggestions saved.",
-                  );
-                }}
-              >
-                <option value="0">Off</option>
-                {Array.from({ length: 10 }, (_, i) => (
-                  <option key={i + 1} value={String(i + 1)}>
-                    {i + 1}
-                  </option>
-                ))}
-              </ThemedSelect>
-            </label>
-            <p className={styles.muted}>
-              How many rows of tags from the pictures on screen. Off hides that strip.
             </p>
             <div className={styles.tagFields}>
               {(
@@ -580,28 +645,31 @@ export function MePage() {
       )}
 
       {tab === "contributions" && (
-        <div>
+        <div ref={listRef}>
           <Contributions
             posts={myPosts.posts}
             total={myPosts.total}
             pending={myPosts.isPending}
-            hasMore={myPosts.hasMore}
-            loadingMore={myPosts.loadingMore}
-            loadMore={myPosts.loadMore}
+            page={contributionsPage}
+            pageSize={pageSize}
+            onPage={setContributionsPage}
+            onPrefetch={myPosts.prefetchPage}
           />
         </div>
       )}
 
       {tab === "favorites" && (
-        <div>
+        <div ref={listRef}>
           <p className={styles.favoritesNote}>Private — only you can see your favorites.</p>
           <PagedPosts
             posts={favorites.posts}
             pending={favorites.isPending}
             empty="No favorites yet. Tap “♡ Save” on any picture."
-            hasMore={favorites.hasMore}
-            loadingMore={favorites.loadingMore}
-            loadMore={favorites.loadMore}
+            page={favoritesPage}
+            pageSize={pageSize}
+            total={favorites.total}
+            onPage={setFavoritesPage}
+            onPrefetch={favorites.prefetchPage}
           />
         </div>
       )}
@@ -885,16 +953,18 @@ function Contributions({
   posts,
   total,
   pending,
-  hasMore,
-  loadingMore,
-  loadMore,
+  page,
+  pageSize,
+  onPage,
+  onPrefetch,
 }: {
   posts: Post[];
   total: number;
   pending: boolean;
-  hasMore: boolean;
-  loadingMore: boolean;
-  loadMore: () => void;
+  page: number;
+  pageSize: number;
+  onPage: (page: number) => void;
+  onPrefetch?: (page: number) => void;
 }) {
   return (
     <div>
@@ -908,9 +978,11 @@ function Contributions({
         posts={posts}
         pending={pending}
         empty="Nothing yet. Use “Upload” on the board to add your first picture — it will show up here and at the top of the board."
-        hasMore={hasMore}
-        loadingMore={loadingMore}
-        loadMore={loadMore}
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPage={onPage}
+        onPrefetch={onPrefetch}
       />
     </div>
   );
@@ -920,18 +992,21 @@ function PagedPosts({
   posts,
   pending,
   empty,
-  hasMore,
-  loadingMore,
-  loadMore,
+  page,
+  pageSize,
+  total,
+  onPage,
+  onPrefetch,
 }: {
   posts: Post[];
   pending: boolean;
   empty: string;
-  hasMore: boolean;
-  loadingMore: boolean;
-  loadMore: () => void;
+  page: number;
+  pageSize: number;
+  total: number;
+  onPage: (page: number) => void;
+  onPrefetch?: (page: number) => void;
 }) {
-  const moreRef = useLoadMore(hasMore && !loadingMore, loadMore);
   return (
     <>
       {pending && <p className={styles.muted}>Loading…</p>}
@@ -941,8 +1016,13 @@ function PagedPosts({
           <PostCard key={post.id} post={post} />
         ))}
       </div>
-      <div ref={moreRef} aria-hidden="true" />
-      {loadingMore && <p className={styles.muted}>Loading more…</p>}
+      <Pager
+        page={page}
+        total={total}
+        pageSize={pageSize}
+        onPage={onPage}
+        onPrefetch={onPrefetch}
+      />
     </>
   );
 }

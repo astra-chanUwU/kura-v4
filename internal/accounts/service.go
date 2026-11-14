@@ -60,6 +60,7 @@ type Repository interface {
 	UpdateTagPreferences(ctx context.Context, userID string, includeTags, excludeTags []string) error
 	UpdateAppearance(ctx context.Context, userID, theme, font string) error
 	UpdateTagSuggestionRows(ctx context.Context, userID string, rows int) error
+	UpdatePostsPerPage(ctx context.Context, userID string, n int) error
 	SetRecoveryKey(ctx context.Context, userID string, keyHash []byte) error
 	GetRecoveryKey(ctx context.Context, userID string) ([]byte, time.Time, error)
 	// RecoverAccount atomically replaces the password and recovery key and
@@ -473,6 +474,14 @@ func (s *Service) SetTagSuggestionRows(ctx context.Context, userID string, rows 
 		return invalid("Tag suggestions use 0 to 10 rows.")
 	}
 	return s.repo.UpdateTagSuggestionRows(ctx, userID, rows)
+}
+
+// SetPostsPerPage records how many posts the board shows per page.
+func (s *Service) SetPostsPerPage(ctx context.Context, userID string, n int) error {
+	if n < 12 || n > 100 {
+		return invalid("Posts per page must be between 12 and 100.")
+	}
+	return s.repo.UpdatePostsPerPage(ctx, userID, n)
 }
 
 func contains(list []string, v string) bool {

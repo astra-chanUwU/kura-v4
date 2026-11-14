@@ -80,6 +80,16 @@
   gap: 1rem;
   padding-top: 1rem;
 }
+/* Same track sizing as .grid, collapsed so column count can be measured
+   before posts exist (loading / empty) without affecting layout. */
+.gridProbe {
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  padding-top: 0;
+  margin: 0;
+}
 .upload {
   display: flex;
   gap: 0.6rem;
@@ -107,38 +117,53 @@
   cursor: pointer;
 }
 
-/* Search + tag strip stick together as one head: it grows with the
-   selected-tag row instead of covering the strip below it. */
+/* WaifuList-inspired board head: vertical centered stack
+   (search → controls → page-tag panel). Sticky as one block so the
+   tag panel is never covered by a separate sticky bar. */
 .boardHead {
   position: sticky;
   top: var(--header-h);
   z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 0 1rem;
   background: var(--background);
 }
-.searchBar {
+/* Keep the gap under the tag panel inside the sticky box so pictures
+   don't slide under the border when the head sticks. */
+.boardHead:has(.tagPanel) {
+  padding-bottom: 1.25rem;
+}
+.boardHead:has(.tagPanel) + .grid,
+.boardHead:has(.tagPanel) + .rows {
+  padding-top: 0;
+}
+
+.searchRow {
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 36rem;
+}
+
+.controlsRow {
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.6rem;
   align-items: center;
-  flex-wrap: wrap;
-  padding: 0.85rem 0;
-  background: var(--background);
+  justify-content: center;
+  width: 100%;
 }
-.searchBar input {
-  flex: 1 1 16rem;
-  max-width: 28rem;
-  padding: 0.5rem 0.7rem;
-  border: 1px solid var(--border-strong);
-  border-radius: 0.5rem;
-  background: var(--surface);
-  color: var(--text);
+
+.tagPanel {
+  width: 100%;
+  min-width: 0;
 }
-.searchBar button {
-  padding: 0.45rem 0.7rem;
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-}
+
 .searchMeta {
   color: var(--muted);
   font-size: 0.85rem;
@@ -244,8 +269,7 @@
 }
 .searchBox {
   position: relative;
-  flex: 1 1 16rem;
-  max-width: 28rem;
+  width: 100%;
 }
 .searchBox input {
   width: 100%;
@@ -318,120 +342,6 @@
 }
 .suggestionCount {
   color: var(--muted);
-}
-
-.viewportTags {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  padding: 0.9rem 0 1rem;
-  background: var(--background);
-  font-size: 0.82rem;
-  min-height: 2.4rem;
-  margin-bottom: 0.25rem;
-  /* border removed — sticky double-border looked heavy on scroll */
-}
-.viewportTags::-webkit-scrollbar {
-  display: none;
-}
-.viewportTagsWrap {
-  flex-wrap: wrap;
-  align-content: flex-start;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  max-height: calc(var(--suggestion-rows) * 2.6rem);
-}
-.viewportChip {
-  flex-shrink: 0;
-  display: inline-flex;
-  gap: 0.35rem;
-  align-items: center;
-  padding: 0.42rem 0.78rem;
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-  font-size: 0.82rem;
-  line-height: 1.1;
-  white-space: nowrap;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  transition:
-    background 0.12s,
-    border-color 0.12s;
-}
-.viewportChip:hover {
-  background: var(--surface-soft);
-  border-color: var(--accent);
-}
-.viewportChip:active {
-  transform: scale(0.97);
-}
-.viewportChipCount {
-  color: var(--muted);
-  font-size: 0.74rem;
-  font-variant-numeric: tabular-nums;
-}
-/* One pill per viewport tag: - on the left, tag in the middle, + on the right. */
-.viewportTag {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: stretch;
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  background: var(--surface);
-  overflow: hidden;
-  white-space: nowrap;
-}
-.viewportTagMain,
-.viewportTagSide {
-  border: none;
-  background: none;
-  color: var(--text);
-  cursor: pointer;
-  font-size: 0.82rem;
-  line-height: 1.1;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-.viewportTagMain {
-  padding: 0.42rem 0.3rem;
-}
-.viewportTagSide {
-  flex: 0 0 1.7rem;
-  width: 1.7rem;
-  padding: 0.42rem 0;
-  font-size: 0.95rem;
-}
-.viewportExclude {
-  color: var(--danger);
-  border-right: 1px solid var(--border);
-}
-.viewportInclude {
-  color: var(--accent);
-  border-left: 1px solid var(--border);
-}
-.viewportTagMain:hover,
-.viewportTagSide:hover {
-  background: var(--surface-soft);
-}
-.viewportEmpty {
-  flex-shrink: 0;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.viewportCta {
-  border-color: var(--accent);
-  color: var(--accent);
-  font-weight: 600;
-  text-decoration: none;
 }
 
 .toTop {
@@ -508,7 +418,6 @@
   display: flex;
   gap: 0.75rem;
   align-items: center;
-  margin-left: auto;
   flex-wrap: wrap;
 }
 .viewGroup {
@@ -550,37 +459,16 @@
   cursor: default;
 }
 
-/* Tablet: search takes its own row, layout controls wrap under it. */
+/* Tablet: keep the centered stack; tighten gaps. */
 @media (max-width: 900px) {
-  .searchBox {
-    flex: 1 1 100%;
+  .searchRow {
     max-width: none;
   }
-  .searchBar .searchBox input {
-    max-width: none;
-  }
-  .searchBar {
+  .controlsRow {
     gap: 0.5rem;
-  }
-  .viewControls {
-    margin-left: 0;
-    width: 100%;
   }
   .grid {
     gap: 0.75rem;
-  }
-  .viewportTags {
-    gap: 0.5rem;
-    padding: 0.7rem 0 0.85rem;
-    /* edge-to-edge scroll with fade hint */
-    margin-inline: calc(50% - 50vw);
-    padding-inline: clamp(1rem, 4vw, 3.5rem);
-    box-sizing: border-box;
-    width: 100vw;
-  }
-  .viewportChip {
-    padding: 0.38rem 0.7rem;
-    font-size: 0.8rem;
   }
 }
 
@@ -594,10 +482,6 @@
   .viewGroup {
     display: none;
   }
-  .viewControls {
-    width: auto;
-    margin-left: auto;
-  }
   .uploadButton {
     min-height: 2.5rem;
     padding: 0.5rem 0.85rem;
@@ -605,24 +489,5 @@
   .toTop {
     right: 0.9rem;
     bottom: 0.9rem;
-  }
-  .viewportTags {
-    gap: 0.45rem;
-    padding: 0.65rem 0 0.75rem;
-    min-height: auto;
-    margin-inline: calc(50% - 50vw);
-    padding-inline: 0.9rem;
-    width: 100vw;
-    /* snap scrolling for thumb-friendly swipe */
-    scroll-snap-type: x proximity;
-    scroll-padding-inline: 0.9rem;
-  }
-  .viewportChip {
-    padding: 0.34rem 0.62rem;
-    font-size: 0.78rem;
-    scroll-snap-align: start;
-  }
-  .viewportChipCount {
-    font-size: 0.7rem;
   }
 }

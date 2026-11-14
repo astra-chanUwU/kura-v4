@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_PAGE_SIZE } from "../domain/paging";
 import type { User } from "../types/api";
 import { HiddenPostsPage } from "./HiddenPostsPage";
 
@@ -37,9 +38,8 @@ function queue(overrides: Record<string, unknown> = {}) {
     deleted: 5,
     isPending: false,
     error: null,
-    hasMore: false,
-    loadingMore: false,
-    loadMore: vi.fn(),
+    isSuccess: true,
+    prefetchPage: vi.fn(),
     ...overrides,
   };
 }
@@ -73,7 +73,6 @@ vi.mock("../hooks/useKura", async () => {
       unhidePost: vi.fn(() => Promise.resolve()),
       deletePost: vi.fn(() => Promise.resolve()),
     }),
-    useLoadMore: () => ({ current: null }),
   };
 });
 
@@ -81,6 +80,7 @@ describe("HiddenPostsPage filters", () => {
   beforeEach(() => {
     hoisted.useHiddenPosts.mockReset();
     hoisted.useHiddenPosts.mockReturnValue(queue());
+    window.scrollTo = vi.fn();
   });
 
   afterEach(() => {
@@ -103,12 +103,17 @@ describe("HiddenPostsPage filters", () => {
     expect(screen.getByRole("option", { name: "All removed (9)" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Hidden only (4)" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Deleted only (5)" })).toBeInTheDocument();
-    expect(hoisted.useHiddenPosts).toHaveBeenCalledWith(true, {
-      kind: "all",
-      q: "",
-      rating: "",
-      sort: "newest",
-    });
+    expect(hoisted.useHiddenPosts).toHaveBeenCalledWith(
+      true,
+      {
+        kind: "all",
+        q: "",
+        rating: "",
+        sort: "newest",
+      },
+      1,
+      DEFAULT_PAGE_SIZE,
+    );
   });
 
   it("uses the singular match label and hides the count while the first page is pending", () => {
@@ -139,6 +144,8 @@ describe("HiddenPostsPage filters", () => {
     expect(hoisted.useHiddenPosts).not.toHaveBeenCalledWith(
       true,
       expect.objectContaining({ q: "miku" }),
+      expect.anything(),
+      expect.anything(),
     );
 
     act(() => {
@@ -147,12 +154,17 @@ describe("HiddenPostsPage filters", () => {
 
     expect(screen.getByText("Nothing matches.")).toBeInTheDocument();
     expect(screen.queryByText("Nothing here. The board is fully visible.")).not.toBeInTheDocument();
-    expect(hoisted.useHiddenPosts).toHaveBeenLastCalledWith(true, {
-      kind: "all",
-      q: "miku",
-      rating: "",
-      sort: "newest",
-    });
+    expect(hoisted.useHiddenPosts).toHaveBeenLastCalledWith(
+      true,
+      {
+        kind: "all",
+        q: "miku",
+        rating: "",
+        sort: "newest",
+      },
+      1,
+      DEFAULT_PAGE_SIZE,
+    );
 
     fireEvent.change(search, { target: { value: "" } });
     expect(screen.getByText("Nothing matches.")).toBeInTheDocument();
@@ -160,12 +172,17 @@ describe("HiddenPostsPage filters", () => {
       vi.advanceTimersByTime(300);
     });
     expect(screen.getByText("Nothing here. The board is fully visible.")).toBeInTheDocument();
-    expect(hoisted.useHiddenPosts).toHaveBeenLastCalledWith(true, {
-      kind: "all",
-      q: "",
-      rating: "",
-      sort: "newest",
-    });
+    expect(hoisted.useHiddenPosts).toHaveBeenLastCalledWith(
+      true,
+      {
+        kind: "all",
+        q: "",
+        rating: "",
+        sort: "newest",
+      },
+      1,
+      DEFAULT_PAGE_SIZE,
+    );
   });
 
   it("passes rating, order, and kind through to the hook", () => {
@@ -173,30 +190,66 @@ describe("HiddenPostsPage filters", () => {
     fireEvent.click(screen.getByRole("button", { name: "Rating" }));
     fireEvent.click(screen.getByRole("option", { name: "NSFW" }));
     expect(screen.getByText("Nothing matches.")).toBeInTheDocument();
-    expect(hoisted.useHiddenPosts).toHaveBeenLastCalledWith(true, {
-      kind: "all",
-      q: "",
-      rating: "nsfw",
-      sort: "newest",
-    });
+    expect(hoisted.useHiddenPosts).toHaveBeenLastCalledWith(
+      true,
+      {
+        kind: "all",
+        q: "",
+        rating: "nsfw",
+        sort: "newest",
+      },
+      1,
+      DEFAULT_PAGE_SIZE,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Order" }));
     fireEvent.click(screen.getByRole("option", { name: "Oldest removal" }));
-    expect(hoisted.useHiddenPosts).toHaveBeenLastCalledWith(true, {
-      kind: "all",
-      q: "",
-      rating: "nsfw",
-      sort: "oldest",
-    });
+    expect(hoisted.useHiddenPosts).toHaveBeenLastCalledWith(
+      true,
+      {
+        kind: "all",
+        q: "",
+        rating: "nsfw",
+        sort: "oldest",
+      },
+      1,
+      DEFAULT_PAGE_SIZE,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Show" }));
     fireEvent.click(screen.getByRole("option", { name: "Hidden only (4)" }));
     expect(screen.getByText("Nothing matches.")).toBeInTheDocument();
-    expect(hoisted.useHiddenPosts).toHaveBeenLastCalledWith(true, {
-      kind: "hidden",
-      q: "",
-      rating: "nsfw",
-      sort: "oldest",
-    });
+    expect(hoisted.useHiddenPosts).toHaveBeenLastCalledWith(
+      true,
+      {
+        kind: "hidden",
+        q: "",
+        rating: "nsfw",
+        sort: "oldest",
+      },
+      1,
+      DEFAULT_PAGE_SIZE,
+    );
+  });
+
+  it("clamps past the last page once a successful total is known", () => {
+    hoisted.useHiddenPosts.mockReturnValue(queue({ posts: [removedPost], total: 80 }));
+    const view = render(<HiddenPostsPage />);
+    fireEvent.click(screen.getByRole("button", { name: "2" }));
+    expect(hoisted.useHiddenPosts).toHaveBeenLastCalledWith(
+      true,
+      { kind: "all", q: "", rating: "", sort: "newest" },
+      2,
+      DEFAULT_PAGE_SIZE,
+    );
+
+    hoisted.useHiddenPosts.mockReturnValue(queue({ posts: [removedPost], total: 5 }));
+    view.rerender(<HiddenPostsPage />);
+    expect(hoisted.useHiddenPosts).toHaveBeenLastCalledWith(
+      true,
+      { kind: "all", q: "", rating: "", sort: "newest" },
+      1,
+      DEFAULT_PAGE_SIZE,
+    );
   });
 });

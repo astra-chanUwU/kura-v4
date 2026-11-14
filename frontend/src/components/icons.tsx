@@ -48,6 +48,15 @@ export function IconHeart({ filled }: { filled?: boolean }) {
   );
 }
 
+export function IconTag() {
+  return (
+    <Base>
+      <path d="M4.5 12.2 11.6 19.3a1.6 1.6 0 0 0 2.3 0l6.6-6.6a1.6 1.6 0 0 0 0-2.3L13.2 3.1H4.5v9.1Z" />
+      <circle cx="8.2" cy="7.6" r="1.15" fill="currentColor" stroke="none" />
+    </Base>
+  );
+}
+
 export function IconList() {
   return (
     <Base>

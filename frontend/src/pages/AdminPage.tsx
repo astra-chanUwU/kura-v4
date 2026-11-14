@@ -1,17 +1,14 @@
 import { Link, Navigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { IconCrown, IconKey, IconShield, IconUser } from "../components/icons";
+import { Pager } from "../components/Pager";
 import { ThemedSelect } from "../components/ThemedSelect";
 import { shortError, useToasts } from "../components/Toasts";
 import { assignableRoles, atLeast, isRole, ROLE_LABELS, ROLES, type Role } from "../domain/roles";
-import {
-  useAdminUsers,
-  useDebouncedValue,
-  useLoadMore,
-  useMe,
-  useStaffActions,
-} from "../hooks/useKura";
+import { clampPage, pageCount, resolvePageSize } from "../domain/paging";
+import { useAdminUsers, useDebouncedValue, useMe, useStaffActions } from "../hooks/useKura";
+import { usePrefetchPage } from "../hooks/usePrefetchPage";
 import type { User } from "../types/api";
 import { StaffSection } from "./StaffLayout";
 import styles from "./AdminPage.module.css";
@@ -108,19 +105,38 @@ function matchLabel(total: number): string {
 // People & roles, the Staff section's landing tab. Moderators have no
 // people tools, so they land on the hidden-posts queue instead.
 export function AdminPage() {
-  const { user } = useMe();
+  const { me, user } = useMe();
   const toasts = useToasts();
   const staff = useStaffActions();
   const isAdmin = !!user && atLeast(user.role, "admin");
   const [q, setQ] = useState("");
   const [role, setRole] = useState<"" | Role>("");
   const [sort, setSort] = useState<PeopleSort>("name");
+  const [page, setPage] = useState(1);
+  const pageSize = resolvePageSize(me);
+  const lastPageSize = useRef(pageSize);
+  useEffect(() => {
+    if (lastPageSize.current === pageSize) return;
+    lastPageSize.current = pageSize;
+    setPage(1);
+  }, [pageSize]);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [confirming, setConfirming] = useState<StagedRole[] | null>(null);
   const debouncedQ = useDebouncedValue(q, 300);
   const submittedQ = debouncedQ.trim();
-  const people = useAdminUsers(isAdmin, { q: submittedQ, role, sort });
-  const moreRef = useLoadMore(people.hasMore && !people.loadingMore, people.loadMore);
+  const people = useAdminUsers(isAdmin, { q: submittedQ, role, sort }, page, pageSize);
+  usePrefetchPage(people.prefetchPage, page, pageCount(people.total, pageSize), people.isSuccess);
+  useEffect(() => {
+    if (!people.isSuccess) return;
+    const clamped = clampPage(page, people.total, pageSize);
+    if (clamped !== page) setPage(clamped);
+  }, [people.isSuccess, people.total, page, pageSize]);
+  const lastPage = useRef(page);
+  useEffect(() => {
+    if (lastPage.current === page) return;
+    lastPage.current = page;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [page]);
 
   if (!user) return null;
   if (!isAdmin) return <Navigate to="/admin/hidden" replace />;
@@ -215,14 +231,20 @@ export function AdminPage() {
           type="text"
           className={styles.search}
           value={q}
-          onChange={(event) => setQ(event.target.value)}
+          onChange={(event) => {
+            setQ(event.target.value);
+            setPage(1);
+          }}
           placeholder="Username or display name"
           aria-label="Search people"
         />
         <ThemedSelect
           label="Role"
           value={role}
-          onChange={(next) => setRole(isRole(next) ? next : "")}
+          onChange={(next) => {
+            setRole(isRole(next) ? next : "");
+            setPage(1);
+          }}
         >
           <option value="">Everyone ({everyone})</option>
           <option value="member">Member ({people.member})</option>
@@ -233,7 +255,10 @@ export function AdminPage() {
         <ThemedSelect
           label="Order"
           value={sort}
-          onChange={(next) => setSort(next === "newest" || next === "oldest" ? next : "name")}
+          onChange={(next) => {
+            setSort(next === "newest" || next === "oldest" ? next : "name");
+            setPage(1);
+          }}
         >
           <option value="name">Name</option>
           <option value="newest">Newest</option>
@@ -296,8 +321,13 @@ export function AdminPage() {
           })}
         </ul>
       )}
-      <div ref={moreRef} aria-hidden="true" />
-      {people.loadingMore && <p className={simple.muted}>Loading more…</p>}
+      <Pager
+        page={page}
+        total={people.total}
+        pageSize={pageSize}
+        onPage={setPage}
+        onPrefetch={people.prefetchPage}
+      />
       <ConfirmDialog
         open={confirming !== null}
         title={confirmCopy.title}

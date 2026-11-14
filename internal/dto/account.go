@@ -99,12 +99,18 @@ type Preferences struct {
 	Theme              string   `json:"theme"`
 	Font               string   `json:"font"`
 	TagSuggestionRows  int      `json:"tag_suggestion_rows"`
+	PostsPerPage       int      `json:"posts_per_page"`
 }
 
 // UpdateTagSuggestionRows sets how many rows of board tag suggestions
 // to show. 0 hides them.
 type UpdateTagSuggestionRows struct {
 	Rows int `json:"rows"`
+}
+
+// UpdatePostsPerPage sets how many posts the board shows per page.
+type UpdatePostsPerPage struct {
+	PostsPerPage int `json:"posts_per_page"`
 }
 
 // UpdateAppearance replaces the account's default theme and font.

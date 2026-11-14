@@ -1,0 +1,262 @@
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.header:hover {
+  background: var(--surface-soft);
+}
+
+.header:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.headerOpen {
+  border-bottom: 1px solid var(--border);
+}
+
+.headerLeft {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.headerRight {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.icon {
+  display: inline-flex;
+  color: var(--accent);
+  flex: none;
+}
+
+.title {
+  font-weight: 550;
+}
+
+.badgeActive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #17131f;
+  font-size: 0.72rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.badgeMuted {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.chevron {
+  display: inline-flex;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.headerOpen .chevron {
+  transform: rotate(180deg);
+}
+
+.clearButton {
+  padding: 0.25rem 0.55rem;
+  border: none;
+  border-radius: 0.35rem;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 550;
+}
+
+.clearButton:hover {
+  color: var(--accent);
+  background: var(--surface);
+}
+
+.clearButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.content {
+  padding: 0.75rem 0.85rem 0.85rem;
+}
+
+.loading,
+.empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.empty {
+  font-style: italic;
+}
+
+.searchWrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.65rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
+  background: var(--surface-soft);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: var(--muted);
+}
+
+.searchInput::-webkit-search-cancel-button {
+  display: none;
+}
+
+.clearSearch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: none;
+  border-radius: 0.3rem;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.clearSearch:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.clearSearch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.chipList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  max-height: 12.5rem;
+  overflow-y: auto;
+}
+
+.chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.chipMain,
+.chipSide {
+  border: none;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.82rem;
+  line-height: 1.1;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chipMain {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  padding: 0.38rem 0.7rem 0.38rem 0.35rem;
+}
+
+.chipSide {
+  flex: 0 0 1.65rem;
+  width: 1.65rem;
+  padding: 0.38rem 0;
+  font-size: 0.95rem;
+}
+
+.chipExclude {
+  color: var(--danger);
+  border-right: 1px solid var(--border);
+}
+
+.chipMain:hover,
+.chipSide:hover {
+  background: var(--surface-soft);
+}
+
+.chipMain:focus-visible,
+.chipSide:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.chipCount {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -40,6 +40,15 @@ vi.mock("@tanstack/react-router", async () => {
   };
 });
 vi.mock("../hooks/usePrefetchPost", () => ({ usePrefetchPost: () => ({}) }));
+vi.mock("@tanstack/react-query", async () => {
+  const actual = await vi.importActual<typeof import("@tanstack/react-query")>(
+    "@tanstack/react-query",
+  );
+  return {
+    ...actual,
+    useQueryClient: () => ({ prefetchQuery: vi.fn() }),
+  };
+});
 vi.mock("../components/SavedSearches", () => ({
   SaveCurrentSearchButton: () => null,
   SavedSearchList: () => null,
@@ -66,7 +75,7 @@ vi.mock("../hooks/useKura", () => ({
     ),
   ],
   useDebouncedValue: (value: unknown) => value,
-  useLoadMore: () => ({ current: null }),
+  prefetchBoardPage: vi.fn(),
   useMe: () => ({
     me: board.signedIn
       ? {
@@ -78,6 +87,7 @@ vi.mock("../hooks/useKura", () => ({
             tag_suggestion_rows: 1,
             theme: "kura",
             font: "system",
+            posts_per_page: 40,
           },
         }
       : undefined,
@@ -101,10 +111,8 @@ vi.mock("../hooks/useKura", () => ({
       loading: false,
       searching: false,
       error: null,
+      isSuccess: true,
       retry: vi.fn(),
-      hasMore: false,
-      loadingMore: false,
-      loadMore: vi.fn(),
       active,
     };
   },
@@ -149,7 +157,12 @@ describe("image board states", () => {
     board.historyState = {};
     board.navigate.mockClear();
     sessionStorage.clear();
+    localStorage.removeItem("kura-board-tag-panel");
   });
+  const openPageTags = () => {
+    const toggle = screen.getByRole("button", { name: /Tags on this page/ });
+    if (toggle.getAttribute("aria-expanded") !== "true") fireEvent.click(toggle);
+  };
   it("offers recovery when the API is unavailable", () => {
     const retry = vi.fn();
     mockUseSite.mockReturnValue({
@@ -174,7 +187,7 @@ describe("image board states", () => {
     expect(screen.getByText("No images yet")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
-  it("shows the no-tags default in the scrolling tag strip, linking signed-out viewers to register", () => {
+  it("shows an empty page-tag panel when posts have no tags", () => {
     board.posts = [untaggedPost];
     mockUseSite.mockReturnValue({
       site: { name: "My archive", description: "" },
@@ -183,28 +196,10 @@ describe("image board states", () => {
       retry: vi.fn(),
     });
     render(<HomePage />);
-    const strip = screen.getByLabelText("Tags in current view");
-    expect(strip).toHaveTextContent("No tags detected");
-    expect(screen.getByRole("link", { name: "Start contributing" })).toHaveAttribute(
-      "href",
-      "/register",
-    );
+    openPageTags();
+    expect(screen.getByText("No tags on this page")).toBeInTheDocument();
   });
-  it("opens the upload dialog from Start contributing when signed in", () => {
-    board.posts = [untaggedPost];
-    board.signedIn = true;
-    mockUseSite.mockReturnValue({
-      site: { name: "My archive", description: "" },
-      loading: false,
-      error: null,
-      retry: vi.fn(),
-    });
-    render(<HomePage />);
-    expect(screen.getByText("No tags detected")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Start contributing" }));
-    expect(screen.getByRole("dialog", { name: "Upload pictures" })).toBeInTheDocument();
-  });
-  it("keeps tag recommendations visible after adding a tag", () => {
+  it("keeps page tags visible after staging a tag", () => {
     board.posts = [
       { ...untaggedPost, id: "p1", tags: ["anime", "girl"] },
       { ...untaggedPost, id: "p2", tags: ["anime", "landscape"] },
@@ -216,17 +211,15 @@ describe("image board states", () => {
       retry: vi.fn(),
     });
     render(<HomePage />);
-    fireEvent.click(screen.getByRole("button", { name: "Add tag anime" }));
-    // The filtered view still recommends its other tags, and the strip lives
-    // in the same sticky board head as the search bar — a separate sticky
-    // strip at a fixed offset gets covered once the selected-tag row appears.
-    expect(screen.getByRole("button", { name: "Add tag girl" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add tag landscape" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Add tag anime" })).not.toBeInTheDocument();
-    const strip = screen.getByLabelText("Tags in current view");
-    const head = strip.closest('[class*="boardHead"]');
-    expect(head).not.toBeNull();
-    expect(head).toContainElement(screen.getByLabelText("Search the board"));
+    openPageTags();
+    fireEvent.click(screen.getByRole("button", { name: "Include tag anime" }));
+    // Staged chips stay in the search row; the panel still lists other page tags.
+    expect(screen.getByRole("button", { name: "Include tag girl" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Include tag landscape" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Include tag anime" })).not.toBeInTheDocument();
+    const panel = screen.getByText("Tags on this page").closest('[class*="boardHead"]');
+    expect(panel).not.toBeNull();
+    expect(panel).toContainElement(screen.getByLabelText("Search the board"));
   });
   it("pre-loads the signed-in user's saved default tags", () => {
     board.posts = [
@@ -348,7 +341,8 @@ describe("image board states", () => {
       retry: vi.fn(),
     });
     const first = render(<HomePage />);
-    fireEvent.click(screen.getByRole("button", { name: "Add tag girl" }));
+    openPageTags();
+    fireEvent.click(screen.getByRole("button", { name: "Include tag girl" }));
     expect(board.navigate).not.toHaveBeenCalledWith(
       expect.objectContaining({ search: expect.objectContaining({ tags: "anime,girl" }) }),
     );
@@ -373,7 +367,8 @@ describe("image board states", () => {
     });
     render(<HomePage />);
     expect(screen.getByRole("button", { name: "Remove tag anime" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    // Prefer the controls-row Clear (not the panel Clear when both exist).
+    fireEvent.click(screen.getAllByRole("button", { name: "Clear" })[0]!);
     expect(screen.queryByRole("button", { name: "Remove tag anime" })).not.toBeInTheDocument();
     expect(screen.queryByText(/result/)).not.toBeInTheDocument();
     expect(board.navigate).toHaveBeenCalledWith({
@@ -426,7 +421,7 @@ describe("image board states", () => {
       search: { tags: undefined, exclude: "gif", q: undefined },
     });
   });
-  it("stages strip tags until Filter writes them into the URL", () => {
+  it("stages page tags until Filter writes them into the URL", () => {
     board.posts = [
       { ...untaggedPost, id: "p1", tags: ["yuri", "cute", "white_hair"] },
       { ...untaggedPost, id: "p2", tags: ["yuri", "cute"] },
@@ -439,11 +434,12 @@ describe("image board states", () => {
       retry: vi.fn(),
     });
     render(<HomePage />);
-    fireEvent.click(screen.getByRole("button", { name: "Add tag yuri" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add tag cute" }));
+    openPageTags();
+    fireEvent.click(screen.getByRole("button", { name: "Include tag yuri" }));
+    fireEvent.click(screen.getByRole("button", { name: "Include tag cute" }));
     expect(screen.getByRole("button", { name: "Remove tag yuri" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove tag cute" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add tag white_hair" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Include tag white_hair" })).toBeInTheDocument();
     expect(screen.queryByText(/results with all selected tags/)).not.toBeInTheDocument();
     expect(board.navigate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: /Filter/ }));
@@ -475,7 +471,7 @@ describe("image board states", () => {
     expect(screen.getByText(/1 result/)).toBeInTheDocument();
     expect(board.navigate).not.toHaveBeenCalled();
   });
-  it("excludes a tag from the viewport strip's minus button", () => {
+  it("excludes a tag from the page panel's minus button", () => {
     board.posts = [
       { ...untaggedPost, id: "p1", tags: ["anime", "girl"] },
       { ...untaggedPost, id: "p2", tags: ["anime", "landscape"] },
@@ -487,16 +483,17 @@ describe("image board states", () => {
       retry: vi.fn(),
     });
     render(<HomePage />);
+    openPageTags();
     expect(screen.getByRole("button", { name: "Include tag girl" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Exclude tag girl" }));
     expect(screen.getByRole("button", { name: "Remove excluded tag girl" })).toBeInTheDocument();
-    // Staged from the strip: the pictures stay put until Filter.
+    // Staged from the panel: the pictures stay put until Filter.
     expect(screen.queryByText(/1 result/)).not.toBeInTheDocument();
     expect(board.navigate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: /Filter/ }));
     expect(screen.getByText(/1 result/)).toBeInTheDocument();
   });
-  it("shows detected tags instead of the no-tags default", () => {
+  it("shows detected page tags instead of the empty state", () => {
     board.posts = [{ ...untaggedPost, tags: ["anime"] }];
     mockUseSite.mockReturnValue({
       site: { name: "My archive", description: "" },
@@ -505,7 +502,33 @@ describe("image board states", () => {
       retry: vi.fn(),
     });
     render(<HomePage />);
-    expect(screen.queryByText("No tags detected")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add tag anime" })).toBeInTheDocument();
+    openPageTags();
+    expect(screen.queryByText("No tags on this page")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Include tag anime" })).toBeInTheDocument();
+  });
+  it("keeps page tags closed until the panel is opened, and remembers that choice", () => {
+    board.posts = [{ ...untaggedPost, tags: ["anime"] }];
+    mockUseSite.mockReturnValue({
+      site: { name: "My archive", description: "" },
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+    });
+    const first = render(<HomePage />);
+    const toggle = screen.getByRole("button", { name: /Tags on this page/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "Include tag anime" })).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "Include tag anime" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Tags on this page/ }));
+    expect(screen.queryByRole("button", { name: "Include tag anime" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Tags on this page/ }));
+    first.unmount();
+    render(<HomePage />);
+    expect(screen.getByRole("button", { name: /Tags on this page/ })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Include tag anime" })).toBeInTheDocument();
   });
 });

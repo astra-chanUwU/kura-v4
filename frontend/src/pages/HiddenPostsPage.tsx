@@ -1,17 +1,14 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { IconEye, IconTrash } from "../components/icons";
+import { Pager } from "../components/Pager";
 import { ThemedSelect } from "../components/ThemedSelect";
 import { shortError, useToasts } from "../components/Toasts";
 import { atLeast } from "../domain/roles";
-import {
-  useDebouncedValue,
-  useHiddenPosts,
-  useLoadMore,
-  useMe,
-  useStaffActions,
-} from "../hooks/useKura";
+import { clampPage, pageCount, resolvePageSize } from "../domain/paging";
+import { useDebouncedValue, useHiddenPosts, useMe, useStaffActions } from "../hooks/useKura";
+import { usePrefetchPage } from "../hooks/usePrefetchPage";
 import { StaffSection } from "./StaffLayout";
 import styles from "./HiddenPostsPage.module.css";
 import simple from "./Simple.module.css";
@@ -25,20 +22,44 @@ function matchLabel(total: number): string {
 }
 
 export function HiddenPostsPage() {
-  const { user } = useMe();
+  const { me, user } = useMe();
   const toasts = useToasts();
   const staff = useStaffActions();
   const [kind, setKind] = useState<Kind>("all");
   const [q, setQ] = useState("");
   const [rating, setRating] = useState<Rating>("");
   const [sort, setSort] = useState<Sort>("newest");
+  const [page, setPage] = useState(1);
+  const pageSize = resolvePageSize(me);
+  const lastPageSize = useRef(pageSize);
+  useEffect(() => {
+    if (lastPageSize.current === pageSize) return;
+    lastPageSize.current = pageSize;
+    setPage(1);
+  }, [pageSize]);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const debouncedQ = useDebouncedValue(q, 300);
   const submittedQ = debouncedQ.trim();
   const isStaff = !!user && atLeast(user.role, "moderator");
   const isAdmin = !!user && atLeast(user.role, "admin");
-  const hidden = useHiddenPosts(isStaff, { kind, q: submittedQ, rating, sort });
-  const moreRef = useLoadMore(hidden.hasMore && !hidden.loadingMore, hidden.loadMore);
+  const hidden = useHiddenPosts(
+    isStaff,
+    { kind, q: submittedQ, rating, sort },
+    page,
+    pageSize,
+  );
+  usePrefetchPage(hidden.prefetchPage, page, pageCount(hidden.total, pageSize), hidden.isSuccess);
+  useEffect(() => {
+    if (!hidden.isSuccess) return;
+    const clamped = clampPage(page, hidden.total, pageSize);
+    if (clamped !== page) setPage(clamped);
+  }, [hidden.isSuccess, hidden.total, page, pageSize]);
+  const lastPage = useRef(page);
+  useEffect(() => {
+    if (lastPage.current === page) return;
+    lastPage.current = page;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [page]);
 
   if (!user) return null;
 
@@ -62,7 +83,14 @@ export function HiddenPostsPage() {
       }
     >
       <div className={styles.filterRow}>
-        <ThemedSelect label="Show" value={kind} onChange={(next) => setKind(next as Kind)}>
+        <ThemedSelect
+          label="Show"
+          value={kind}
+          onChange={(next) => {
+            setKind(next as Kind);
+            setPage(1);
+          }}
+        >
           <option value="all">All removed ({hidden.hidden + hidden.deleted})</option>
           <option value="hidden">Hidden only ({hidden.hidden})</option>
           <option value="deleted">Deleted only ({hidden.deleted})</option>
@@ -71,16 +99,33 @@ export function HiddenPostsPage() {
           type="text"
           className={styles.search}
           value={q}
-          onChange={(event) => setQ(event.target.value)}
+          onChange={(event) => {
+            setQ(event.target.value);
+            setPage(1);
+          }}
           placeholder="Artist, tag, uploader, or who removed it"
           aria-label="Search removed posts"
         />
-        <ThemedSelect label="Rating" value={rating} onChange={(next) => setRating(next as Rating)}>
+        <ThemedSelect
+          label="Rating"
+          value={rating}
+          onChange={(next) => {
+            setRating(next as Rating);
+            setPage(1);
+          }}
+        >
           <option value="">Any rating</option>
           <option value="sfw">SFW</option>
           <option value="nsfw">NSFW</option>
         </ThemedSelect>
-        <ThemedSelect label="Order" value={sort} onChange={(next) => setSort(next as Sort)}>
+        <ThemedSelect
+          label="Order"
+          value={sort}
+          onChange={(next) => {
+            setSort(next as Sort);
+            setPage(1);
+          }}
+        >
           <option value="newest">Newest removal</option>
           <option value="oldest">Oldest removal</option>
         </ThemedSelect>
@@ -147,8 +192,13 @@ export function HiddenPostsPage() {
           </article>
         ))}
       </div>
-      <div ref={moreRef} aria-hidden="true" />
-      {hidden.loadingMore && <p className={simple.muted}>Loading more…</p>}
+      <Pager
+        page={page}
+        total={hidden.total}
+        pageSize={pageSize}
+        onPage={setPage}
+        onPrefetch={hidden.prefetchPage}
+      />
       <ConfirmDialog
         open={pendingDeleteId !== null}
         title="Delete this post?"

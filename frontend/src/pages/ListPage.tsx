@@ -1,22 +1,54 @@
 import { Link } from "@tanstack/react-router";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { VisibilityToggle } from "../components/VisibilityToggle";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Post } from "../types/api";
 import { BoardViewControls } from "../components/BoardViewControls";
 import { IconSave, IconTrash, IconUndo } from "../components/icons";
+import { Pager } from "../components/Pager";
 import { PostCard } from "../components/PostCard";
 import { PostRow } from "../components/PostRow";
 import { useBoardView } from "../hooks/useBoardView";
 import { shortError, useToasts } from "../components/Toasts";
-import { useList, useListActions, useLoadMore, useMe } from "../hooks/useKura";
+import { clampPage, pageCount, resolvePageSize } from "../domain/paging";
+import { useList, useListActions, useMe } from "../hooks/useKura";
+import { usePrefetchPage } from "../hooks/usePrefetchPage";
 import styles from "./Simple.module.css";
 import listStyles from "./ListPage.module.css";
 
 export function ListPage({ id }: { id: string }) {
-  const { data, isPending, error, hasMore, loadingMore, loadMore } = useList(id);
-  const moreRef = useLoadMore(Boolean(hasMore) && !loadingMore, loadMore);
-  const { user } = useMe();
+  const [page, setPage] = useState(1);
+  const { me, user } = useMe();
+  const pageSize = resolvePageSize(me);
+  const listRef = useRef<HTMLElement>(null);
+  const lastPageSize = useRef(pageSize);
+  useEffect(() => {
+    if (lastPageSize.current === pageSize) return;
+    lastPageSize.current = pageSize;
+    setPage(1);
+  }, [pageSize]);
+  useEffect(() => {
+    setPage(1);
+  }, [id]);
+  const { data, isPending, error, isSuccess, prefetchPage } = useList(id, page, pageSize);
+  usePrefetchPage(prefetchPage, page, pageCount(data?.total ?? 0, pageSize), isSuccess);
+  const total = data?.total ?? 0;
+  // Snap past-end pages once this query's total is known.
+  useEffect(() => {
+    if (!isSuccess) return;
+    const clamped = clampPage(page, total, pageSize);
+    if (clamped !== page) setPage(clamped);
+  }, [isSuccess, total, page, pageSize]);
+  const lastPage = useRef(page);
+  useEffect(() => {
+    if (lastPage.current === page) return;
+    lastPage.current = page;
+    if (listRef.current) {
+      listRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [page]);
   const { view, changeView } = useBoardView();
   const actions = useListActions(id);
   const toasts = useToasts();
@@ -189,6 +221,7 @@ export function ListPage({ id }: { id: string }) {
 
   return (
     <section
+      ref={listRef}
       className={`${styles.page} ${view.wide ? listStyles.pageWide : ""}`}
       aria-labelledby="list-title"
       style={{ maxWidth: view.wide ? "none" : "64rem" }}
@@ -443,8 +476,13 @@ export function ListPage({ id }: { id: string }) {
           </div>
         ))}
       </div>
-      <div ref={moreRef} aria-hidden="true" />
-      {loadingMore && <p className={styles.muted}>Loading more…</p>}
+      <Pager
+        page={page}
+        total={data.total}
+        pageSize={pageSize}
+        onPage={setPage}
+        onPrefetch={prefetchPage}
+      />
       <ConfirmDialog
         open={confirmDelete}
         title="Delete this list?"

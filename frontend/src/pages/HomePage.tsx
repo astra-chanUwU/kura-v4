@@ -1,6 +1,9 @@
-import { Link, useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { BoardTagPanel } from "../components/BoardTagPanel";
 import { BoardViewControls } from "../components/BoardViewControls";
+import { Pager } from "../components/Pager";
 import { PostCard } from "../components/PostCard";
 import { PostRow } from "../components/PostRow";
 import { shortError, useToasts } from "../components/Toasts";
@@ -8,28 +11,39 @@ import { SaveCurrentSearchButton } from "../components/SavedSearches";
 import { UploadDialog } from "../components/UploadDialog";
 import uploadStyles from "../components/UploadDialog.module.css";
 import {
+  boardPageFromSearch,
   boardSort,
   isFilterActive,
   sameTagSet,
   searchFromFilter,
   splitTagInput,
+  type BoardSearch,
   type BoardSort,
 } from "../domain/boardFilter";
 import { boardMemoryFor, writeBoardMemory } from "../domain/boardMemory";
+import { clampPage, pageCount, resolvePageSize, snapPageSize } from "../domain/paging";
 import {
   normalizeTagToken,
+  prefetchBoardPage,
   tagTokens,
   useBoard,
   useDebouncedValue,
-  useLoadMore,
   useMe,
   useRandomPost,
   useTagSuggestions,
 } from "../hooks/useKura";
 import { useBoardView } from "../hooks/useBoardView";
+import { usePageTags } from "../hooks/usePageTags";
+import { usePrefetchPage } from "../hooks/usePrefetchPage";
 import { useSite } from "../hooks/useSite";
-import { useViewportTags } from "../hooks/useViewportTags";
 import styles from "./HomePage.module.css";
+
+/** How many tracks the board grid currently paints. */
+function gridColumnCount(el: Element): number {
+  const raw = getComputedStyle(el).gridTemplateColumns;
+  if (!raw || raw === "none") return 0;
+  return raw.split(/\s+/).filter(Boolean).length;
+}
 
 function sortToken(sort: string | undefined): "" | "oldest" | "favorites" {
   if (sort === "oldest" || sort === "favorites") return sort;
@@ -87,18 +101,14 @@ export function HomePage() {
     };
   }, [signedIn]);
 
-  // The applied filter lives in the URL (?tags=a,b&exclude=c&q=x).
+  // The applied filter lives in the URL (?tags=a,b&exclude=c&q=x&page=2).
   // Tag chips write it immediately. Back/Forward restore that entry.
   // This tab also remembers the last board. A bare "/" (the logo) puts
   // that board back. Saved defaults seed a bare homepage only when
   // nothing is remembered yet.
-  const urlSearch = useSearch({ strict: false }) as {
-    tags?: string;
-    exclude?: string;
-    q?: string;
-    sort?: string;
-  };
+  const urlSearch = useSearch({ strict: false }) as BoardSearch;
   const navigate = useNavigate();
+  const page = boardPageFromSearch(urlSearch);
   // Set on an empty board the user asked for (Clear, or the last chip
   // removed). Back/Forward restore this with the history entry. The
   // remembered board stores the same choice, so the logo honors a Clear.
@@ -349,17 +359,114 @@ export function HomePage() {
       })
       .finally(() => setRandomBusy(false));
   };
-  const board = useBoard(appliedFilter, !defaultsPending);
-  const { posts, loading, error, retry, hasMore, loadingMore, loadMore, total } = board;
+  const preferredPageSize = resolvePageSize(me);
+  const [columns, setColumns] = useState(0);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  // Grid mode fills complete rows; rows mode keeps the preference as-is.
+  // columns < 1 → snap leaves preferred alone until the board grid is measured.
+  const pageSize =
+    view.mode === "grid" ? snapPageSize(preferredPageSize, columns) : preferredPageSize;
+  const board = useBoard(appliedFilter, page, pageSize, !defaultsPending);
+  const { posts, loading, error, retry, total, isSuccess, searching } = board;
+  const queryClient = useQueryClient();
+  const prefetchBoard = useCallback(
+    (target: number) => {
+      void prefetchBoardPage(queryClient, appliedFilter, target, pageSize);
+    },
+    // Applied filter fields match useBoard's query key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      queryClient,
+      pageSize,
+      appliedTags.join(","),
+      appliedExcludedTags.join(","),
+      appliedQuery,
+      appliedFilter.sort,
+    ],
+  );
+  usePrefetchPage(
+    prefetchBoard,
+    page,
+    pageCount(total, pageSize),
+    isSuccess && !defaultsPending,
+  );
   const tagSuggestions = useTagSuggestions(debouncedSearchText, appliedFilter, searchFocused);
   const suggestions = tagSuggestions.suggestions.filter(
     (item) => !selectedTags.includes(item.tag) && !excludedTags.includes(item.tag),
   );
-  // Infinite scroll, including a filtered board. The server pages every search.
-  const moreRef = useLoadMore(hasMore && !loadingMore, loadMore);
-  // Changing the tag set means a new result list: jump back to the
-  // start of the board instead of leaving the user mid-scroll.
+  // Changing the tag set or page means a new result list: jump back to
+  // the start of the board instead of leaving the user mid-scroll.
   const goToBoardTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+  const lastBoardPage = useRef(page);
+  useEffect(() => {
+    if (lastBoardPage.current === page) return;
+    lastBoardPage.current = page;
+    goToBoardTop();
+  }, [page]);
+  // Filter writes omit page (reset to 1). Pager pushes history so
+  // Back/Forward moves between pages. Page 1 omits `page` from the URL.
+  const goToBoardPage = (nextPage: number, replace = false) => {
+    if (!Number.isFinite(nextPage)) return;
+    let target = Math.floor(nextPage);
+    if (target < 1) return;
+    // Clamp past the end only when total matches the current query.
+    if (isSuccess && !searching) {
+      target = clampPage(target, total, pageSize);
+    }
+    if (target === page) return;
+    const search: BoardSearch = searchFromFilter(appliedFilter);
+    if (target > 1) search.page = target;
+    void navigate({
+      to: "/",
+      replace,
+      state: { boardCleared },
+      search,
+    });
+  };
+  // Count CSS grid tracks from a stable board grid (real tiles or probe)
+  // so page size can fill whole rows even while loading / empty.
+  useLayoutEffect(() => {
+    if (view.mode !== "grid") return;
+    const el = gridRef.current;
+    if (!el) return;
+    const measure = () => {
+      const n = gridColumnCount(el);
+      setColumns((prev) => (prev === n ? prev : n));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [view.mode]);
+  // Keep the same item under the cursor when the effective page size changes
+  // (preference or column snap): newPage = floor(((page-1)*old)/new) + 1.
+  // Wait for a real column measure before treating size as settled, so the
+  // preferred→snapped transition does not remap / double-fetch a page jump.
+  const lastPageSize = useRef<number | null>(null);
+  useEffect(() => {
+    if (view.mode === "grid" && columns < 1) return;
+    if (lastPageSize.current === null) {
+      lastPageSize.current = pageSize;
+      return;
+    }
+    const oldSize = lastPageSize.current;
+    if (oldSize === pageSize) return;
+    lastPageSize.current = pageSize;
+    const newPage = Math.floor(((page - 1) * oldSize) / pageSize) + 1;
+    if (newPage !== page) goToBoardPage(newPage, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageSize, columns, view.mode]);
+  // Once total is known for the current query, a URL page past the end
+  // snaps to the last page. keepPreviousData can leave a stale total while
+  // searching — never clamp against that.
+  useEffect(() => {
+    if (defaultsPending || !isSuccess || searching || error) return;
+    const clamped = clampPage(page, total, pageSize);
+    if (clamped === page) return;
+    goToBoardPage(clamped, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, total, isSuccess, searching, error, defaultsPending, urlKey, boardCleared, pageSize]);
 
   // The on-screen tag strip only stages a chip. Applying here would
   // swap the pictures and jump to the top, so the next tag in that
@@ -421,11 +528,13 @@ export function HomePage() {
   };
   const shownPosts = posts;
   const filterActive = isFilterActive(appliedFilter);
+  // writeUrl omits page (resets to 1). Scroll here only when already on
+  // page 1 — otherwise the page-change effect scrolls once.
   const changeSort = (sort: BoardSort) => {
     if (boardSort(urlSearch.sort) === sort) return;
     skipSeed.current = true;
     writeUrl(appliedTags, appliedExcludedTags, appliedQuery, { sort });
-    goToBoardTop();
+    if (page === 1) goToBoardTop();
   };
   // The picture link carries the chips, including ones staged from the
   // strip and not yet applied. Opening one writes that filter into the
@@ -443,15 +552,11 @@ export function HomePage() {
     commitFilter(selectedTags, excludedTags, appliedQuery);
   };
 
-  // One row is the current horizontal strip (12 tags). More rows wrap.
-  // 0 hides the strip. Signed-out visitors get the one-row default.
-  const suggestionRows = me?.preferences.tag_suggestion_rows ?? 1;
-  const suggestionLimit = suggestionRows <= 1 ? 12 : suggestionRows * 16;
-  const { recommended: viewportTags, observe: observePost } = useViewportTags(
-    shownPosts,
-    [...selectedTags, ...excludedTags, ...appliedTags, ...appliedExcludedTags],
-    suggestionLimit,
-  );
+  // Tags from the current page's posts. Stable until the page set changes.
+  const { tags: pageTags } = usePageTags(shownPosts, selectedTags, excludedTags);
+  const activeFilterCount = selectedTags.length + excludedTags.length;
+  const showTagPanel =
+    shownPosts.length > 0 || activeFilterCount > 0 || loading || defaultsPending;
 
   const failed = error ?? siteError;
 
@@ -490,10 +595,9 @@ export function HomePage() {
           </button>
         </p>
       )}
-      {/* One sticky head for search + tag strip: as a single block it grows
-          with the selected-tag row, so the strip is never covered by it. */}
+      {/* Sticky board head: centered search → controls → page-tag panel. */}
       <div className={styles.boardHead}>
-        <div className={styles.searchBar}>
+        <div className={styles.searchRow}>
           {(selectedTags.length > 0 || excludedTags.length > 0) && (
             <div className={styles.chipRow} aria-label="Tag filters">
               {selectedTags.map((tag) => (
@@ -640,6 +744,9 @@ export function HomePage() {
               </ul>
             )}
           </div>
+        </div>
+
+        <div className={styles.controlsRow}>
           <div className={styles.filterControls}>
             <button
               type="button"
@@ -735,72 +842,16 @@ export function HomePage() {
           </div>
         </div>
 
-        {/* Viewport-aware tag strip: top tags from visible posts. It lives in
-          the sticky board head, so it stays visible while scrolling. When
-          the current view has no tags it keeps its place with a default
-          prompt instead of vanishing. */}
-        {suggestionRows > 0 && !loading && !failed && !defaultsPending && shownPosts.length > 0 && (
-          <div
-            className={`${styles.viewportTags} ${suggestionRows > 1 ? styles.viewportTagsWrap : ""}`}
-            style={
-              suggestionRows > 1
-                ? ({ "--suggestion-rows": suggestionRows } as CSSProperties)
-                : undefined
-            }
-            aria-label="Tags in current view"
-          >
-            {viewportTags.length > 0 ? (
-              viewportTags.map((t) => (
-                <span key={t.tag} className={styles.viewportTag}>
-                  <button
-                    type="button"
-                    className={`${styles.viewportTagSide} ${styles.viewportExclude}`}
-                    aria-label={`Exclude tag ${t.tag}`}
-                    title={`Exclude ${t.tag}`}
-                    onClick={() => stageExclude(t.tag)}
-                  >
-                    −
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.viewportTagMain}
-                    aria-label={`Add tag ${t.tag}`}
-                    onClick={() => stageInclude(t.tag)}
-                  >
-                    {t.tag} <span className={styles.viewportChipCount}>· {t.count}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.viewportTagSide} ${styles.viewportInclude}`}
-                    aria-label={`Include tag ${t.tag}`}
-                    title={`Include ${t.tag}`}
-                    onClick={() => stageInclude(t.tag)}
-                  >
-                    +
-                  </button>
-                </span>
-              ))
-            ) : (
-              <>
-                <span className={styles.viewportEmpty}>No tags detected</span>
-                {signedIn ? (
-                  <button
-                    type="button"
-                    className={`${styles.viewportChip} ${styles.viewportCta}`}
-                    onClick={() => {
-                      setDroppedFiles([]);
-                      setUploadOpen(true);
-                    }}
-                  >
-                    Start contributing
-                  </button>
-                ) : (
-                  <Link to="/register" className={`${styles.viewportChip} ${styles.viewportCta}`}>
-                    Start contributing
-                  </Link>
-                )}
-              </>
-            )}
+        {showTagPanel && (
+          <div className={styles.tagPanel}>
+            <BoardTagPanel
+              tags={pageTags}
+              activeCount={activeFilterCount}
+              onInclude={stageInclude}
+              onExclude={stageExclude}
+              onClear={clearFilters}
+              loading={loading || defaultsPending}
+            />
           </div>
         )}
       </div>
@@ -834,31 +885,40 @@ export function HomePage() {
           <p>Try removing a tag, a different spelling, or a tag like “gif”.</p>
         </div>
       )}
-      {shownPosts.length > 0 &&
-        !defaultsPending &&
-        (view.mode === "rows" ? (
-          <div className={styles.rows}>
-            {shownPosts.map((post) => (
-              <div key={post.id} ref={(el) => observePost(el, post.id)} data-post-id={post.id}>
-                <PostRow
-                  post={post}
-                  onTagClick={addTag}
-                  search={postSearch}
-                  onOpen={commitStaged}
-                  fromBoard
-                />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className={styles.grid}>
-            {shownPosts.map((post) => (
-              <div key={post.id} ref={(el) => observePost(el, post.id)} data-post-id={post.id}>
+      {view.mode === "rows" && shownPosts.length > 0 && !defaultsPending && (
+        <div className={styles.rows}>
+          {shownPosts.map((post) => (
+            <div key={post.id} data-post-id={post.id}>
+              <PostRow
+                post={post}
+                onTagClick={addTag}
+                search={postSearch}
+                onOpen={commitStaged}
+                fromBoard
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      {view.mode === "grid" && (
+        <div
+          ref={gridRef}
+          className={
+            shownPosts.length > 0 && !defaultsPending
+              ? styles.grid
+              : `${styles.grid} ${styles.gridProbe}`
+          }
+          aria-hidden={shownPosts.length === 0 || defaultsPending}
+        >
+          {shownPosts.length > 0 &&
+            !defaultsPending &&
+            shownPosts.map((post) => (
+              <div key={post.id} data-post-id={post.id}>
                 <PostCard post={post} search={postSearch} onOpen={commitStaged} fromBoard />
               </div>
             ))}
-          </div>
-        ))}
+        </div>
+      )}
       <button
         type="button"
         aria-label="Back to top"
@@ -868,10 +928,14 @@ export function HomePage() {
       >
         ↑
       </button>
-      <div ref={moreRef} aria-hidden="true" />
-      {loadingMore && <p className={styles.message}>Loading more…</p>}
-      {!loading && !board.searching && !failed && posts.length > 0 && !hasMore && (
-        <p className={styles.message}>That's everything.</p>
+      {!loading && !defaultsPending && !failed && posts.length > 0 && (
+        <Pager
+          page={page}
+          total={total}
+          pageSize={pageSize}
+          onPage={goToBoardPage}
+          onPrefetch={prefetchBoard}
+        />
       )}
     </section>
   );

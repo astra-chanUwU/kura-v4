@@ -282,6 +282,22 @@ func TestSetTagSuggestionRowsValidates(t *testing.T) {
 	}
 }
 
+func TestSetPostsPerPageValidates(t *testing.T) {
+	ctx := context.Background()
+	repo := NewMockRepository(t)
+	repo.EXPECT().UpdatePostsPerPage(ctx, "u1", 12).Return(nil)
+	repo.EXPECT().UpdatePostsPerPage(ctx, "u1", 100).Return(nil)
+	svc, err := NewService(repo, "http://localhost:5174", nil)
+	require.NoError(t, err)
+	require.NoError(t, svc.SetPostsPerPage(ctx, "u1", 12))
+	require.NoError(t, svc.SetPostsPerPage(ctx, "u1", 100))
+	for _, n := range []int{11, 101} {
+		err := svc.SetPostsPerPage(ctx, "u1", n)
+		var vErr *ValidationError
+		require.ErrorAs(t, err, &vErr)
+	}
+}
+
 func TestShowNSFWRequiresAdultConfirmation(t *testing.T) {
 	ctx := context.Background()
 	repo := NewMockRepository(t)

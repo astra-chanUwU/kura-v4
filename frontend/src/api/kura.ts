@@ -40,9 +40,15 @@ function boardParams(filter: BoardFilter): URLSearchParams {
   return params;
 }
 
+function queryLimit(limit?: number): number {
+  if (limit === undefined || !Number.isFinite(limit) || limit < 1) return 40;
+  return Math.floor(limit);
+}
+
 type HiddenPostsQuery = {
   kind: "all" | "hidden" | "deleted";
   offset: number;
+  limit?: number;
   q?: string;
   rating?: "" | "sfw" | "nsfw";
   sort?: "newest" | "oldest";
@@ -51,7 +57,7 @@ type HiddenPostsQuery = {
 function hiddenPostsPath(query: HiddenPostsQuery): string {
   const params = new URLSearchParams();
   params.set("kind", query.kind);
-  params.set("limit", "40");
+  params.set("limit", String(queryLimit(query.limit)));
   params.set("offset", String(query.offset));
   const q = query.q?.trim() ?? "";
   if (q !== "") params.set("q", q);
@@ -62,6 +68,7 @@ function hiddenPostsPath(query: HiddenPostsQuery): string {
 
 type HistoryQuery = {
   offset: number;
+  limit?: number;
   q?: string;
   actorId?: string;
   action?: string;
@@ -71,7 +78,7 @@ type HistoryQuery = {
 
 function historyPath(query: HistoryQuery): string {
   const params = new URLSearchParams();
-  params.set("limit", "40");
+  params.set("limit", String(queryLimit(query.limit)));
   params.set("offset", String(query.offset));
   params.set("sort", query.sort === "oldest" ? "oldest" : "newest");
   const q = query.q?.trim() ?? "";
@@ -87,6 +94,7 @@ function historyPath(query: HistoryQuery): string {
 
 type AdminUsersQuery = {
   offset: number;
+  limit?: number;
   q?: string;
   role?: "" | Role;
   sort?: "name" | "newest" | "oldest";
@@ -94,7 +102,7 @@ type AdminUsersQuery = {
 
 function adminUsersPath(query: AdminUsersQuery): string {
   const params = new URLSearchParams();
-  params.set("limit", "40");
+  params.set("limit", String(queryLimit(query.limit)));
   params.set("offset", String(query.offset));
   params.set("sort", query.sort === "newest" || query.sort === "oldest" ? query.sort : "name");
   const q = query.q?.trim() ?? "";
@@ -169,8 +177,8 @@ export const api = {
     sendJSON<Me>("/me/tag-preferences", "PATCH", { include_tags, exclude_tags }),
   setAppearance: (theme: string, font: string) =>
     sendJSON<Me>("/me/appearance", "PATCH", { theme, font }),
-  setTagSuggestionRows: (rows: number) =>
-    sendJSON<Me>("/me/tag-suggestion-rows", "PATCH", { rows }),
+  setPostsPerPage: (posts_per_page: number) =>
+    sendJSON<Me>("/me/posts-per-page", "PATCH", { posts_per_page }),
   setPassword: (password: string) => sendJSON<Me>("/me/password", "POST", { password }),
   adminUsers: (query: AdminUsersQuery, signal?: AbortSignal) =>
     getJSON<UserPage>(adminUsersPath(query), signal),
@@ -198,10 +206,10 @@ export const api = {
     getJSON<Profile>(`/users/${username}`, signal),
   posts: (offset: number, signal?: AbortSignal) =>
     getJSON<Post[]>(`/posts?limit=40&offset=${offset}`, signal),
-  search: (filter: BoardFilter, after: string, signal?: AbortSignal) => {
+  search: (filter: BoardFilter, offset: number, limit = 40, signal?: AbortSignal) => {
     const params = boardParams(filter);
-    params.set("limit", "40");
-    if (after !== "") params.set("after", after);
+    params.set("limit", String(queryLimit(limit)));
+    params.set("offset", String(offset));
     return getJSON<SearchPage>(`/search?${params}`, signal);
   },
   tagSuggestions: (q: string, filter: BoardFilter, signal?: AbortSignal) => {
@@ -224,15 +232,15 @@ export const api = {
     const query = params.toString();
     return getJSON<Post>(`/random-post${query ? `?${query}` : ""}`);
   },
-  favorites: (offset: number, signal?: AbortSignal) =>
-    getJSON<SearchPage>(`/me/favorites?limit=40&offset=${offset}`, signal),
-  myPosts: (offset: number, signal?: AbortSignal) =>
-    getJSON<SearchPage>(`/me/posts?limit=40&offset=${offset}`, signal),
+  favorites: (offset: number, limit = 40, signal?: AbortSignal) =>
+    getJSON<SearchPage>(`/me/favorites?limit=${queryLimit(limit)}&offset=${offset}`, signal),
+  myPosts: (offset: number, limit = 40, signal?: AbortSignal) =>
+    getJSON<SearchPage>(`/me/posts?limit=${queryLimit(limit)}&offset=${offset}`, signal),
   favorite: (postId: string) => sendJSON<void>(`/me/favorites/${postId}`, "POST"),
   unfavorite: (postId: string) => sendJSON<void>(`/me/favorites/${postId}`, "DELETE"),
   myLists: (signal?: AbortSignal) => getJSON<ListSummary[]>("/me/lists", signal),
-  list: (id: string, offset: number, signal?: AbortSignal) =>
-    getJSON<ListDetail>(`/lists/${id}?limit=40&offset=${offset}`, signal),
+  list: (id: string, offset: number, limit = 40, signal?: AbortSignal) =>
+    getJSON<ListDetail>(`/lists/${id}?limit=${queryLimit(limit)}&offset=${offset}`, signal),
   createList: (body: { title: string; description: string; visibility: string }) =>
     sendJSON<ListSummary>("/lists", "POST", body),
   updateList: (id: string, body: { title: string; description: string; visibility: string }) =>

@@ -1,18 +1,18 @@
 -- name: CreateUserWithID :one
-INSERT INTO users (id, username, display_name) VALUES ($1, $2, $3) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, role;
+INSERT INTO users (id, username, display_name) VALUES ($1, $2, $3) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role;
 
 -- name: CreateUser :one
-INSERT INTO users (username, display_name) VALUES ($1, $2) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, role;
+INSERT INTO users (username, display_name) VALUES ($1, $2) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role;
 
 -- name: GetUserByUsername :one
-SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, role FROM users WHERE username = $1;
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role FROM users WHERE username = $1;
 
 -- name: GetUserByID :one
-SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, role FROM users WHERE id = $1;
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role FROM users WHERE id = $1;
 
 -- name: UpdateProfile :one
 UPDATE users SET display_name=$2, bio=$3, location=$4, website=$5, updated_at=now()
-WHERE id=$1 RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, role;
+WHERE id=$1 RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role;
 
 -- name: UpsertPassword :exec
 INSERT INTO password_credentials (user_id, password_hash) VALUES ($1,$2)
@@ -84,11 +84,14 @@ UPDATE users SET preferred_theme=$2, preferred_font=$3, updated_at=now() WHERE i
 -- name: UpdateTagSuggestionRows :exec
 UPDATE users SET tag_suggestion_rows=$2, updated_at=now() WHERE id=$1;
 
+-- name: UpdatePostsPerPage :exec
+UPDATE users SET posts_per_page=$2, updated_at=now() WHERE id=$1;
+
 -- name: ListUsers :many
-SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, role FROM users ORDER BY created_at, username;
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role FROM users ORDER BY created_at, username;
 
 -- name: UpdateUserRole :one
-UPDATE users SET role=$2, updated_at=now() WHERE id=$1 RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, role;
+UPDATE users SET role=$2, updated_at=now() WHERE id=$1 RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role;
 
 -- name: CountUsersByRole :one
 SELECT count(*) FROM users WHERE role=$1;
@@ -100,7 +103,7 @@ SELECT count(*) FROM users;
 SELECT id, username FROM users WHERE sqlc.arg(query)::text <> '' AND username ILIKE sqlc.arg(query)::text ESCAPE '\' ORDER BY username LIMIT 8;
 
 -- name: ListFilteredUsers :many
-SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, role
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role
 FROM users
 WHERE (
     sqlc.arg(role)::text = ''

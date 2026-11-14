@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Post } from "../types/api";
 import {
+  boardPageFromSearch,
   filterFromSearch,
   filterPosts,
   mergeTagEdit,
@@ -83,6 +84,24 @@ describe("board filter URL round trip", () => {
       exclude: undefined,
       q: undefined,
     });
+  });
+
+  it("keeps page integers >= 2 and drops page 1 or invalid values", () => {
+    expect(validateBoardSearch({ page: 2 }).page).toBe(2);
+    expect(validateBoardSearch({ page: "3" }).page).toBe(3);
+    expect(validateBoardSearch({ page: 1 }).page).toBeUndefined();
+    expect(validateBoardSearch({ page: "1" }).page).toBeUndefined();
+    expect(validateBoardSearch({ page: 0 }).page).toBeUndefined();
+    expect(validateBoardSearch({ page: 1.5 }).page).toBeUndefined();
+    expect(validateBoardSearch({ page: "1.5" }).page).toBeUndefined();
+    expect(validateBoardSearch({ page: "two" }).page).toBeUndefined();
+    expect(validateBoardSearch({ page: -2 }).page).toBeUndefined();
+  });
+
+  it("defaults a missing page to 1 and never writes page from a filter", () => {
+    expect(boardPageFromSearch({})).toBe(1);
+    expect(boardPageFromSearch({ page: 4 })).toBe(4);
+    expect(searchFromFilter({ tags: ["yuri"], exclude: [], q: "" }).page).toBeUndefined();
   });
 });
 

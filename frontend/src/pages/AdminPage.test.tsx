@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_PAGE_SIZE } from "../domain/paging";
 import type { User } from "../types/api";
 import { AdminPage } from "./AdminPage";
 
@@ -48,9 +49,8 @@ function usersResult(overrides: Record<string, unknown> = {}) {
     superAdmin: 1,
     isPending: false,
     error: null,
-    hasMore: false,
-    loadingMore: false,
-    loadMore: () => {},
+    isSuccess: true,
+    prefetchPage: vi.fn(),
     ...overrides,
   };
 }
@@ -59,7 +59,6 @@ vi.mock("../hooks/useKura", async () => {
   const actual = await vi.importActual<typeof import("../hooks/useKura")>("../hooks/useKura");
   return {
     useDebouncedValue: actual.useDebouncedValue,
-    useLoadMore: () => ({ current: null }),
     useMe: () => ({ user: actor }),
     useAdminUsers: (...args: unknown[]) => hoisted.useAdminUsers(...args),
     useStaffActions: () => ({ setUserRole }),
@@ -71,6 +70,7 @@ describe("AdminPage roles", () => {
     setUserRole.mockClear();
     hoisted.useAdminUsers.mockReset();
     hoisted.useAdminUsers.mockReturnValue(usersResult());
+    window.scrollTo = vi.fn();
   });
 
   afterEach(() => {
@@ -141,19 +141,29 @@ describe("AdminPage roles", () => {
     expect(screen.getByRole("option", { name: "Admin (2)" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Super Admin (1)" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("option", { name: "Moderator (3)" }));
-    expect(hoisted.useAdminUsers).toHaveBeenLastCalledWith(true, {
-      q: "",
-      role: "moderator",
-      sort: "name",
-    });
+    expect(hoisted.useAdminUsers).toHaveBeenLastCalledWith(
+      true,
+      {
+        q: "",
+        role: "moderator",
+        sort: "name",
+      },
+      1,
+      DEFAULT_PAGE_SIZE,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Order" }));
     fireEvent.click(screen.getByRole("option", { name: "Oldest" }));
-    expect(hoisted.useAdminUsers).toHaveBeenLastCalledWith(true, {
-      q: "",
-      role: "moderator",
-      sort: "oldest",
-    });
+    expect(hoisted.useAdminUsers).toHaveBeenLastCalledWith(
+      true,
+      {
+        q: "",
+        role: "moderator",
+        sort: "oldest",
+      },
+      1,
+      DEFAULT_PAGE_SIZE,
+    );
   });
 
   it("hides the match count while the first page is pending and uses the singular label", () => {
@@ -178,6 +188,8 @@ describe("AdminPage roles", () => {
     expect(hoisted.useAdminUsers).not.toHaveBeenCalledWith(
       true,
       expect.objectContaining({ q: "kiri" }),
+      expect.anything(),
+      expect.anything(),
     );
 
     act(() => {
@@ -186,16 +198,23 @@ describe("AdminPage roles", () => {
     expect(hoisted.useAdminUsers).not.toHaveBeenCalledWith(
       true,
       expect.objectContaining({ q: "kiri" }),
+      expect.anything(),
+      expect.anything(),
     );
 
     act(() => {
       vi.advanceTimersByTime(1);
     });
-    expect(hoisted.useAdminUsers).toHaveBeenLastCalledWith(true, {
-      q: "kiri",
-      role: "",
-      sort: "name",
-    });
+    expect(hoisted.useAdminUsers).toHaveBeenLastCalledWith(
+      true,
+      {
+        q: "kiri",
+        role: "",
+        sort: "name",
+      },
+      1,
+      DEFAULT_PAGE_SIZE,
+    );
   });
 
   it("says nothing matches when a query or role finds nobody", () => {
@@ -224,11 +243,16 @@ describe("AdminPage roles", () => {
     fireEvent.click(screen.getByRole("option", { name: "Member (4)" }));
     expect(screen.getByText("Nothing matches.")).toBeInTheDocument();
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
-    expect(hoisted.useAdminUsers).toHaveBeenLastCalledWith(true, {
-      q: "",
-      role: "member",
-      sort: "name",
-    });
+    expect(hoisted.useAdminUsers).toHaveBeenLastCalledWith(
+      true,
+      {
+        q: "",
+        role: "member",
+        sort: "name",
+      },
+      1,
+      DEFAULT_PAGE_SIZE,
+    );
   });
 
   it("says there are no accounts when everyone is empty", () => {
@@ -253,5 +277,26 @@ describe("AdminPage roles", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(setUserRole).toHaveBeenCalledWith("astra", "moderator");
+  });
+
+  it("clamps past the last page once a successful total is known", () => {
+    hoisted.useAdminUsers.mockReturnValue(usersResult({ total: 80 }));
+    const view = render(<AdminPage />);
+    fireEvent.click(screen.getByRole("button", { name: "2" }));
+    expect(hoisted.useAdminUsers).toHaveBeenLastCalledWith(
+      true,
+      { q: "", role: "", sort: "name" },
+      2,
+      DEFAULT_PAGE_SIZE,
+    );
+
+    hoisted.useAdminUsers.mockReturnValue(usersResult({ total: 5, users: [people[0]] }));
+    view.rerender(<AdminPage />);
+    expect(hoisted.useAdminUsers).toHaveBeenLastCalledWith(
+      true,
+      { q: "", role: "", sort: "name" },
+      1,
+      DEFAULT_PAGE_SIZE,
+    );
   });
 });

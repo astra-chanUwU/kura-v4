@@ -1,14 +1,12 @@
 import {
   keepPreviousData,
-  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
-  type InfiniteData,
   type QueryClient,
   type QueryKey,
 } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ChangeEntry, Post, SearchPage } from "../types/api";
 import { isRole, type Role } from "../domain/roles";
 import {
@@ -18,6 +16,7 @@ import {
   type BoardFilter,
   type Neighbors,
 } from "../domain/boardFilter";
+import { DEFAULT_PAGE_SIZE, pageOffset } from "../domain/paging";
 import { clearBoardMemory } from "../domain/boardMemory";
 import { api, DuplicatePostError } from "../api/kura";
 
@@ -68,31 +67,46 @@ function invalidateSearch(client: QueryClient) {
   void client.invalidateQueries({ queryKey: ["neighbors"] });
 }
 
-/** The board, filtered or not. Pages come from the server, 40 at a time. */
-export function useBoard(filter: BoardFilter, enabled = true) {
-  const query = useInfiniteQuery({
-    queryKey: queryKeys.board(filter),
-    queryFn: ({ pageParam, signal }) => api.search(filter, pageParam, signal),
-    initialPageParam: "",
-    getNextPageParam: (lastPage, allPages) => {
-      const loaded = allPages.reduce((n, page) => n + page.posts.length, 0);
-      const cursor = lastPage.posts.at(-1)?.id;
-      return loaded < lastPage.total && cursor ? cursor : undefined;
-    },
+/** Prefetch one board page with the same key/fn as useBoard. */
+export function prefetchBoardPage(
+  client: QueryClient,
+  filter: BoardFilter,
+  page: number,
+  pageSize: number,
+) {
+  const size = pageSize ?? DEFAULT_PAGE_SIZE;
+  const offset = pageOffset(page, size);
+  return client.prefetchQuery({
+    queryKey: queryKeys.board(filter, offset, size),
+    queryFn: ({ signal }) => api.search(filter, offset, size, signal),
+    staleTime: 60_000,
+  });
+}
+
+/** The board, filtered or not. One server page for the given page number. */
+export function useBoard(
+  filter: BoardFilter,
+  page = 1,
+  pageSize = DEFAULT_PAGE_SIZE,
+  enabled = true,
+) {
+  const size = pageSize ?? DEFAULT_PAGE_SIZE;
+  const offset = pageOffset(page, size);
+  const query = useQuery({
+    queryKey: queryKeys.board(filter, offset, size),
+    queryFn: ({ signal }) => api.search(filter, offset, size, signal),
     enabled,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
   return {
-    posts: query.data?.pages.flatMap((page) => page.posts) ?? [],
-    total: query.data?.pages.at(-1)?.total ?? 0,
+    posts: query.data?.posts ?? [],
+    total: query.data?.total ?? 0,
     loading: query.isPending,
     searching: query.isFetching && !query.isPending,
     error: query.error,
+    isSuccess: query.isSuccess,
     retry: () => void query.refetch(),
-    hasMore: query.hasNextPage ?? false,
-    loadingMore: query.isFetchingNextPage,
-    loadMore: () => void query.fetchNextPage(),
     active: isFilterActive(filter),
   };
 }
@@ -107,28 +121,6 @@ export function useTagSuggestions(text: string, filter: BoardFilter, enabled: bo
     staleTime: 60_000,
   });
   return { suggestions: query.data ?? [], loading: query.isFetching };
-}
-
-function nextOffset(loaded: number, total: number): number | undefined {
-  return loaded < total ? loaded : undefined;
-}
-
-/** Watches a sentinel and asks for the next page as it nears the viewport. */
-export function useLoadMore(enabled: boolean, loadMore: () => void) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || !enabled || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) loadMore();
-      },
-      { rootMargin: "900px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [enabled, loadMore]);
-  return ref;
 }
 
 // Debounce a rapidly changing value (e.g. keystrokes) so downstream
@@ -188,44 +180,58 @@ export function usePostNeighbors(id: string, filter: BoardFilter): Neighbors & {
 }
 
 function usePagedPosts(
-  key: readonly unknown[],
-  fetchPage: (offset: number, signal: AbortSignal) => Promise<SearchPage>,
+  key: (offset: number, pageSize: number) => readonly unknown[],
+  fetchPage: (offset: number, limit: number, signal: AbortSignal) => Promise<SearchPage>,
   enabled: boolean,
+  page: number,
+  pageSize: number,
 ) {
-  const query = useInfiniteQuery({
-    queryKey: key,
-    queryFn: ({ pageParam, signal }) => fetchPage(pageParam, signal),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage, allPages) => {
-      const loaded = allPages.reduce((n, page) => n + page.posts.length, 0);
-      return nextOffset(loaded, lastPage.total);
-    },
+  const client = useQueryClient();
+  const size = pageSize ?? DEFAULT_PAGE_SIZE;
+  const offset = pageOffset(page, size);
+  const query = useQuery({
+    queryKey: key(offset, size),
+    queryFn: ({ signal }) => fetchPage(offset, size, signal),
     enabled,
+    placeholderData: keepPreviousData,
   });
+  const prefetchPage = useCallback(
+    (target: number) => {
+      const off = pageOffset(target, size);
+      void client.prefetchQuery({
+        queryKey: key(off, size),
+        queryFn: ({ signal }) => fetchPage(off, size, signal),
+      });
+    },
+    [client, key, fetchPage, size],
+  );
   return {
-    posts: query.data?.pages.flatMap((page) => page.posts) ?? [],
-    total: query.data?.pages.at(-1)?.total ?? 0,
+    posts: query.data?.posts ?? [],
+    total: query.data?.total ?? 0,
     isPending: query.isPending,
     error: query.error,
-    hasMore: query.hasNextPage ?? false,
-    loadingMore: query.isFetchingNextPage,
-    loadMore: () => void query.fetchNextPage(),
+    isSuccess: query.isSuccess,
+    prefetchPage,
   };
 }
 
-export function useFavorites(enabled: boolean) {
+export function useFavorites(enabled: boolean, page = 1, pageSize = DEFAULT_PAGE_SIZE) {
   return usePagedPosts(
-    queryKeys.favorites(),
-    (offset, signal) => api.favorites(offset, signal),
+    queryKeys.favorites,
+    api.favorites,
     enabled,
+    page,
+    pageSize,
   );
 }
 
-export function useMyPosts(enabled: boolean) {
+export function useMyPosts(enabled: boolean, page = 1, pageSize = DEFAULT_PAGE_SIZE) {
   return usePagedPosts(
-    queryKeys.myPosts(),
-    (offset, signal) => api.myPosts(offset, signal),
+    queryKeys.myPosts,
+    api.myPosts,
     enabled,
+    page,
+    pageSize,
   );
 }
 
@@ -237,26 +243,34 @@ export function useMyLists(enabled: boolean) {
   });
 }
 
-export function useList(id: string) {
-  const query = useInfiniteQuery({
-    queryKey: queryKeys.list(id),
-    queryFn: ({ pageParam, signal }) => api.list(id, pageParam, signal),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage, allPages) => {
-      const loaded = allPages.reduce((n, page) => n + page.items.length, 0);
-      return nextOffset(loaded, lastPage.total);
-    },
+export function useList(id: string, page = 1, pageSize = DEFAULT_PAGE_SIZE) {
+  const client = useQueryClient();
+  const size = pageSize ?? DEFAULT_PAGE_SIZE;
+  const offset = pageOffset(page, size);
+  const query = useQuery({
+    queryKey: queryKeys.list(id, offset, size),
+    queryFn: ({ signal }) => api.list(id, offset, size, signal),
     enabled: id !== "",
+    placeholderData: keepPreviousData,
   });
-  const items = query.data?.pages.flatMap((page) => page.items) ?? [];
-  const first = query.data?.pages[0];
+  const prefetchPage = useCallback(
+    (target: number) => {
+      const off = pageOffset(target, size);
+      void client.prefetchQuery({
+        queryKey: queryKeys.list(id, off, size),
+        queryFn: ({ signal }) => api.list(id, off, size, signal),
+      });
+    },
+    [client, id, size],
+  );
   return {
-    data: first ? { list: first.list, items, total: first.total } : undefined,
+    data: query.data
+      ? { list: query.data.list, items: query.data.items, total: query.data.total }
+      : undefined,
     isPending: query.isPending,
     error: query.error,
-    hasMore: query.hasNextPage ?? false,
-    loadingMore: query.isFetchingNextPage,
-    loadMore: () => void query.fetchNextPage(),
+    isSuccess: query.isSuccess,
+    prefetchPage,
   };
 }
 
@@ -309,33 +323,19 @@ export function useToggleFavorite() {
       await client.cancelQueries({ queryKey: queryKeys.post(postId) });
       const single = client.getQueryData<Post>(queryKeys.post(postId));
       if (single) patch(queryKeys.post(postId), patchPost(single));
-      for (const [key, data] of client.getQueriesData<InfiniteData<SearchPage>>({
-        queryKey: ["board"],
-      })) {
+      for (const [key, data] of client.getQueriesData<SearchPage>({ queryKey: ["board"] })) {
         if (!data) continue;
-        patch(key, {
-          ...data,
-          pages: data.pages.map((page) => ({ ...page, posts: page.posts.map(patchPost) })),
-        });
+        patch(key, { ...data, posts: data.posts.map(patchPost) });
       }
-      for (const key of [queryKeys.favorites(), queryKeys.myPosts()] as const) {
-        const list = client.getQueryData<InfiniteData<SearchPage>>(key);
-        if (list) {
-          patch(key, {
-            ...list,
-            pages: list.pages.map((page) => ({ ...page, posts: page.posts.map(patchPost) })),
-          });
+      for (const prefix of [["favorites"], ["my-posts"]] as const) {
+        for (const [key, list] of client.getQueriesData<SearchPage>({ queryKey: [...prefix] })) {
+          if (!list) continue;
+          patch(key, { ...list, posts: list.posts.map(patchPost) });
         }
       }
-      for (const [key, detail] of client.getQueriesData<InfiniteData<ListDetail>>({
-        queryKey: ["list"],
-      })) {
-        if (detail) {
-          patch(key, {
-            ...detail,
-            pages: detail.pages.map((page) => ({ ...page, items: page.items.map(patchPost) })),
-          });
-        }
+      for (const [key, detail] of client.getQueriesData<ListDetail>({ queryKey: ["list"] })) {
+        if (!detail) continue;
+        patch(key, { ...detail, items: detail.items.map(patchPost) });
       }
       return { touched };
     },
@@ -467,7 +467,11 @@ export function useAccountActions() {
     setTagPreferences: (includeTags: string[], excludeTags: string[]) =>
       api.setTagPreferences(includeTags, excludeTags).then(refresh),
     setAppearance: (theme: string, font: string) => api.setAppearance(theme, font).then(refresh),
-    setTagSuggestionRows: (rows: number) => api.setTagSuggestionRows(rows).then(refresh),
+    setPostsPerPage: (postsPerPage: number) =>
+      api.setPostsPerPage(postsPerPage).then((me) => {
+        refresh();
+        return me;
+      }),
     setAvatar: (file: File) => api.setAvatar(file).then(refresh),
     removeAvatar: () => api.removeAvatar().then(refresh),
     setPassword: (password: string) => api.setPassword(password).then(refresh),
@@ -484,35 +488,46 @@ export type AdminUsersFilter = {
   sort?: "name" | "newest" | "oldest";
 };
 
-export function useAdminUsers(enabled: boolean, filter: AdminUsersFilter = {}) {
+export function useAdminUsers(
+  enabled: boolean,
+  filter: AdminUsersFilter = {},
+  page = 1,
+  pageSize = DEFAULT_PAGE_SIZE,
+) {
+  const client = useQueryClient();
   const q = (filter.q ?? "").trim();
   const requestedRole = filter.role ?? "";
   const role = isRole(requestedRole) ? requestedRole : "";
   const sort = filter.sort === "newest" || filter.sort === "oldest" ? filter.sort : "name";
-  const query = useInfiniteQuery({
-    queryKey: queryKeys.adminUsers(q, role, sort),
-    queryFn: ({ pageParam, signal }) =>
-      api.adminUsers({ offset: pageParam, q, role, sort }, signal),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage, allPages) => {
-      const loaded = allPages.reduce((n, page) => n + page.users.length, 0);
-      return nextOffset(loaded, lastPage.total);
-    },
+  const size = pageSize ?? DEFAULT_PAGE_SIZE;
+  const offset = pageOffset(page, size);
+  const query = useQuery({
+    queryKey: queryKeys.adminUsers(q, role, sort, offset, size),
+    queryFn: ({ signal }) => api.adminUsers({ offset, limit: size, q, role, sort }, signal),
     enabled,
+    placeholderData: keepPreviousData,
   });
-  const first = query.data?.pages[0];
+  const prefetchPage = useCallback(
+    (target: number) => {
+      const off = pageOffset(target, size);
+      void client.prefetchQuery({
+        queryKey: queryKeys.adminUsers(q, role, sort, off, size),
+        queryFn: ({ signal }) => api.adminUsers({ offset: off, limit: size, q, role, sort }, signal),
+      });
+    },
+    [client, q, role, sort, size],
+  );
   return {
-    users: query.data?.pages.flatMap((page) => page.users) ?? [],
-    total: first?.total ?? 0,
-    member: first?.member ?? 0,
-    moderator: first?.moderator ?? 0,
-    admin: first?.admin ?? 0,
-    superAdmin: first?.super_admin ?? 0,
+    users: query.data?.users ?? [],
+    total: query.data?.total ?? 0,
+    member: query.data?.member ?? 0,
+    moderator: query.data?.moderator ?? 0,
+    admin: query.data?.admin ?? 0,
+    superAdmin: query.data?.super_admin ?? 0,
     isPending: query.isPending,
     error: query.error,
-    hasMore: (query.hasNextPage ?? false) && enabled,
-    loadingMore: query.isFetchingNextPage,
-    loadMore: () => void query.fetchNextPage(),
+    isSuccess: query.isSuccess,
+    prefetchPage,
   };
 }
 
@@ -523,33 +538,46 @@ export type HiddenQueueFilter = {
   sort?: "newest" | "oldest";
 };
 
-export function useHiddenPosts(enabled: boolean, filter: HiddenQueueFilter = {}) {
+export function useHiddenPosts(
+  enabled: boolean,
+  filter: HiddenQueueFilter = {},
+  page = 1,
+  pageSize = DEFAULT_PAGE_SIZE,
+) {
+  const client = useQueryClient();
   const kind = filter.kind ?? "all";
   const q = (filter.q ?? "").trim();
   const rating = filter.rating === "sfw" || filter.rating === "nsfw" ? filter.rating : "";
   const sort = filter.sort === "oldest" ? "oldest" : "newest";
-  const query = useInfiniteQuery({
-    queryKey: queryKeys.hiddenPosts(kind, q, rating, sort),
-    queryFn: ({ pageParam, signal }) =>
-      api.hiddenPosts({ kind, offset: pageParam, q, rating, sort }, signal),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage, allPages) => {
-      const loaded = allPages.reduce((n, page) => n + page.posts.length, 0);
-      return nextOffset(loaded, lastPage.total);
-    },
+  const size = pageSize ?? DEFAULT_PAGE_SIZE;
+  const offset = pageOffset(page, size);
+  const query = useQuery({
+    queryKey: queryKeys.hiddenPosts(kind, q, rating, sort, offset, size),
+    queryFn: ({ signal }) =>
+      api.hiddenPosts({ kind, offset, limit: size, q, rating, sort }, signal),
     enabled,
+    placeholderData: keepPreviousData,
   });
-  const first = query.data?.pages[0];
+  const prefetchPage = useCallback(
+    (target: number) => {
+      const off = pageOffset(target, size);
+      void client.prefetchQuery({
+        queryKey: queryKeys.hiddenPosts(kind, q, rating, sort, off, size),
+        queryFn: ({ signal }) =>
+          api.hiddenPosts({ kind, offset: off, limit: size, q, rating, sort }, signal),
+      });
+    },
+    [client, kind, q, rating, sort, size],
+  );
   return {
-    posts: query.data?.pages.flatMap((page) => page.posts) ?? [],
-    total: first?.total ?? 0,
-    hidden: first?.hidden ?? 0,
-    deleted: first?.deleted ?? 0,
+    posts: query.data?.posts ?? [],
+    total: query.data?.total ?? 0,
+    hidden: query.data?.hidden ?? 0,
+    deleted: query.data?.deleted ?? 0,
     isPending: query.isPending,
     error: query.error,
-    hasMore: (query.hasNextPage ?? false) && enabled,
-    loadingMore: query.isFetchingNextPage,
-    loadMore: () => void query.fetchNextPage(),
+    isSuccess: query.isSuccess,
+    prefetchPage,
   };
 }
 
@@ -561,32 +589,48 @@ export type HistoryFilter = {
   sort?: "newest" | "oldest";
 };
 
-export function useRecentHistory(enabled: boolean, filter: HistoryFilter = {}) {
+export function useRecentHistory(
+  enabled: boolean,
+  filter: HistoryFilter = {},
+  page = 1,
+  pageSize = DEFAULT_PAGE_SIZE,
+) {
+  const client = useQueryClient();
   const q = (filter.q ?? "").trim();
   const actorId = (filter.actorId ?? "").trim();
   const action = (filter.action ?? "").trim();
   const entity = (filter.entity ?? "").trim();
   const sort = filter.sort === "oldest" ? "oldest" : "newest";
-  const query = useInfiniteQuery({
-    queryKey: queryKeys.adminHistory(actorId, q, action, entity, sort),
-    queryFn: ({ pageParam, signal }) =>
-      api.recentHistory({ offset: pageParam, q, actorId, action, entity, sort }, signal),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage, allPages) => {
-      const loaded = allPages.reduce((n, page) => n + page.entries.length, 0);
-      return nextOffset(loaded, lastPage.total);
-    },
+  const size = pageSize ?? DEFAULT_PAGE_SIZE;
+  const offset = pageOffset(page, size);
+  const query = useQuery({
+    queryKey: queryKeys.adminHistory(actorId, q, action, entity, sort, offset, size),
+    queryFn: ({ signal }) =>
+      api.recentHistory({ offset, limit: size, q, actorId, action, entity, sort }, signal),
     enabled,
+    placeholderData: keepPreviousData,
   });
-  const pages = query.data?.pages ?? [];
+  const prefetchPage = useCallback(
+    (target: number) => {
+      const off = pageOffset(target, size);
+      void client.prefetchQuery({
+        queryKey: queryKeys.adminHistory(actorId, q, action, entity, sort, off, size),
+        queryFn: ({ signal }) =>
+          api.recentHistory(
+            { offset: off, limit: size, q, actorId, action, entity, sort },
+            signal,
+          ),
+      });
+    },
+    [client, actorId, q, action, entity, sort, size],
+  );
   return {
-    entries: pages.flatMap((page) => page.entries),
-    total: pages.at(-1)?.total ?? 0,
+    entries: query.data?.entries ?? [],
+    total: query.data?.total ?? 0,
     isPending: query.isPending,
     error: query.error,
-    hasMore: (query.hasNextPage ?? false) && enabled,
-    loadingMore: query.isFetchingNextPage,
-    loadMore: () => void query.fetchNextPage(),
+    isSuccess: query.isSuccess,
+    prefetchPage,
   };
 }
 

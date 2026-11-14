@@ -72,6 +72,7 @@ func (h *Auth) RegisterRoutes(api fiber.Router) {
 	api.Patch("/me/tag-preferences", h.updateTagPreferences)
 	api.Patch("/me/appearance", h.updateAppearance)
 	api.Patch("/me/tag-suggestion-rows", h.updateTagSuggestionRows)
+	api.Patch("/me/posts-per-page", h.updatePostsPerPage)
 	api.Post("/me/avatar", h.setAvatar)
 	api.Delete("/me/avatar", h.removeAvatar)
 	api.Post("/me/password", h.setPassword)
@@ -342,6 +343,25 @@ func (h *Auth) updateTagSuggestionRows(c fiber.Ctx) error {
 		return fiber.NewError(400, "Invalid request.")
 	}
 	if err := h.accounts.SetTagSuggestionRows(c.Context(), user.ID, in.Rows); err != nil {
+		return writeError(c, err)
+	}
+	updated, err := h.accounts.GetUser(c.Context(), user.ID)
+	if err != nil {
+		return writeError(c, err)
+	}
+	return h.meResponse(c, updated)
+}
+
+func (h *Auth) updatePostsPerPage(c fiber.Ctx) error {
+	user, err := requireUser(c)
+	if err != nil {
+		return err
+	}
+	var in dto.UpdatePostsPerPage
+	if err := c.Bind().Body(&in); err != nil {
+		return fiber.NewError(400, "Invalid request.")
+	}
+	if err := h.accounts.SetPostsPerPage(c.Context(), user.ID, in.PostsPerPage); err != nil {
 		return writeError(c, err)
 	}
 	updated, err := h.accounts.GetUser(c.Context(), user.ID)

@@ -1,17 +1,19 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActorCombobox } from "../components/ActorCombobox";
 import { HistoryList } from "../components/HistoryList";
+import { Pager } from "../components/Pager";
+import { clampPage, pageCount, resolvePageSize } from "../domain/paging";
 import { ThemedSelect } from "../components/ThemedSelect";
 import { shortError, useToasts } from "../components/Toasts";
 import { atLeast } from "../domain/roles";
 import {
   useDebouncedValue,
   useHistoryActors,
-  useLoadMore,
   useMe,
   useRecentHistory,
   useStaffActions,
 } from "../hooks/useKura";
+import { usePrefetchPage } from "../hooks/usePrefetchPage";
 import type { ChangeEntry, HistoryActor } from "../types/api";
 import { StaffSection } from "./StaffLayout";
 import styles from "./HistoryPage.module.css";
@@ -34,7 +36,7 @@ function matchLabel(total: number): string {
 }
 
 export function HistoryPage() {
-  const { user } = useMe();
+  const { me, user } = useMe();
   const toasts = useToasts();
   const staff = useStaffActions();
   const [busyId, setBusyId] = useState("");
@@ -44,20 +46,49 @@ export function HistoryPage() {
   const [action, setAction] = useState<HistoryAction>("");
   const [entity, setEntity] = useState<HistoryEntity>("");
   const [sort, setSort] = useState<HistorySort>("newest");
+  const [page, setPage] = useState(1);
+  const pageSize = resolvePageSize(me);
+  const lastPageSize = useRef(pageSize);
+  useEffect(() => {
+    if (lastPageSize.current === pageSize) return;
+    lastPageSize.current = pageSize;
+    setPage(1);
+  }, [pageSize]);
   const debouncedQ = useDebouncedValue(q, 300);
   const debouncedPerson = useDebouncedValue(personQuery, 120);
   const submittedQ = debouncedQ.trim();
   const submittedPerson = debouncedPerson.trim();
   const isStaff = !!user && atLeast(user.role, "moderator");
-  const history = useRecentHistory(isStaff, {
-    q: submittedQ,
-    actorId: actor?.id ?? "",
-    action,
-    entity,
-    sort,
-  });
+  const history = useRecentHistory(
+    isStaff,
+    {
+      q: submittedQ,
+      actorId: actor?.id ?? "",
+      action,
+      entity,
+      sort,
+    },
+    page,
+    pageSize,
+  );
+  usePrefetchPage(
+    history.prefetchPage,
+    page,
+    pageCount(history.total, pageSize),
+    history.isSuccess,
+  );
+  useEffect(() => {
+    if (!history.isSuccess) return;
+    const clamped = clampPage(page, history.total, pageSize);
+    if (clamped !== page) setPage(clamped);
+  }, [history.isSuccess, history.total, page, pageSize]);
+  const lastPage = useRef(page);
+  useEffect(() => {
+    if (lastPage.current === page) return;
+    lastPage.current = page;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [page]);
   const actorQuery = useHistoryActors(submittedPerson, isStaff && actor === null);
-  const moreRef = useLoadMore(history.hasMore && !history.loadingMore, history.loadMore);
 
   if (!user) return null;
 
@@ -106,6 +137,7 @@ export function HistoryPage() {
           onChange={(next) => {
             setActor(next);
             setPersonQuery("");
+            setPage(1);
           }}
           query={personQuery}
           onQueryChange={setPersonQuery}
@@ -120,6 +152,7 @@ export function HistoryPage() {
           onClick={() => {
             setActor({ id: user.id, username: user.username });
             setPersonQuery("");
+            setPage(1);
           }}
         >
           Me
@@ -128,14 +161,20 @@ export function HistoryPage() {
           type="text"
           className={styles.search}
           value={q}
-          onChange={(event) => setQ(event.target.value)}
+          onChange={(event) => {
+            setQ(event.target.value);
+            setPage(1);
+          }}
           placeholder="Tag, artist, role, or source"
           aria-label="Search changes"
         />
         <ThemedSelect
           label="Action"
           value={action}
-          onChange={(next) => setAction(next as HistoryAction)}
+          onChange={(next) => {
+            setAction(next as HistoryAction);
+            setPage(1);
+          }}
         >
           <option value="">Any change</option>
           <option value="post.created">Uploaded</option>
@@ -149,7 +188,10 @@ export function HistoryPage() {
         <ThemedSelect
           label="About"
           value={entity}
-          onChange={(next) => setEntity(next === "post" || next === "user" ? next : "")}
+          onChange={(next) => {
+            setEntity(next === "post" || next === "user" ? next : "");
+            setPage(1);
+          }}
         >
           <option value="">Everything</option>
           <option value="post">Posts</option>
@@ -158,7 +200,10 @@ export function HistoryPage() {
         <ThemedSelect
           label="Order"
           value={sort}
-          onChange={(next) => setSort(next === "oldest" ? "oldest" : "newest")}
+          onChange={(next) => {
+            setSort(next === "oldest" ? "oldest" : "newest");
+            setPage(1);
+          }}
         >
           <option value="newest">Newest</option>
           <option value="oldest">Oldest</option>
@@ -183,8 +228,13 @@ export function HistoryPage() {
           showThumbnails
         />
       )}
-      <div ref={moreRef} aria-hidden="true" />
-      {history.loadingMore && <p className={simple.muted}>Loading more…</p>}
+      <Pager
+        page={page}
+        total={history.total}
+        pageSize={pageSize}
+        onPage={setPage}
+        onPrefetch={history.prefetchPage}
+      />
     </StaffSection>
   );
 }
