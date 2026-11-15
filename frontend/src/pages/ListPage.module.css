@@ -68,6 +68,7 @@
 
 .controlsRow {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
@@ -114,6 +115,14 @@
   margin-left: calc(50% - 50vw);
   padding-inline: clamp(1rem, 4vw, 3.5rem);
   box-sizing: border-box;
+}
+
+/* Keep the NSFW badge off the move buttons in the bottom-left corner. */
+.cardWrap [data-nsfw-badge] {
+  top: auto;
+  left: auto;
+  right: 0.45rem;
+  bottom: 2.45rem;
 }
 
 /* Pick number, bottom-right of the picture. */

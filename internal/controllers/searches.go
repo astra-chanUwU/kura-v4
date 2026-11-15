@@ -74,7 +74,7 @@ func searchError(c fiber.Ctx, err error) error {
 	if errors.As(err, &vErr) {
 		return fiber.NewError(400, vErr.Message)
 	}
-	if errors.Is(err, searches.ErrNotFound) {
+	if errors.Is(err, model.ErrNotFound) {
 		return fiber.NewError(404, "Not found.")
 	}
 	return writeError(c, err)

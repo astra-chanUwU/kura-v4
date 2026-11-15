@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"errors"
+	"io"
+	"math"
 	"strconv"
 	"strings"
 
@@ -69,14 +71,8 @@ func (h *Posts) RegisterMedia(app fiber.Router) {
 }
 
 func (h *Posts) searchQuery(c fiber.Ctx) model.PostQuery {
-	limit := int32(40)
-	if v, err := strconv.Atoi(c.Query("limit")); err == nil && v > 0 {
-		limit = min(int32(v), 100)
-	}
-	offset := int32(0)
-	if v, err := strconv.Atoi(c.Query("offset")); err == nil && v > 0 {
-		offset = int32(v)
-	}
+	limit := queryBound(c.Query("limit"), 40, 100)
+	offset := queryBound(c.Query("offset"), 0, math.MaxInt32)
 	return model.PostQuery{
 		Tags:        splitCSV(c.Query("tags")),
 		Exclude:     splitCSV(c.Query("exclude")),
@@ -97,6 +93,20 @@ func splitCSV(value string) []string {
 	return strings.Split(value, ",")
 }
 
+// queryBound parses a page limit or offset. A value past MaxInt32 stays at
+// the cap. Casting it to int32 first wraps into a negative page, and a
+// negative offset is then treated as the first page.
+func queryBound(raw string, fallback, cap int32) int32 {
+	v, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || v <= 0 {
+		return fallback
+	}
+	if v > int64(cap) {
+		return cap
+	}
+	return int32(v)
+}
+
 // search is the board: required tags, excluded tags, free text, and sort,
 // one page at a time.
 func (h *Posts) search(c fiber.Ctx) error {
@@ -108,10 +118,7 @@ func (h *Posts) search(c fiber.Ctx) error {
 }
 
 func (h *Posts) tags(c fiber.Ctx) error {
-	limit := int32(8)
-	if v, err := strconv.Atoi(c.Query("limit")); err == nil && v > 0 {
-		limit = min(int32(v), 24)
-	}
+	limit := queryBound(c.Query("limit"), 8, 24)
 	filter := h.searchQuery(c)
 	filter.Q = c.Query("text")
 	filter.AfterID = ""
@@ -132,7 +139,7 @@ func (h *Posts) neighbors(c fiber.Ctx) error {
 		return writeError(c, err)
 	}
 	if !canReadPost(c, post) {
-		return writeError(c, board.ErrNotFound)
+		return writeError(c, model.ErrNotFound)
 	}
 	n, err := h.board.Neighbors(c.Context(), post.ID, h.searchQuery(c))
 	if err != nil {
@@ -147,7 +154,7 @@ func (h *Posts) related(c fiber.Ctx) error {
 		return writeError(c, err)
 	}
 	if !canReadPost(c, post) {
-		return writeError(c, board.ErrNotFound)
+		return writeError(c, model.ErrNotFound)
 	}
 	limit := 12
 	if raw := c.Query("limit"); raw != "" {
@@ -164,7 +171,7 @@ func (h *Posts) related(c fiber.Ctx) error {
 
 func (h *Posts) random(c fiber.Ctx) error {
 	post, err := h.board.Random(c.Context(), h.searchQuery(c))
-	if errors.Is(err, board.ErrNotFound) {
+	if errors.Is(err, model.ErrNotFound) {
 		return fiber.NewError(404, "No picture matches that search.")
 	}
 	if err != nil {
@@ -174,19 +181,31 @@ func (h *Posts) random(c fiber.Ctx) error {
 }
 
 func (h *Posts) list(c fiber.Ctx) error {
-	limit := int32(40)
-	if v, err := strconv.Atoi(c.Query("limit")); err == nil && v > 0 {
-		limit = min(int32(v), 100)
-	}
-	offset := int32(0)
-	if v, err := strconv.Atoi(c.Query("offset")); err == nil && v > 0 {
-		offset = int32(v)
-	}
-	posts, err := h.board.List(c.Context(), limit, offset, viewerSeesNSFW(c))
+	limit := queryBound(c.Query("limit"), 40, 100)
+	offset := queryBound(c.Query("offset"), 0, math.MaxInt32)
+	includeNSFW := viewerSeesNSFW(c)
+	posts, err := h.board.List(c.Context(), limit, offset, includeNSFW)
 	if err != nil {
 		return writeError(c, err)
 	}
-	return c.JSON(postsDTO(posts, h.favs(c)))
+	return c.JSON(postsDTO(visibleBoardPosts(posts, includeNSFW), h.favs(c)))
+}
+
+// visibleBoardPosts is the public list. Service.List keeps every row so
+// the library audit can page through a full store. Hidden, deleted, and
+// unopted-in NSFW posts stay off this response.
+func visibleBoardPosts(posts []model.Post, includeNSFW bool) []model.Post {
+	out := make([]model.Post, 0, len(posts))
+	for _, p := range posts {
+		if p.Hidden || p.Deleted {
+			continue
+		}
+		if p.Rating == "nsfw" && !includeNSFW {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 func (h *Posts) get(c fiber.Ctx) error {
@@ -195,7 +214,7 @@ func (h *Posts) get(c fiber.Ctx) error {
 		return writeError(c, err)
 	}
 	if !canReadPost(c, post) {
-		return writeError(c, board.ErrNotFound)
+		return writeError(c, model.ErrNotFound)
 	}
 	post, err = h.board.WithLastTagger(c.Context(), post)
 	if err != nil {
@@ -219,7 +238,10 @@ func (h *Posts) create(c fiber.Ctx) error {
 	}
 	defer src.Close() //nolint:errcheck
 	head := make([]byte, 512)
-	n, _ := src.Read(head)
+	n, readErr := src.Read(head)
+	if readErr != nil && !errors.Is(readErr, io.EOF) {
+		return readErr
+	}
 	contentType := board.SniffContentType(head[:n], fileHeader.Filename)
 	if !board.IsAllowedMedia(contentType) {
 		return fiber.NewError(400, "That file type isn't supported yet. Try an image, GIF or MP4/WebM video.")
@@ -239,17 +261,12 @@ func (h *Posts) create(c fiber.Ctx) error {
 	// Identical bytes are already a post. Say so plainly (409) instead
 	// of returning the old post as if the upload had added it, and
 	// include that post so the client can show the existing entry.
-	if existing, err := h.board.GetBySHA(c.Context(), sha); err == nil {
-		// The blob is content-addressed and already belongs to this post.
-		// Include the post only when this viewer could open it directly.
-		body := fiber.Map{
-			"code":    "duplicate_post",
-			"message": "Already on the board.",
-		}
-		if canReadPost(c, existing) {
-			body["post"] = postDTO(existing, h.favs(c))
-		}
-		return c.Status(409).JSON(body)
+	existing, err := h.board.GetBySHA(c.Context(), sha)
+	if err == nil {
+		return h.duplicatePost(c, existing)
+	}
+	if !errors.Is(err, model.ErrNotFound) {
+		return writeError(c, err)
 	}
 	rating := c.FormValue("rating")
 	if rating != "" && rating != "sfw" && rating != "nsfw" {
@@ -263,6 +280,14 @@ func (h *Posts) create(c fiber.Ctx) error {
 	post, err := h.board.Create(c.Context(), model.Post{OwnerID: &user.ID, OriginalName: fileHeader.Filename, StorageKey: key, ContentType: contentType, SizeBytes: fileHeader.Size,
 		Artist: meta.Artist, Source: meta.Source, SourceID: meta.SourceID, SourceURL: c.FormValue("source_url"), Tags: tags, Rating: rating}, sha)
 	if err != nil {
+		// A unique SHA can lose the race between the lookup and the insert.
+		// Other failures, including an artist page that failed after the
+		// row was stored, are not reported as a duplicate.
+		if strings.Contains(err.Error(), "23505") {
+			if existing, getErr := h.board.GetBySHA(c.Context(), sha); getErr == nil {
+				return h.duplicatePost(c, existing)
+			}
+		}
 		// Content-addressed blobs may be shared with an existing post;
 		// never delete them here.
 		return writeError(c, err)
@@ -270,6 +295,19 @@ func (h *Posts) create(c fiber.Ctx) error {
 	post.OwnerUsername = user.Username
 	h.board.RecordCreation(c.Context(), *user, post)
 	return c.Status(201).JSON(postDTO(post, h.favs(c)))
+}
+
+func (h *Posts) duplicatePost(c fiber.Ctx, existing model.Post) error {
+	// The blob is content-addressed and already belongs to this post.
+	// Include the post only when this viewer could open it directly.
+	body := fiber.Map{
+		"code":    "duplicate_post",
+		"message": "Already on the board.",
+	}
+	if canReadPost(c, existing) {
+		body["post"] = postDTO(existing, h.favs(c))
+	}
+	return c.Status(409).JSON(body)
 }
 
 func (h *Posts) updateMeta(c fiber.Ctx) error {
@@ -286,7 +324,7 @@ func (h *Posts) updateMeta(c fiber.Ctx) error {
 		return writeError(c, err)
 	}
 	if !canReadPost(c, existing) {
-		return writeError(c, board.ErrNotFound)
+		return writeError(c, model.ErrNotFound)
 	}
 	post, err := h.board.SetMetaAs(c.Context(), user, c.Params("id"), in.Artist, in.Tags, in.Rating, in.SourceURL)
 	if err != nil {

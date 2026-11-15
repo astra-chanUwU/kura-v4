@@ -22,6 +22,12 @@
 .viewGroup button:last-child {
   border-right: none;
 }
+.viewGroup button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 .viewGroup button.viewActive {
   background: var(--surface-soft);
   color: var(--text);

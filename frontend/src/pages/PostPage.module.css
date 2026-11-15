@@ -64,6 +64,7 @@
 }
 .stepControls {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
 }
@@ -111,7 +112,8 @@ a.stepButton:focus-visible {
 }
 .meta {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.45rem 1rem;
   color: var(--muted);
   font-size: 0.85rem;
 }
@@ -157,6 +159,26 @@ a.stepButton:focus-visible {
 .facts div {
   display: grid;
   gap: 0.12rem;
+  min-width: 0;
+}
+.idLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.55rem;
+  align-items: center;
+}
+.postId {
+  overflow-wrap: anywhere;
+}
+.copyId {
+  padding: 0.35rem 0.7rem;
+  min-height: 2.25rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.35rem;
+  background: var(--surface-soft);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
 }
 .facts dd {
   margin: 0;
@@ -236,6 +258,7 @@ a.stepButton:focus-visible {
 }
 .tagForm {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 .tagForm input {
@@ -280,6 +303,9 @@ a.stepButton:focus-visible {
   }
   .tagForm button {
     flex: none;
+  }
+  .copyId {
+    min-height: 2.75rem;
   }
 }
 

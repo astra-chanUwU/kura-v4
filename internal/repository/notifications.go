@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/astra-chanUwU/kura-v4/internal/dao"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
@@ -15,10 +14,6 @@ type Notifications struct {
 func NewNotifications(d *dao.NotificationsDAO) *Notifications {
 	return &Notifications{dao: d}
 }
-
-func (r *Notifications) DB() *sql.DB { return r.dao.DB() }
-
-func (r *Notifications) WithTx(tx *sql.Tx) *dao.NotificationsDAO { return r.dao.WithTx(tx) }
 
 func (r *Notifications) Create(ctx context.Context, recipientID, actorID, kind, postID, commentID string) error {
 	return r.dao.Create(ctx, recipientID, actorID, kind, postID, commentID)
@@ -41,12 +36,12 @@ func (r *Notifications) MarkRead(ctx context.Context, recipientID string, ids []
 	if len(ids) <= 1 {
 		return r.dao.MarkRead(ctx, recipientID, ids)
 	}
-	tx, err := r.DB().BeginTx(ctx, nil)
+	tx, err := r.dao.DB().BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback() //nolint:errcheck
-	if err := r.WithTx(tx).MarkRead(ctx, recipientID, ids); err != nil {
+	if err := r.dao.WithTx(tx).MarkRead(ctx, recipientID, ids); err != nil {
 		return err
 	}
 	return tx.Commit()

@@ -6,7 +6,7 @@ import {
   useDeleteSavedSearch,
   useSavedSearches,
 } from "../hooks/useSavedSearches";
-import { useMe } from "../hooks/useKura";
+import { useMe } from "../hooks/useSession";
 import type { SavedSearch } from "../types/savedSearch";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { shortError, useToasts } from "./Toasts";

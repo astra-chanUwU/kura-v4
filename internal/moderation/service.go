@@ -10,10 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var (
-	ErrNotFound  = errors.New("not found")
-	ErrForbidden = errors.New("you don't have permission to do that")
-)
+var ErrForbidden = errors.New("you don't have permission to do that")
 
 type ValidationError struct{ Message string }
 
@@ -47,8 +44,6 @@ type Repository interface {
 type Service struct{ repo Repository }
 
 func NewService(repo Repository) *Service { return &Service{repo: repo} }
-
-func notFound(err error) bool { return errors.Is(err, model.ErrNotFound) }
 
 func clampLimit(limit int32) int32 {
 	if limit <= 0 {
@@ -125,9 +120,6 @@ func (s *Service) SetRole(ctx context.Context, actor model.User, targetID string
 		return model.User{}, invalid("Unknown role.")
 	}
 	target, err := s.repo.GetUser(ctx, targetID)
-	if notFound(err) {
-		return model.User{}, ErrNotFound
-	}
 	if err != nil {
 		return model.User{}, err
 	}
@@ -164,9 +156,6 @@ func (s *Service) SetPostHidden(ctx context.Context, actor model.User, postID st
 		return model.Post{}, ErrForbidden
 	}
 	post, err := s.repo.GetPost(ctx, postID)
-	if notFound(err) {
-		return model.Post{}, ErrNotFound
-	}
 	if err != nil {
 		return model.Post{}, err
 	}
@@ -193,9 +182,7 @@ func (s *Service) SetPostHidden(ctx context.Context, actor model.User, postID st
 // HistoryForPost lists a post's changes, newest first. Any signed-in user
 // may view it (transparency); rolling back needs moderator+ (see Rollback).
 func (s *Service) HistoryForPost(ctx context.Context, postID string, limit int32) ([]model.ChangeEntry, error) {
-	if _, err := s.repo.GetPost(ctx, postID); notFound(err) {
-		return nil, ErrNotFound
-	} else if err != nil {
+	if _, err := s.repo.GetPost(ctx, postID); err != nil {
 		return nil, err
 	}
 	entries, err := s.repo.ListHistoryForEntity(ctx, "post", postID, clampLimit(limit))
@@ -326,9 +313,6 @@ func historyAction(action string) error {
 // target's current role and the role being restored.
 func (s *Service) Rollback(ctx context.Context, actor model.User, historyID string) (model.ChangeEntry, error) {
 	entry, err := s.repo.GetHistory(ctx, historyID)
-	if notFound(err) {
-		return model.ChangeEntry{}, ErrNotFound
-	}
 	if err != nil {
 		return model.ChangeEntry{}, err
 	}
@@ -338,7 +322,7 @@ func (s *Service) Rollback(ctx context.Context, actor model.User, historyID stri
 	case "user":
 		return s.rollbackUser(ctx, actor, entry)
 	default:
-		return model.ChangeEntry{}, ErrNotFound
+		return model.ChangeEntry{}, model.ErrNotFound
 	}
 }
 
@@ -351,9 +335,6 @@ func (s *Service) rollbackPost(ctx context.Context, actor model.User, entry mode
 		return model.ChangeEntry{}, err
 	}
 	post, err := s.repo.GetPost(ctx, entry.EntityID)
-	if notFound(err) {
-		return model.ChangeEntry{}, ErrNotFound
-	}
 	if err != nil {
 		return model.ChangeEntry{}, err
 	}
@@ -390,9 +371,6 @@ func (s *Service) rollbackUser(ctx context.Context, actor model.User, entry mode
 		return model.ChangeEntry{}, err
 	}
 	target, err := s.repo.GetUser(ctx, entry.EntityID)
-	if notFound(err) {
-		return model.ChangeEntry{}, ErrNotFound
-	}
 	if err != nil {
 		return model.ChangeEntry{}, err
 	}

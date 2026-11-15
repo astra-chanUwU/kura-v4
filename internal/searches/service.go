@@ -2,7 +2,6 @@ package searches
 
 import (
 	"context"
-	"errors"
 	"regexp"
 	"sort"
 	"strings"
@@ -19,8 +18,6 @@ const (
 )
 
 var (
-	ErrNotFound = errors.New("not found")
-
 	// Spaces and other separators become underscores, then hyphens do too,
 	// so "White Hair" and "white-hair" are the same tag.
 	tagCleanRE = regexp.MustCompile(`[^a-z0-9_-]+`)
@@ -122,7 +119,7 @@ func (s *Service) Delete(ctx context.Context, userID, id string) error {
 		return err
 	}
 	if n == 0 {
-		return ErrNotFound
+		return model.ErrNotFound
 	}
 	return nil
 }

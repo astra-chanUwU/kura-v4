@@ -57,12 +57,12 @@ func (e *Engine) reportsList(ctx context.Context, args []string) int {
 	if err != nil {
 		return e.badUsage(cmd, err.Error())
 	}
-	if err := parsed.Only("limit", "offset"); err != nil {
-		return e.badUsage(cmd, err.Error())
+	if err := parsed.Only("limit", "offset"); err != nil || len(parsed.Pos) != 0 {
+		return e.badUsage(cmd, catalogUsage(cmd))
 	}
 	limit, offset, ok := e.pageArgs(cmd, parsed)
 	if !ok {
-		return 1
+		return 2
 	}
 	page, err := e.deps.Reports.ListOpen(ctx, user, limit, offset)
 	if err != nil {

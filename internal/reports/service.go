@@ -11,10 +11,7 @@ import (
 
 const maxNoteRunes = 500
 
-var (
-	ErrNotFound  = errors.New("not found")
-	ErrForbidden = errors.New("you don't have permission to do that")
-)
+var ErrForbidden = errors.New("you don't have permission to do that")
 
 type ValidationError struct{ Message string }
 
@@ -92,23 +89,16 @@ func (s *Service) Dismiss(ctx context.Context, actor model.User, reportID string
 	if actor.ID == "" || !actor.Role.AtLeast(model.RoleModerator) {
 		return model.PostReport{}, ErrForbidden
 	}
-	report, err := s.repo.DismissPostReport(ctx, reportID, actor.ID)
-	if errors.Is(err, model.ErrNotFound) {
-		return model.PostReport{}, ErrNotFound
-	}
-	return report, err
+	return s.repo.DismissPostReport(ctx, reportID, actor.ID)
 }
 
 func (s *Service) visiblePost(ctx context.Context, viewer *model.User, postID string) error {
 	post, err := s.repo.ReportPostAccess(ctx, postID)
-	if errors.Is(err, model.ErrNotFound) {
-		return ErrNotFound
-	}
 	if err != nil {
 		return err
 	}
 	if !canSeePost(viewer, post) {
-		return ErrNotFound
+		return model.ErrNotFound
 	}
 	return nil
 }

@@ -110,7 +110,7 @@ func TestPostsUploadJPEG(t *testing.T) {
 		},
 		getBySHA: func(ctx context.Context, sha string) (model.Post, error) {
 			require.Equal(t, "sha-1", sha)
-			return model.Post{}, board.ErrNotFound
+			return model.Post{}, model.ErrNotFound
 		},
 		create: func(ctx context.Context, p model.Post, sha string) (model.Post, error) {
 			created = true
@@ -322,6 +322,103 @@ func TestPostsDeleteRequiresAdmin(t *testing.T) {
 	require.Equal(t, "post-9", gotID)
 	require.True(t, gotHidden)
 	require.True(t, gotDeleted)
+}
+
+func TestPostsGetMissingAndNSFW(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "session")
+	b := &postsBoard{
+		get: func(ctx context.Context, id string) (model.Post, error) {
+			return model.Post{}, model.ErrNotFound
+		},
+	}
+	code, env, _ := postsRun(t, Deps{Board: b}, []string{"posts", "get", "missing"}, path)
+	require.Equal(t, 1, code)
+	require.Equal(t, "not_found", env.Error.Code)
+	require.Equal(t, "Not found.", env.Error.Message)
+
+	b.get = func(ctx context.Context, id string) (model.Post, error) {
+		return model.Post{ID: id, Rating: "nsfw"}, nil
+	}
+	code, env, raw := postsRun(t, Deps{Board: b}, []string{"posts", "get", "n1"}, path)
+	require.Equal(t, 1, code)
+	require.Equal(t, "not_found", env.Error.Code)
+	require.Equal(t, "Not found.", env.Error.Message)
+	require.NotContains(t, raw, "n1")
+
+	session, acc := postsSession(t, model.RoleMember)
+	code, env, _ = postsRun(t, Deps{Accounts: acc, Board: b}, []string{"posts", "get", "n1"}, session)
+	require.Equal(t, 1, code)
+	require.Equal(t, "not_found", env.Error.Code)
+
+	acc.session = func(ctx context.Context, token string) (model.User, error) {
+		return model.User{ID: "user-1", Username: "ada", Role: model.RoleMember, ShowNSFW: true}, nil
+	}
+	code, env, _ = postsRun(t, Deps{Accounts: acc, Board: b}, []string{"posts", "get", "n1"}, session)
+	require.Equal(t, 0, code)
+	require.Equal(t, "n1", postsData(t, env)["id"])
+}
+
+func TestPostsEditHiddenIsNotFound(t *testing.T) {
+	session, acc := postsSession(t, model.RoleMember)
+	called := false
+	b := &postsBoard{
+		get: func(ctx context.Context, id string) (model.Post, error) {
+			return model.Post{ID: id, Rating: "sfw", Hidden: true}, nil
+		},
+		setMeta: func(ctx context.Context, actor *model.User, id, artist string, tags []string, rating, sourceURL string) (model.Post, error) {
+			called = true
+			return model.Post{}, nil
+		},
+	}
+	code, env, _ := postsRun(t, Deps{Accounts: acc, Board: b}, []string{"posts", "edit", "p1", "--rating", "nsfw"}, session)
+	require.Equal(t, 1, code)
+	require.Equal(t, "not_found", env.Error.Code)
+	require.Equal(t, "Not found.", env.Error.Message)
+	require.False(t, called)
+}
+
+func TestPostsDeleteModeratorIsForbidden(t *testing.T) {
+	session, acc := postsSession(t, model.RoleModerator)
+	called := false
+	mod := &postsModeration{
+		setHidden: func(ctx context.Context, actor model.User, postID string, hidden, deleted bool) (model.Post, error) {
+			called = true
+			return model.Post{}, nil
+		},
+	}
+	code, env, _ := postsRun(t, Deps{Accounts: acc, Moderation: mod}, []string{"posts", "delete", "post-9"}, session)
+	require.Equal(t, 1, code)
+	require.Equal(t, "forbidden", env.Error.Code)
+	require.False(t, called)
+
+	var gotHidden, gotDeleted bool
+	mod.setHidden = func(ctx context.Context, actor model.User, postID string, hidden, deleted bool) (model.Post, error) {
+		called = true
+		gotHidden, gotDeleted = hidden, deleted
+		return model.Post{ID: postID, Hidden: hidden}, nil
+	}
+	code, env, _ = postsRun(t, Deps{Accounts: acc, Moderation: mod}, []string{"posts", "restore", "post-9"}, session)
+	require.Equal(t, 0, code)
+	require.True(t, env.OK)
+	require.Equal(t, "posts.restore", env.Command)
+	require.True(t, called)
+	require.False(t, gotHidden)
+	require.False(t, gotDeleted)
+}
+
+func TestPostsUnhideRequiresModerator(t *testing.T) {
+	session, acc := postsSession(t, model.RoleMember)
+	called := false
+	mod := &postsModeration{
+		setHidden: func(ctx context.Context, actor model.User, postID string, hidden, deleted bool) (model.Post, error) {
+			called = true
+			return model.Post{}, nil
+		},
+	}
+	code, env, _ := postsRun(t, Deps{Accounts: acc, Moderation: mod}, []string{"posts", "unhide", "post-9"}, session)
+	require.Equal(t, 1, code)
+	require.Equal(t, "forbidden", env.Error.Code)
+	require.False(t, called)
 }
 
 func postsRun(t *testing.T, deps Deps, args []string, session string) (int, Envelope, string) {

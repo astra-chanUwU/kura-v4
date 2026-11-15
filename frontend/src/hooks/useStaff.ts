@@ -5,7 +5,7 @@ import { queryKeys } from "../api/queryKeys";
 import { DEFAULT_PAGE_SIZE, pageOffset } from "../domain/paging";
 import { isRole, type Role } from "../domain/roles";
 import type { ChangeEntry } from "../types/api";
-import { invalidateSearch } from "./useBoardData";
+import { invalidatePostSurfaces } from "./useBoardData";
 
 export type AdminUsersFilter = {
   q?: string;
@@ -180,10 +180,7 @@ export function usePostHistory(postId: string, enabled: boolean) {
 export function useStaffActions() {
   const client = useQueryClient();
   const refreshPost = (postId: string) => {
-    void client.invalidateQueries({ queryKey: queryKeys.post(postId) });
-    invalidateSearch(client);
-    void client.invalidateQueries({ queryKey: queryKeys.postHistory(postId) });
-    void client.invalidateQueries({ queryKey: ["hidden-posts"] });
+    invalidatePostSurfaces(client, postId);
     void client.invalidateQueries({ queryKey: ["admin-history"] });
   };
   return {

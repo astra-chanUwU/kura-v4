@@ -2,8 +2,8 @@ package board
 
 import (
 	"context"
-	"errors"
 	"io"
+	"log/slog"
 	"net/url"
 	"strings"
 	"unicode/utf8"
@@ -47,7 +47,7 @@ func (s *Service) Create(ctx context.Context, p model.Post, sha string) (model.P
 	if err != nil {
 		return model.Post{}, err
 	}
-	p.Tags, err = s.applyImplications(ctx, p.Tags)
+	p.Tags, artistTag, err = s.rewriteTags(ctx, p.Tags, artistTag)
 	if err != nil {
 		return model.Post{}, err
 	}
@@ -61,29 +61,32 @@ func (s *Service) Create(ctx context.Context, p model.Post, sha string) (model.P
 	if err != nil {
 		return model.Post{}, err
 	}
+	// The post is already stored. Queue derivatives before the artist page
+	// so a wiki-row failure cannot leave the file without a derive job.
+	s.enqueueDerive(ctx, created.ID)
 	if err := s.ensureArtistPage(ctx, artistTag); err != nil {
 		return model.Post{}, err
 	}
-	// One job per new post. HTTP, the agent, and seed all come through here.
-	// A queue error is logged and does not undo the post.
-	s.enqueueDerive(ctx, created.ID)
 	return created, nil
 }
 
 // GetBySHA finds the existing post for identical bytes, if any.
 func (s *Service) GetBySHA(ctx context.Context, sha string) (model.Post, error) {
-	p, err := s.repo.GetPostBySHA(ctx, sha)
-	if errors.Is(err, model.ErrNotFound) {
-		return model.Post{}, ErrNotFound
-	}
-	return p, err
+	return s.repo.GetPostBySHA(ctx, sha)
 }
 
 // RecordCreation writes the post.created history row for a new post.
 func (s *Service) RecordCreation(ctx context.Context, actor model.User, post model.Post) {
 	empty := model.PostSnapshot{Artist: "", Tags: []string{}, Rating: "sfw", Hidden: false}
-	_, _ = s.repo.InsertHistory(ctx, model.ChangeEntry{EntityType: "post", EntityID: post.ID, ActorID: &actor.ID,
+	_, err := s.repo.InsertHistory(ctx, model.ChangeEntry{EntityType: "post", EntityID: post.ID, ActorID: &actor.ID,
 		ActorUsername: actor.Username, Action: "post.created", Before: model.MarshalPostSnapshot(empty), After: model.MarshalPostSnapshot(model.SnapshotOf(post))})
+	if err != nil {
+		log := s.log
+		if log == nil {
+			log = slog.Default()
+		}
+		log.Error("record post.created", "post_id", post.ID, "error", err)
+	}
 }
 
 func normalizeSourceURL(raw string) (string, error) {

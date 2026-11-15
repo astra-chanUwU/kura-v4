@@ -2,7 +2,9 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 
 	"github.com/astra-chanUwU/kura-v4/internal/dao"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
@@ -22,10 +24,10 @@ func (r *Jobs) Enqueue(ctx context.Context, kind string, payload json.RawMessage
 
 func (r *Jobs) Claim(ctx context.Context, kinds []string) (model.Job, error) {
 	job, err := r.dao.Claim(ctx, kinds)
-	if err != nil {
-		return model.Job{}, Empty(err)
+	if errors.Is(err, sql.ErrNoRows) {
+		return model.Job{}, model.ErrEmpty
 	}
-	return job, nil
+	return job, err
 }
 
 func (r *Jobs) Complete(ctx context.Context, job model.Job) error {

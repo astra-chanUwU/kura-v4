@@ -7,10 +7,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/model"
 )
 
-var (
-	ErrNotFound  = errors.New("not found")
-	ErrForbidden = errors.New("you don't have permission to do that")
-)
+var ErrForbidden = errors.New("you don't have permission to do that")
 
 // ValidationError is a rejected jobs request, safe to show to staff.
 type ValidationError struct{ Message string }
@@ -66,7 +63,7 @@ func (s *Service) Retry(ctx context.Context, actor model.User, id int64) error {
 		return err
 	}
 	if n == 0 {
-		return ErrNotFound
+		return model.ErrNotFound
 	}
 	return nil
 }

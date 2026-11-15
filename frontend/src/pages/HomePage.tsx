@@ -10,7 +10,7 @@ import uploadStyles from "../components/UploadDialog.module.css";
 import {
   boardPageFromSearch,
   boardSort,
-  isFilterActive,
+  normalizeTagToken,
   sameTagSet,
   searchFromFilter,
   splitTagInput,
@@ -19,15 +19,8 @@ import {
 } from "../domain/boardFilter";
 import { boardMemoryFor, writeBoardMemory } from "../domain/boardMemory";
 import { clampPage, pageCount, resolvePageSize, snapPageSize } from "../domain/paging";
-import {
-  normalizeTagToken,
-  prefetchBoardPage,
-  useBoard,
-  useDebouncedValue,
-  useMe,
-  useRandomPost,
-  useTagSuggestions,
-} from "../hooks/useKura";
+import { prefetchBoardPage, useBoard, useRandomPost } from "../hooks/useBoardData";
+import { useMe } from "../hooks/useSession";
 import { useBoardView } from "../hooks/useBoardView";
 import { usePageTags } from "../hooks/usePageTags";
 import { usePrefetchPage } from "../hooks/usePrefetchPage";
@@ -155,9 +148,8 @@ export function HomePage() {
     });
   };
 
-  const [searchText, setSearchText] = useState(() => urlSearch.q ?? "");
-  // Chips and the applied filter are the same set. The text query is
-  // the only thing that waits for Filter / Enter.
+  // Chips and the applied filter are the same set. Filter commits the strip.
+  // The search box draft lives in the board head.
   const [selectedTags, setSelectedTags] = useState<string[]>(() => parseUrlTags(urlSearch.tags));
   const [excludedTags, setExcludedTags] = useState<string[]>(() => parseUrlTags(urlSearch.exclude));
   const [appliedTags, setAppliedTags] = useState<string[]>(() => parseUrlTags(urlSearch.tags));
@@ -165,7 +157,6 @@ export function HomePage() {
     parseUrlTags(urlSearch.exclude),
   );
   const [appliedQuery, setAppliedQuery] = useState(() => urlSearch.q ?? "");
-  const [searchFocused, setSearchFocused] = useState(false);
   // Latest chips, including ones staged from the strip and not yet in
   // the URL. Leaving the board saves them so the logo can bring them back.
   const chipRef = useRef({ tags: selectedTags, exclude: excludedTags, q: appliedQuery });
@@ -215,7 +206,6 @@ export function HomePage() {
     setAppliedTags(include);
     setAppliedExcludedTags(exclude);
     setAppliedQuery(urlSearch.q ?? "");
-    setSearchText(urlSearch.q ?? "");
     // Logo, a typed URL, Back/Forward. Our own write already decided
     // whether defaults are allowed.
     if (pendingWrite.current !== urlKey) skipSeed.current = false;
@@ -260,7 +250,6 @@ export function HomePage() {
     setAppliedTags(include);
     setAppliedExcludedTags(exclude);
     setAppliedQuery(query);
-    setSearchText(query);
     writeUrl(include, exclude, query, { replace: true, cleared });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultsKey, hasUrlFilter, boardCleared, accountLoading, viewerId]);
@@ -281,7 +270,6 @@ export function HomePage() {
   };
   const applyDefaults = () => {
     if (!me) return;
-    setSearchText("");
     commitFilter(
       me.preferences.default_include_tags ?? [],
       me.preferences.default_exclude_tags ?? [],
@@ -289,22 +277,6 @@ export function HomePage() {
       true,
     );
   };
-  const applyFilters = () => {
-    const q = searchText.trim();
-    setSearchText(q);
-    commitFilter(selectedTags, excludedTags, q, true);
-  };
-  const clearFilters = () => {
-    setSearchText("");
-    commitFilter([], [], "", true);
-  };
-  const pendingCount =
-    selectedTags.filter((t) => !appliedTags.includes(t)).length +
-    appliedTags.filter((t) => !selectedTags.includes(t)).length +
-    excludedTags.filter((t) => !appliedExcludedTags.includes(t)).length +
-    appliedExcludedTags.filter((t) => !excludedTags.includes(t)).length +
-    (searchText.trim() !== appliedQuery ? 1 : 0);
-  const filtersDirty = pendingCount > 0;
   const hasDefaults =
     !!me &&
     ((me.preferences.default_include_tags ?? []).length > 0 ||
@@ -324,10 +296,6 @@ export function HomePage() {
         !sameTagSet(appliedExcludedTags, defaultExclude) ||
         appliedQuery !== "");
   const defaultsPending = !hasUrlFilter && !boardCleared && (accountLoading || restorePending);
-  const [highlight, setHighlight] = useState(0);
-  // Keystrokes update the input instantly, but filtering (and anything
-  // network-adjacent) only sees the debounced value, 200ms behind.
-  const debouncedSearchText = useDebouncedValue(searchText, 200);
   const appliedFilter = {
     tags: appliedTags,
     exclude: appliedExcludedTags,
@@ -380,16 +348,7 @@ export function HomePage() {
       appliedFilter.sort,
     ],
   );
-  usePrefetchPage(
-    prefetchBoard,
-    page,
-    pageCount(total, pageSize),
-    isSuccess && !defaultsPending,
-  );
-  const tagSuggestions = useTagSuggestions(debouncedSearchText, appliedFilter, searchFocused);
-  const suggestions = tagSuggestions.suggestions.filter(
-    (item) => !selectedTags.includes(item.tag) && !excludedTags.includes(item.tag),
-  );
+  usePrefetchPage(prefetchBoard, page, pageCount(total, pageSize), isSuccess && !defaultsPending);
   // Changing the tag set or page means a new result list: jump back to
   // the start of the board instead of leaving the user mid-scroll.
   const goToBoardTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
@@ -481,8 +440,6 @@ export function HomePage() {
   };
   const addTag = (tag: string) => {
     const normalized = normalizeTagToken(tag);
-    setSearchText("");
-    setHighlight(0);
     if (!normalized) return;
     const include = selectedTags.includes(normalized)
       ? selectedTags
@@ -495,8 +452,6 @@ export function HomePage() {
   };
   const addExcludedTag = (tag: string) => {
     const normalized = normalizeTagToken(tag);
-    setSearchText("");
-    setHighlight(0);
     if (!normalized) return;
     const exclude = excludedTags.includes(normalized)
       ? excludedTags
@@ -511,8 +466,6 @@ export function HomePage() {
   // required tags, "-tag" tokens are excluded tags, one chip each.
   const addTagsFromText = (text: string) => {
     const { include, exclude } = splitTagInput(text);
-    setSearchText("");
-    setHighlight(0);
     if (include.length === 0 && exclude.length === 0) return;
     const nextExclude = [
       ...new Set([...excludedTags.filter((t) => !include.includes(t)), ...exclude]),
@@ -523,7 +476,6 @@ export function HomePage() {
     commitFilter(nextInclude, nextExclude, appliedQuery);
   };
   const shownPosts = posts;
-  const filterActive = isFilterActive(appliedFilter);
   // writeUrl omits page (resets to 1). Scroll here only when already on
   // page 1 — otherwise the page-change effect scrolls once.
   const changeSort = (sort: BoardSort) => {
@@ -551,8 +503,7 @@ export function HomePage() {
   // Tags from the current page's posts. Stable until the page set changes.
   const { tags: pageTags } = usePageTags(shownPosts, selectedTags, excludedTags);
   const activeFilterCount = selectedTags.length + excludedTags.length;
-  const showTagPanel =
-    shownPosts.length > 0 || activeFilterCount > 0 || loading || defaultsPending;
+  const showTagPanel = shownPosts.length > 0 || activeFilterCount > 0 || loading || defaultsPending;
 
   const failed = error ?? siteError;
 
@@ -594,34 +545,18 @@ export function HomePage() {
       <BoardHead
         selectedTags={selectedTags}
         excludedTags={excludedTags}
-        appliedTags={appliedTags}
-        appliedExcludedTags={appliedExcludedTags}
-        appliedQuery={appliedQuery}
-        searchText={searchText}
-        setSearchText={setSearchText}
-        searchFocused={searchFocused}
-        setSearchFocused={setSearchFocused}
-        highlight={highlight}
-        setHighlight={setHighlight}
-        suggestions={suggestions}
+        appliedFilter={appliedFilter}
         commitFilter={commitFilter}
-        applyFilters={applyFilters}
         addTagsFromText={addTagsFromText}
         addTag={addTag}
         addExcludedTag={addExcludedTag}
-        filtersDirty={filtersDirty}
-        pendingCount={pendingCount}
-        clearFilters={clearFilters}
         differsFromDefaults={differsFromDefaults}
         applyDefaults={applyDefaults}
-        urlSort={urlSearch.sort}
         changeSort={changeSort}
-        filterActive={filterActive}
         searching={searching}
         total={total}
         view={view}
         changeView={changeView}
-        appliedFilter={appliedFilter}
         pickRandom={pickRandom}
         randomBusy={randomBusy}
         signedIn={signedIn}
@@ -636,6 +571,8 @@ export function HomePage() {
         stageExclude={stageExclude}
         loading={loading}
         defaultsPending={defaultsPending}
+        failed={failed}
+        postCount={posts.length}
       />
 
       {(loading || siteLoading || defaultsPending) && <p className={styles.message}>Loading…</p>}
@@ -654,12 +591,7 @@ export function HomePage() {
       )}
       <BoardResults
         posts={posts}
-        loading={loading}
-        failed={failed}
         defaultsPending={defaultsPending}
-        filterActive={filterActive}
-        searching={searching}
-        searchText={searchText}
         view={view}
         gridRef={gridRef}
         postSearch={postSearch}

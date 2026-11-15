@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/astra-chanUwU/kura-v4/internal/dao"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
@@ -13,10 +12,6 @@ type Collections struct {
 }
 
 func NewCollections(d *dao.CollectionsDAO) *Collections { return &Collections{dao: d} }
-
-func (r *Collections) DB() *sql.DB { return r.dao.DB() }
-
-func (r *Collections) WithTx(tx *sql.Tx) *dao.CollectionsDAO { return r.dao.WithTx(tx) }
 
 func (r *Collections) AddFavorite(ctx context.Context, userID, postID string) error {
 	return r.dao.AddFavorite(ctx, userID, postID)
@@ -74,12 +69,12 @@ func (r *Collections) NextPosition(ctx context.Context, listID string) (int32, e
 
 // AddItem inserts a list row and bumps the list's updated time together.
 func (r *Collections) AddItem(ctx context.Context, listID, postID string, pos int32) error {
-	tx, err := r.DB().BeginTx(ctx, nil)
+	tx, err := r.dao.DB().BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback() //nolint:errcheck
-	d := r.WithTx(tx)
+	d := r.dao.WithTx(tx)
 	if err := d.AddItem(ctx, listID, postID, pos); err != nil {
 		return err
 	}
@@ -91,12 +86,12 @@ func (r *Collections) AddItem(ctx context.Context, listID, postID string, pos in
 
 // RemoveItem drops a list row and bumps the list's updated time together.
 func (r *Collections) RemoveItem(ctx context.Context, listID, postID string) error {
-	tx, err := r.DB().BeginTx(ctx, nil)
+	tx, err := r.dao.DB().BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback() //nolint:errcheck
-	d := r.WithTx(tx)
+	d := r.dao.WithTx(tx)
 	if err := d.RemoveItem(ctx, listID, postID); err != nil {
 		return err
 	}
@@ -109,12 +104,12 @@ func (r *Collections) RemoveItem(ctx context.Context, listID, postID string) err
 // Reorder rewrites positions in one transaction; the (list, position) unique
 // constraint is deferrable so intermediate states are allowed.
 func (r *Collections) Reorder(ctx context.Context, listID string, postIDs []string) error {
-	tx, err := r.DB().BeginTx(ctx, nil)
+	tx, err := r.dao.DB().BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback() //nolint:errcheck
-	d := r.WithTx(tx)
+	d := r.dao.WithTx(tx)
 	for i, postID := range postIDs {
 		if err := d.SetItemPosition(ctx, listID, postID, int32(i)); err != nil {
 			return err

@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { PostCard } from "../components/PostCard";
 import { ShareProfileButton } from "../components/ShareProfileButton";
-import { useProfile } from "../hooks/useKura";
+import { useProfile } from "../hooks/useCollections";
 import styles from "./Profile.module.css";
 import { ROLE_LABELS } from "../domain/roles";
 import { FONT_LABELS, THEME_LABELS, normalizeFont, normalizeTheme } from "../domain/appearance";
@@ -43,8 +43,8 @@ export function ProfilePage({ username }: { username: string }) {
           <p className={styles.stats}>
             <strong>{uploadTotal}</strong> {uploadTotal === 1 ? "upload" : "uploads"} ·{" "}
             <strong>{editCount}</strong> {editCount === 1 ? "tag edit" : "tag edits"} ·{" "}
-            <strong>{lists.length}</strong> {lists.length === 1 ? "public list" : "public lists"} · joined{" "}
-            {new Date(user.created_at).toLocaleDateString()}
+            <strong>{lists.length}</strong> {lists.length === 1 ? "public list" : "public lists"} ·
+            joined {new Date(user.created_at).toLocaleDateString()}
           </p>
         </div>
         <div className={styles.share}>
@@ -69,7 +69,8 @@ export function ProfilePage({ username }: { username: string }) {
         </div>
         {uploadTotal > uploads.length && (
           <p className={styles.muted}>
-            {uploadTotal} on the board. {contributions - uploadTotal > 0 ? "Hidden pictures stay off this page." : ""}
+            {uploadTotal} on the board.{" "}
+            {contributions - uploadTotal > 0 ? "Hidden pictures stay off this page." : ""}
           </p>
         )}
       </div>

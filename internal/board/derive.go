@@ -75,7 +75,7 @@ func (s *Service) DerivePost(ctx context.Context, payload json.RawMessage) error
 		return fmt.Errorf("post.derive post_id: %w", err)
 	}
 	p, err := s.repo.GetPost(ctx, body.PostID)
-	if errors.Is(err, model.ErrNotFound) || errors.Is(err, ErrNotFound) {
+	if errors.Is(err, model.ErrNotFound) {
 		return nil
 	}
 	if err != nil {

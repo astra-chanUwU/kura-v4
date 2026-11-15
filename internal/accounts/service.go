@@ -12,17 +12,20 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/astra-chanUwU/kura-v4/internal/model"
+	"github.com/astra-chanUwU/kura-v4/internal/repository"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
 )
 
 var (
-	ErrNotFound           = errors.New("not found")
 	ErrUsernameTaken      = errors.New("username is already taken")
 	ErrInvalidCredentials = errors.New("invalid username or password")
 	ErrLastSignInMethod   = errors.New("you need at least one way to sign in — add another before removing this one")
@@ -65,6 +68,8 @@ type Repository interface {
 	// RecoverAccount atomically replaces the password and recovery key and
 	// revokes every passkey and session.
 	RecoverAccount(ctx context.Context, userID, passwordHash string, recoveryHash []byte) error
+	// ReplacePassword sets the password hash and revokes every session.
+	ReplacePassword(ctx context.Context, userID, hash string) error
 }
 
 var usernameRE = regexp.MustCompile(`^[a-z0-9_]{3,24}$`)
@@ -98,12 +103,10 @@ func NewService(repo Repository, publicURL string, media Media) (*Service, error
 	}
 	origins := []string{strings.TrimSuffix(publicURL, "/")}
 	host := u.Hostname()
-	if host == "localhost" {
-		origins = append(origins, strings.Replace(origins[0], "localhost", "127.0.0.1", 1))
-	}
-	if host == "127.0.0.1" {
-		origins = append(origins, strings.Replace(origins[0], "127.0.0.1", "localhost", 1))
-	}
+	// An IP literal is not a WebAuthn relying-party id, and it must not be
+	// listed as an accepted origin either. An unpinned ceremony falls back
+	// to this list, so an IP alias would let a ceremony finish from an
+	// address the browser will not actually bind a passkey to.
 	wa, err := webauthn.New(&webauthn.Config{
 		RPDisplayName: "Kura",
 		RPID:          host,
@@ -199,6 +202,7 @@ func (s *Service) RegisterWithPassword(ctx context.Context, username, password, 
 func (s *Service) LoginWithPassword(ctx context.Context, username, password string) (model.User, string, error) {
 	name, err := NormalizeUsername(username)
 	if err != nil {
+		_ = CheckPassword(password, dummyHash) // equalize timing; result unused
 		return model.User{}, "", ErrInvalidCredentials
 	}
 	user, err := s.repo.GetUserByUsername(ctx, name)
@@ -210,7 +214,16 @@ func (s *Service) LoginWithPassword(ctx context.Context, username, password stri
 		return model.User{}, "", err
 	}
 	hash, err := s.repo.GetPasswordHash(ctx, user.ID)
-	if isNotFound(err) || !CheckPassword(password, hash) {
+	if isNotFound(err) {
+		// The account exists but has no password (passkey-only). Still pay
+		// for Argon2id, or the fast path reveals that the username exists.
+		_ = CheckPassword(password, dummyHash)
+		return model.User{}, "", ErrInvalidCredentials
+	}
+	if err != nil {
+		return model.User{}, "", err
+	}
+	if !CheckPassword(password, hash) {
 		return model.User{}, "", ErrInvalidCredentials
 	}
 	if NeedsRehash(hash) {
@@ -240,12 +253,9 @@ func (s *Service) newSession(ctx context.Context, userID string) (string, error)
 
 func (s *Service) UserForSession(ctx context.Context, token string) (model.User, error) {
 	if token == "" {
-		return model.User{}, ErrNotFound
+		return model.User{}, model.ErrNotFound
 	}
 	id, err := s.repo.SessionUserID(ctx, tokenHash(token))
-	if isNotFound(err) {
-		return model.User{}, ErrNotFound
-	}
 	if err != nil {
 		return model.User{}, err
 	}
@@ -262,23 +272,15 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 // --- profile & security ---
 
 func (s *Service) GetUser(ctx context.Context, id string) (model.User, error) {
-	u, err := s.repo.GetUserByID(ctx, id)
-	if isNotFound(err) {
-		return model.User{}, ErrNotFound
-	}
-	return u, err
+	return s.repo.GetUserByID(ctx, id)
 }
 
 func (s *Service) GetByUsername(ctx context.Context, username string) (model.User, error) {
 	name, err := NormalizeUsername(username)
 	if err != nil {
-		return model.User{}, ErrNotFound
+		return model.User{}, model.ErrNotFound
 	}
-	u, err := s.repo.GetUserByUsername(ctx, name)
-	if isNotFound(err) {
-		return model.User{}, ErrNotFound
-	}
-	return u, err
+	return s.repo.GetUserByUsername(ctx, name)
 }
 
 func (s *Service) UpdateProfile(ctx context.Context, userID string, in model.User) (model.User, error) {
@@ -293,13 +295,32 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, in model.Use
 	if len([]rune(in.Bio)) > 500 || len([]rune(in.Location)) > 80 {
 		return model.User{}, invalid("One of those profile fields is too long.")
 	}
-	if in.Website != "" {
-		u, err := url.Parse(in.Website)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-			return model.User{}, invalid("Website must be an http(s) link.")
-		}
+	if err := validateWebsite(in.Website); err != nil {
+		return model.User{}, err
 	}
 	return s.repo.UpdateProfile(ctx, in)
+}
+
+func validateWebsite(raw string) error {
+	if raw == "" {
+		return nil
+	}
+	if utf8.RuneCountInString(raw) > 200 || strings.ContainsFunc(raw, func(r rune) bool {
+		return unicode.IsSpace(r) || unicode.IsControl(r) || r == '\\'
+	}) {
+		return invalid("Website must be an http(s) link.")
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Opaque != "" || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || strings.Trim(u.Hostname(), ".") == "" {
+		return invalid("Website must be an http(s) link.")
+	}
+	if port := u.Port(); port != "" {
+		n, convErr := strconv.Atoi(port)
+		if convErr != nil || n < 1 || n > 65535 {
+			return invalid("Website must be an http(s) link.")
+		}
+	}
+	return nil
 }
 
 func (s *Service) Security(ctx context.Context, userID string) (model.AccountSecurity, error) {
@@ -324,56 +345,74 @@ func (s *Service) Security(ctx context.Context, userID string) (model.AccountSec
 	return out, nil
 }
 
-func (s *Service) SetPassword(ctx context.Context, userID, password string) error {
+// SetPassword replaces the password, revokes every existing session
+// (a stolen cookie must not survive the change), and returns a new
+// session for the caller who just set it.
+func (s *Service) SetPassword(ctx context.Context, userID, password string) (string, error) {
 	user, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if err := validatePassword(user.Username, password); err != nil {
-		return err
+		return "", err
 	}
 	hash, err := HashPassword(password)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return s.repo.UpsertPassword(ctx, userID, hash)
+	if err := s.repo.ReplacePassword(ctx, userID, hash); err != nil {
+		return "", err
+	}
+	return s.newSession(ctx, userID)
 }
 
 func (s *Service) RemovePassword(ctx context.Context, userID string) error {
-	creds, err := s.repo.ListCredentials(ctx, userID)
-	if err != nil {
-		return err
-	}
-	if len(creds) == 0 {
+	// The repository decides under a row lock. A check here, then a
+	// separate delete, lets two requests each see the other method and
+	// remove both.
+	err := s.repo.DeletePassword(ctx, userID)
+	if errors.Is(err, repository.ErrLastSignInMethod) {
 		return ErrLastSignInMethod
 	}
-	return s.repo.DeletePassword(ctx, userID)
+	return err
 }
 
 func (s *Service) RemovePasskey(ctx context.Context, userID, passkeyID string) error {
-	creds, err := s.repo.ListCredentials(ctx, userID)
-	if err != nil {
-		return err
-	}
-	has, err := s.repo.HasPassword(ctx, userID)
-	if err != nil {
-		return err
-	}
-	if len(creds) <= 1 && !has {
+	n, err := s.repo.DeleteCredential(ctx, passkeyID, userID)
+	if errors.Is(err, repository.ErrLastSignInMethod) {
 		return ErrLastSignInMethod
 	}
-	n, err := s.repo.DeleteCredential(ctx, passkeyID, userID)
 	if err != nil {
 		return err
 	}
 	if n == 0 {
-		return ErrNotFound
+		return model.ErrNotFound
 	}
 	return nil
 }
 
-// SetAvatar records a new profile picture (blob stored by the caller).
+// avatarKeyRE matches storage keys: a legacy UUID or a SHA-256 hex digest.
+// Anything else is a path, and must not be stored or opened.
+var avatarKeyRE = regexp.MustCompile(`^([a-f0-9-]{36}|[a-f0-9]{64})$`)
+
+func allowedAvatarType(contentType string) bool {
+	switch strings.ToLower(contentType) {
+	case "image/jpeg", "image/png", "image/gif", "image/webp", "image/avif":
+		return true
+	default:
+		return false
+	}
+}
+
+// SetAvatar records a profile picture the caller already stored. The key
+// and content type are not trusted: a path or a non-image type is rejected.
 func (s *Service) SetAvatar(ctx context.Context, userID, key, contentType string) error {
+	if key == "" && contentType == "" {
+		return s.repo.SetAvatar(ctx, userID, "", "")
+	}
+	if !avatarKeyRE.MatchString(key) || !allowedAvatarType(contentType) {
+		return invalid("Profile pictures must be an image (JPEG, PNG, GIF, WebP or AVIF).")
+	}
 	return s.repo.SetAvatar(ctx, userID, key, contentType)
 }
 
@@ -383,7 +422,7 @@ func (s *Service) SetAvatar(ctx context.Context, userID, key, contentType string
 // small file that is safe to serve at any size.
 func (s *Service) StoreAvatar(ctx context.Context, userID string, r io.Reader, _ string) error {
 	if s.media == nil {
-		return ErrNotFound
+		return model.ErrNotFound
 	}
 	data, err := io.ReadAll(r)
 	if err != nil {
@@ -410,9 +449,12 @@ func (s *Service) Avatar(ctx context.Context, userID string) (model.User, io.Rea
 	user, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil || user.AvatarKey == "" || s.media == nil {
 		if err == nil {
-			err = ErrNotFound
+			err = model.ErrNotFound
 		}
 		return user, nil, err
+	}
+	if !avatarKeyRE.MatchString(user.AvatarKey) || !allowedAvatarType(user.AvatarType) {
+		return user, nil, model.ErrNotFound
 	}
 	file, err := s.media.Open(ctx, user.AvatarKey)
 	if err != nil {
@@ -424,10 +466,19 @@ func (s *Service) Avatar(ctx context.Context, userID string) (model.User, io.Rea
 		return user, nil, err
 	}
 	if !avatarNeedsResize(data, user.AvatarType) {
+		if !allowedAvatarType(user.AvatarType) {
+			return user, nil, model.ErrNotFound
+		}
 		return user, io.NopCloser(bytes.NewReader(data)), nil
 	}
 	resized, err := resizedAvatarJPEG(ctx, data)
 	if err != nil {
+		// Only a real image type may pass through when it cannot be
+		// re-encoded. A stored text/html (or any other) type must not be
+		// served under the attacker's content type.
+		if !allowedAvatarType(user.AvatarType) {
+			return user, nil, model.ErrNotFound
+		}
 		return user, io.NopCloser(bytes.NewReader(data)), nil
 	}
 	user.AvatarType = "image/jpeg"
@@ -582,7 +633,14 @@ func (s *Service) RecoverAccount(ctx context.Context, username, recoveryKey, new
 		return model.User{}, "", "", err
 	}
 	stored, _, err := s.repo.GetRecoveryKey(ctx, user.ID)
-	if isNotFound(err) || !CheckRecoveryKey(recoveryKey, stored) {
+	if isNotFound(err) {
+		_ = CheckRecoveryKey(recoveryKey, RecoveryKeyHash("kura-unknown-user")) // equalize timing
+		return model.User{}, "", "", ErrInvalidCredentials
+	}
+	if err != nil {
+		return model.User{}, "", "", err
+	}
+	if !CheckRecoveryKey(recoveryKey, stored) {
 		return model.User{}, "", "", ErrInvalidCredentials
 	}
 	if err := validatePassword(user.Username, newPassword); err != nil {

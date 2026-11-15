@@ -10,7 +10,7 @@ import { api } from "../api/kura";
 import { queryKeys } from "../api/queryKeys";
 import { DEFAULT_PAGE_SIZE, pageOffset } from "../domain/paging";
 import type { ListDetail, Post, SearchPage } from "../types/api";
-import { invalidateSearch } from "./useBoardData";
+import { invalidatePostSurfaces, invalidateSearch } from "./useBoardData";
 
 function usePagedPosts(
   key: (offset: number, pageSize: number) => readonly unknown[],
@@ -125,6 +125,26 @@ export function useInvalidate() {
   };
 }
 
+function patchPostContainer(data: unknown, patchPost: (post: Post) => Post): unknown {
+  if (Array.isArray(data)) {
+    return data.map((item) =>
+      item && typeof item === "object" && "id" in item && "favorite_count" in item
+        ? patchPost(item as Post)
+        : item,
+    );
+  }
+  if (!data || typeof data !== "object") return data;
+  const record = data as Record<string, unknown>;
+  let changed = false;
+  const next: Record<string, unknown> = { ...record };
+  for (const key of ["posts", "items", "uploads"]) {
+    if (!Array.isArray(record[key])) continue;
+    next[key] = (record[key] as Post[]).map(patchPost);
+    changed = true;
+  }
+  return changed ? next : data;
+}
+
 export function useToggleFavorite() {
   const client = useQueryClient();
   const invalidate = useInvalidate();
@@ -170,6 +190,13 @@ export function useToggleFavorite() {
         if (!detail) continue;
         patch(key, { ...detail, items: detail.items.map(patchPost) });
       }
+      for (const prefix of ["post-related", "profile", "tag-page", "hidden-posts"] as const) {
+        for (const [key, data] of client.getQueriesData({ queryKey: [prefix] })) {
+          if (data == null) continue;
+          const next = patchPostContainer(data, patchPost);
+          if (next !== data) patch(key, next);
+        }
+      }
       return { touched };
     },
     onError: (_err, _vars, context) => {
@@ -177,8 +204,7 @@ export function useToggleFavorite() {
     },
     onSettled: (_data, _err, { postId }) => {
       invalidate();
-      void client.invalidateQueries({ queryKey: queryKeys.post(postId) });
-      void client.invalidateQueries({ queryKey: ["list"] });
+      invalidatePostSurfaces(client, postId);
     },
   });
 }

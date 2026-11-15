@@ -12,7 +12,7 @@ func NotFound(err error) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, model.ErrNotFound) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return model.ErrNotFound
 	}
 	return err

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { notificationPageSize } from "../api/notifications";
 import { shortError, useToasts } from "../components/Toasts";
 import { useMarkNotificationsRead, useNotifications } from "../hooks/useNotifications";
-import { useMe } from "../hooks/useKura";
+import { useMe } from "../hooks/useSession";
 import type { NotificationItem } from "../types/notification";
 import styles from "./NotificationsPage.module.css";
 

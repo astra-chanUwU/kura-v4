@@ -19,7 +19,6 @@ const (
 )
 
 var (
-	ErrNotFound  = errors.New("not found")
 	ErrForbidden = errors.New("forbidden")
 	tagCleanRE   = regexp.MustCompile(`[^a-z0-9_]+`)
 )
@@ -151,7 +150,7 @@ func (s *Service) RemoveAlias(ctx context.Context, actor model.User, targetRaw, 
 		return model.TagPage{}, err
 	}
 	if n == 0 {
-		return model.TagPage{}, ErrNotFound
+		return model.TagPage{}, model.ErrNotFound
 	}
 	return s.page(ctx, &actor, target)
 }
@@ -191,15 +190,20 @@ func (s *Service) page(ctx context.Context, viewer *model.User, tag string) (mod
 		return model.TagPage{}, err
 	}
 	implies, impliedBy := implicationSides(canonical, edges)
-	if !found && count == 0 && !isAlias && len(aliases) == 0 && len(implies) == 0 && len(impliedBy) == 0 {
-		return model.TagPage{}, ErrNotFound
-	}
 	posts, err := s.repo.RecentPosts(ctx, canonical, includeNSFW, exclude)
 	if err != nil {
 		return model.TagPage{}, err
 	}
-	if posts == nil {
-		posts = []model.Post{}
+	posts, removed := visibleTagPosts(posts, includeNSFW)
+	if removed > 0 {
+		if count < int64(removed) {
+			count = 0
+		} else {
+			count -= int64(removed)
+		}
+	}
+	if !found && count == 0 && !isAlias && len(aliases) == 0 && len(implies) == 0 && len(impliedBy) == 0 {
+		return model.TagPage{}, model.ErrNotFound
 	}
 	page := model.TagPage{
 		Tag: tag, Aliases: aliases, Implies: implies, ImpliedBy: impliedBy,
@@ -321,7 +325,7 @@ func (s *Service) RemoveImplication(ctx context.Context, actor model.User, antec
 		return model.TagPage{}, err
 	}
 	if n == 0 {
-		return model.TagPage{}, ErrNotFound
+		return model.TagPage{}, model.ErrNotFound
 	}
 	return s.page(ctx, &actor, antecedent)
 }
@@ -441,13 +445,33 @@ func (s *Service) suggestionForModerator(ctx context.Context, actor model.User, 
 		return model.TagSuggestion{}, ErrForbidden
 	}
 	current, err := s.repo.GetSuggestion(ctx, id)
-	if errors.Is(err, model.ErrNotFound) {
-		return model.TagSuggestion{}, ErrNotFound
-	}
 	if err != nil {
 		return model.TagSuggestion{}, err
 	}
+	// The author cannot accept or reject their own proposal, even as staff.
+	if actor.Username != "" && actor.Username == current.AuthorUsername {
+		return model.TagSuggestion{}, ErrForbidden
+	}
 	return current, nil
+}
+
+// visibleTagPosts drops posts the tag page must not show. Hidden and deleted
+// posts stay off the page for every viewer. NSFW needs an opt-in.
+func visibleTagPosts(posts []model.Post, includeNSFW bool) ([]model.Post, int) {
+	if len(posts) == 0 {
+		return []model.Post{}, 0
+	}
+	out := make([]model.Post, 0, len(posts))
+	for _, post := range posts {
+		if post.Hidden || post.Deleted {
+			continue
+		}
+		if post.Rating == "nsfw" && !includeNSFW {
+			continue
+		}
+		out = append(out, post)
+	}
+	return out, len(posts) - len(out)
 }
 
 func (s *Service) recordSuggestion(ctx context.Context, actor model.User, current model.TagSuggestion, status string) (model.TagSuggestion, error) {

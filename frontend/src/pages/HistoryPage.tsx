@@ -6,13 +6,9 @@ import { clampPage, pageCount, resolvePageSize } from "../domain/paging";
 import { ThemedSelect } from "../components/ThemedSelect";
 import { shortError, useToasts } from "../components/Toasts";
 import { atLeast } from "../domain/roles";
-import {
-  useDebouncedValue,
-  useHistoryActors,
-  useMe,
-  useRecentHistory,
-  useStaffActions,
-} from "../hooks/useKura";
+import { useDebouncedValue } from "../hooks/useBoardData";
+import { useMe } from "../hooks/useSession";
+import { useHistoryActors, useRecentHistory, useStaffActions } from "../hooks/useStaff";
 import { usePrefetchPage } from "../hooks/usePrefetchPage";
 import type { ChangeEntry, HistoryActor } from "../types/api";
 import { StaffSection } from "./StaffLayout";

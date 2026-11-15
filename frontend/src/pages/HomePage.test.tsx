@@ -41,9 +41,8 @@ vi.mock("@tanstack/react-router", async () => {
 });
 vi.mock("../hooks/usePrefetchPost", () => ({ usePrefetchPost: () => ({}) }));
 vi.mock("@tanstack/react-query", async () => {
-  const actual = await vi.importActual<typeof import("@tanstack/react-query")>(
-    "@tanstack/react-query",
-  );
+  const actual =
+    await vi.importActual<typeof import("@tanstack/react-query")>("@tanstack/react-query");
   return {
     ...actual,
     useQueryClient: () => ({ prefetchQuery: vi.fn() }),
@@ -53,29 +52,7 @@ vi.mock("../components/SavedSearches", () => ({
   SaveCurrentSearchButton: () => null,
   SavedSearchList: () => null,
 }));
-vi.mock("../hooks/useKura", () => ({
-  normalizeTagToken: (raw: string) =>
-    raw
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]+/g, "_")
-      .replace(/-/g, "_")
-      .replace(/^_+|_+$/g, ""),
-  tagTokens: (text: string) => [
-    ...new Set(
-      text
-        .split(/[\s,]+/)
-        .map((token) =>
-          token
-            .toLowerCase()
-            .replace(/[^a-z0-9_-]+/g, "_")
-            .replace(/-/g, "_")
-            .replace(/^_+|_+$/g, ""),
-        )
-        .filter(Boolean),
-    ),
-  ],
-  useDebouncedValue: (value: unknown) => value,
-  prefetchBoardPage: vi.fn(),
+vi.mock("../hooks/useSession", () => ({
   useMe: () => ({
     me: board.signedIn
       ? {
@@ -96,6 +73,10 @@ vi.mock("../hooks/useKura", () => ({
     signedIn: board.signedIn,
     error: null,
   }),
+}));
+vi.mock("../hooks/useBoardData", () => ({
+  useDebouncedValue: (value: unknown) => value,
+  prefetchBoardPage: vi.fn(),
   useBoard: (filter: { tags: string[]; exclude: string[]; q: string }) => {
     const active = filter.tags.length > 0 || filter.exclude.length > 0 || filter.q.trim() !== "";
     const posts = active
@@ -118,12 +99,13 @@ vi.mock("../hooks/useKura", () => ({
   },
   useTagSuggestions: () => ({ suggestions: [], loading: false }),
   useRandomPost: () => vi.fn(),
+}));
+vi.mock("../hooks/useCollections", () => ({
   useInvalidate: () => vi.fn(),
   useMyLists: () => ({ data: [] }),
   useToggleFavorite: () => ({ mutate: vi.fn(), isPending: false }),
   usePostActions: () => ({ upload: vi.fn(), addToList: vi.fn() }),
   useListActions: () => ({ createList: vi.fn() }),
-  duplicateOf: () => undefined,
 }));
 const mockUseSite = vi.mocked(useSite);
 

@@ -145,11 +145,11 @@ func TestDeleteIsScopedToOwner(t *testing.T) {
 	}}
 	svc := NewService(repo)
 	err := svc.Delete(context.Background(), "intruder", "s1")
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, err, model.ErrNotFound)
 	require.Len(t, repo.items["owner"], 1)
 	require.NoError(t, svc.Delete(context.Background(), "owner", "s1"))
 	require.Empty(t, repo.items["owner"])
-	require.ErrorIs(t, svc.Delete(context.Background(), "owner", "missing"), ErrNotFound)
+	require.ErrorIs(t, svc.Delete(context.Background(), "owner", "missing"), model.ErrNotFound)
 }
 
 func TestListEmptyIsNotNil(t *testing.T) {

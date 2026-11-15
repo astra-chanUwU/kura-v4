@@ -63,18 +63,16 @@ vi.mock("@tanstack/react-router", () => ({
   ),
 }));
 
-vi.mock("../hooks/useKura", async () => {
-  const actual = await vi.importActual<typeof import("../hooks/useKura")>("../hooks/useKura");
-  return {
-    useDebouncedValue: actual.useDebouncedValue,
-    useMe: () => ({ user: moderator }),
-    useHiddenPosts: (...args: unknown[]) => hoisted.useHiddenPosts(...args),
-    useStaffActions: () => ({
-      unhidePost: vi.fn(() => Promise.resolve()),
-      deletePost: vi.fn(() => Promise.resolve()),
-    }),
-  };
-});
+vi.mock("../hooks/useSession", () => ({
+  useMe: () => ({ user: moderator }),
+}));
+vi.mock("../hooks/useStaff", () => ({
+  useHiddenPosts: (...args: unknown[]) => hoisted.useHiddenPosts(...args),
+  useStaffActions: () => ({
+    unhidePost: vi.fn(() => Promise.resolve()),
+    deletePost: vi.fn(() => Promise.resolve()),
+  }),
+}));
 
 describe("HiddenPostsPage filters", () => {
   beforeEach(() => {
@@ -125,6 +123,15 @@ describe("HiddenPostsPage filters", () => {
     hoisted.useHiddenPosts.mockReturnValue(queue({ total: 1, posts: [removedPost] }));
     view.rerender(<HiddenPostsPage />);
     expect(screen.getByText("1 match")).toBeInTheDocument();
+  });
+
+  it("does not call a failed queue empty", () => {
+    hoisted.useHiddenPosts.mockReturnValue(
+      queue({ error: new Error("Could not load the queue."), isSuccess: false }),
+    );
+    render(<HiddenPostsPage />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not load the queue.");
+    expect(screen.queryByText("Nothing here. The board is fully visible.")).not.toBeInTheDocument();
   });
 
   it("keeps the fully visible copy when the queue is empty and unfiltered", () => {

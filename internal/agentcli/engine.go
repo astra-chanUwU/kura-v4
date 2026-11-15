@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/astra-chanUwU/kura-v4/internal/accounts"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
 )
 
@@ -87,7 +86,7 @@ func (e *Engine) actor(ctx context.Context) (*model.User, error) {
 		return nil, errors.New("accounts service is not available")
 	}
 	user, err := e.deps.Accounts.UserForSession(ctx, token)
-	if errors.Is(err, accounts.ErrNotFound) {
+	if errors.Is(err, model.ErrNotFound) {
 		return nil, ErrExpiredSession
 	}
 	if err != nil {

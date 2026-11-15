@@ -1,0 +1,372 @@
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 6rem 1rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.empty p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.emptyMark {
+  color: var(--accent);
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 1rem;
+  padding-top: 1rem;
+}
+/* Same track sizing as .grid, collapsed so column count can be measured
+   before posts exist (loading / empty) without affecting layout. */
+.gridProbe {
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  padding-top: 0;
+  margin: 0;
+}
+
+/* WaifuList-inspired board head: vertical centered stack
+   (search → controls → page-tag panel). Sticky as one block so the
+   tag panel is never covered by a separate sticky bar. */
+.boardHead {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 0 1rem;
+  background: var(--background);
+}
+/* Keep the gap under the tag panel inside the sticky box so pictures
+   don't slide under the border when the head sticks. */
+.boardHead:has(.tagPanel) {
+  padding-bottom: 1.25rem;
+}
+.boardHead:has(.tagPanel) + .grid,
+.boardHead:has(.tagPanel) + .rows {
+  padding-top: 0;
+}
+
+.searchRow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 36rem;
+}
+
+.controlsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.tagPanel {
+  width: 100%;
+  min-width: 0;
+}
+
+.searchMeta {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.chipRow {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.chip {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 0.8rem;
+}
+.chip button {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.9rem;
+}
+.chipExcluded {
+  border-color: var(--danger);
+  background: var(--surface);
+  color: var(--danger);
+  text-decoration: line-through;
+}
+/* Staged but not applied yet (Filter not pressed). */
+.chipPending {
+  border-style: dashed;
+  opacity: 0.75;
+}
+.filterControls {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.filterControls button {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+.filterControls button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Apply the typed query. Quiet until something is actually unapplied. */
+.filterControls .filterButton {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 650;
+}
+.filterControls .filterButton:hover {
+  background: var(--selection);
+}
+.filterControls .filterActive {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--background);
+  font-weight: 650;
+  box-shadow: 0 0 0 2px var(--selection);
+}
+.filterControls .filterActive:hover {
+  filter: brightness(1.06);
+}
+/* Drop the working filter. */
+.filterControls .clearButton {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border-strong));
+  color: var(--danger);
+  font-weight: 650;
+}
+.filterControls .clearButton:hover {
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface));
+}
+/* Jump back to the saved homepage seed. */
+.filterControls .defaultsButton {
+  border-color: var(--accent);
+  background: var(--selection);
+  color: var(--text);
+  font-weight: 650;
+}
+.filterControls .defaultsButton:hover {
+  background: color-mix(in srgb, var(--accent) 28%, var(--surface));
+}
+.chipExcluded button {
+  color: var(--danger);
+  text-decoration: none;
+}
+.searchBox {
+  position: relative;
+  width: 100%;
+}
+.searchBox input {
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--text);
+}
+.suggestions {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+}
+.suggestions button {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: 0.35rem;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-align: left;
+}
+.suggestions .suggestionActive {
+  background: var(--surface-soft);
+}
+.suggestionRow {
+  display: flex;
+  align-items: stretch;
+  gap: 0.15rem;
+  min-width: 0;
+}
+/* Higher specificity than `.suggestions button` (width: 100%): the tag
+   button takes the free space, + / - stay fixed-size squares. */
+.suggestions .suggestionMain {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  gap: 0.5rem;
+}
+.suggestions .suggestionSide {
+  flex: 0 0 1.9rem;
+  width: 1.9rem;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+}
+.suggestions .suggestionInclude {
+  color: var(--accent);
+}
+.suggestions .suggestionExclude {
+  color: var(--danger);
+}
+.suggestions .suggestionSide:hover {
+  background: var(--surface-soft);
+}
+.suggestionCount {
+  color: var(--muted);
+}
+
+/* Rows mode: one detail row per picture. */
+.rows {
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 1rem;
+}
+
+/* Large screens: keep tiles from becoming billboards. The grid stays
+   fluid inside each band; bands only raise the minimum tile size. */
+@media (min-width: 1601px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  }
+}
+@media (min-width: 2560px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+    gap: 1.25rem;
+  }
+}
+
+.sortGroup {
+  display: inline-flex;
+  flex-wrap: wrap;
+  row-gap: inherit;
+  max-width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
+  overflow: hidden;
+}
+.sortGroup button {
+  padding: 0.35rem 0.55rem;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.sortGroup button:last-child {
+  border-right: none;
+}
+.sortGroup button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.sortGroup button.viewActive {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.viewControls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.uploadButton {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.uploadButton:hover {
+  background: var(--surface-soft);
+}
+.uploadButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Tablet: keep the centered stack; tighten gaps. */
+@media (max-width: 900px) {
+  .searchRow {
+    max-width: none;
+  }
+  .controlsRow {
+    gap: 0.5rem;
+  }
+  .grid {
+    gap: 0.75rem;
+  }
+}
+
+/* Phone: keep a strip of pictures visible under the sticky head. */
+@media (max-width: 640px) {
+  .boardHead {
+    max-height: calc(100dvh - var(--header-h) - 7.5rem);
+    overflow-y: auto;
+  }
+}
+
+/* Phone: two thumbnails per row so search + Upload stay usable. */
+@media (max-width: 700px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+  .uploadButton {
+    min-height: 2.5rem;
+    padding: 0.5rem 0.85rem;
+  }
+}

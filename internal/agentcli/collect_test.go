@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/astra-chanUwU/kura-v4/internal/accounts"
+	"github.com/astra-chanUwU/kura-v4/internal/collections"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
 	"github.com/stretchr/testify/require"
 )
@@ -150,7 +150,7 @@ func (s *stubAccounts) UserForSession(_ context.Context, token string) (model.Us
 	if token == s.token {
 		return s.user, nil
 	}
-	return model.User{}, accounts.ErrNotFound
+	return model.User{}, model.ErrNotFound
 }
 
 func (s *stubAccounts) Logout(context.Context, string) error {
@@ -163,7 +163,7 @@ func (s *stubAccounts) GetByUsername(_ context.Context, username string) (model.
 	}
 	user, ok := s.byName[username]
 	if !ok {
-		return model.User{}, accounts.ErrNotFound
+		return model.User{}, model.ErrNotFound
 	}
 	return user, nil
 }
@@ -190,6 +190,8 @@ type stubCollections struct {
 	addOwner  string
 	addList   string
 	addPost   string
+	addErr    error
+	getErr    error
 }
 
 func (s *stubCollections) Favorite(_ context.Context, userID, postID string) error {
@@ -243,6 +245,9 @@ func (s *stubCollections) GetList(_ context.Context, viewerID *string, id string
 	} else {
 		s.exclude = append([]string{}, exclude...)
 	}
+	if s.getErr != nil {
+		return model.ListDetail{}, s.getErr
+	}
 	return model.ListDetail{List: model.List{ID: id}, Items: []model.Post{}}, nil
 }
 
@@ -251,7 +256,7 @@ func (s *stubCollections) AddItem(_ context.Context, ownerID, listID, postID str
 	s.addOwner = ownerID
 	s.addList = listID
 	s.addPost = postID
-	return nil
+	return s.addErr
 }
 
 func (s *stubCollections) RemoveItem(context.Context, string, string, string) error {
@@ -275,4 +280,25 @@ func TestListsGetPassesExcludeTags(t *testing.T) {
 	require.Equal(t, 0, code)
 	require.NotNil(t, cols.exclude)
 	require.Empty(t, cols.exclude)
+}
+
+func TestListsAddNotYoursMatchesSite(t *testing.T) {
+	user := model.User{ID: "user-1", Username: "ada", Role: model.RoleMember}
+	accounts, opt := signedIn(t, user)
+	cols := &stubCollections{addErr: collections.ErrForbidden}
+	code, env := execAgent(t, Deps{Accounts: accounts, Collections: cols}, []string{"lists", "add", "list-1", "post-9"}, opt)
+	require.Equal(t, 1, code)
+	require.Equal(t, "forbidden", env.Error.Code)
+	require.Equal(t, "That's not yours.", env.Error.Message)
+	require.True(t, cols.addCalled)
+}
+
+func TestListsGetMissingIsNotFound(t *testing.T) {
+	cols := &stubCollections{getErr: model.ErrNotFound}
+	opt := Options{SessionPath: filepath.Join(t.TempDir(), "session")}
+	code, env := execAgent(t, Deps{Collections: cols}, []string{"lists", "get", "missing"}, opt)
+	require.Equal(t, 1, code)
+	require.Equal(t, "not_found", env.Error.Code)
+	require.Equal(t, "Not found.", env.Error.Message)
+	require.Nil(t, env.Data)
 }

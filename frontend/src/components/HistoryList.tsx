@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { diffStates } from "../domain/historyDiff";
 import type { ChangeEntry } from "../types/api";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { IconUndo } from "./icons";
 import styles from "./HistoryList.module.css";
 
@@ -48,6 +49,7 @@ export function HistoryList({
   busyId?: string;
   showThumbnails?: boolean;
 }) {
+  const [pending, setPending] = useState<ChangeEntry | null>(null);
   if (entries.length === 0) return <p className={styles.muted}>No changes recorded yet.</p>;
   return (
     <>
@@ -108,7 +110,7 @@ export function HistoryList({
                     type="button"
                     className={styles.rollback}
                     disabled={busyId === entry.id}
-                    onClick={() => onRollback(entry)}
+                    onClick={() => setPending(entry)}
                   >
                     <IconUndo /> {busyId === entry.id ? "Rolling back…" : "Roll back"}
                   </button>
@@ -140,6 +142,19 @@ export function HistoryList({
           </li>
         ))}
       </ol>
+      <ConfirmDialog
+        open={pending !== null}
+        title="Roll back this change?"
+        message="This writes a new history entry that undoes it. The original entry stays in the log."
+        confirmLabel="Roll back"
+        destructive
+        onCancel={() => setPending(null)}
+        onConfirm={() => {
+          const entry = pending;
+          setPending(null);
+          if (entry) onRollback?.(entry);
+        }}
+      />
     </>
   );
 }

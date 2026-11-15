@@ -4,11 +4,11 @@ import type { BoardSearch } from "../domain/boardFilter";
 import type { Post } from "../types/api";
 import {
   useListActions,
-  useMe,
   useMyLists,
   usePostActions,
   useToggleFavorite,
-} from "../hooks/useKura";
+} from "../hooks/useCollections";
+import { useMe } from "../hooks/useSession";
 import { usePrefetchPost } from "../hooks/usePrefetchPost";
 import { IconHeart, IconList } from "./icons";
 import { VisibilityToggle } from "./VisibilityToggle";
@@ -218,7 +218,11 @@ export function PostCard({
       >
         <img src={post.thumbnail_url} alt="" loading="lazy" />
       </Link>
-      {post.rating === "nsfw" && <span className={styles.nsfwBadge}>NSFW</span>}
+      {post.rating === "nsfw" && (
+        <span className={styles.nsfwBadge} data-nsfw-badge="">
+          NSFW
+        </span>
+      )}
       <PostActions post={post} compact />
     </article>
   );

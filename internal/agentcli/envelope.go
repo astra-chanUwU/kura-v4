@@ -11,6 +11,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/board"
 	"github.com/astra-chanUwU/kura-v4/internal/collections"
 	"github.com/astra-chanUwU/kura-v4/internal/comments"
+	"github.com/astra-chanUwU/kura-v4/internal/model"
 	"github.com/astra-chanUwU/kura-v4/internal/moderation"
 	"github.com/astra-chanUwU/kura-v4/internal/reports"
 	"github.com/astra-chanUwU/kura-v4/internal/tags"
@@ -112,9 +113,11 @@ func classify(err error) (code, message string, unexpected bool) {
 		return "unauthenticated", "That session expired. Sign in again with `kura agent login`.", false
 	case errors.Is(err, accounts.ErrInvalidCredentials):
 		return "unauthenticated", "That username and sign-in didn't match. Check it and try again.", false
-	case errors.Is(err, moderation.ErrForbidden), errors.Is(err, collections.ErrForbidden), errors.Is(err, tags.ErrForbidden), errors.Is(err, comments.ErrForbidden), errors.Is(err, reports.ErrForbidden):
+	case errors.Is(err, collections.ErrForbidden):
+		return "forbidden", "That's not yours.", false
+	case errors.Is(err, moderation.ErrForbidden), errors.Is(err, tags.ErrForbidden), errors.Is(err, comments.ErrForbidden), errors.Is(err, reports.ErrForbidden):
 		return "forbidden", "You don't have permission to do that.", false
-	case errors.Is(err, accounts.ErrNotFound), errors.Is(err, board.ErrNotFound), errors.Is(err, collections.ErrNotFound), errors.Is(err, moderation.ErrNotFound), errors.Is(err, tags.ErrNotFound), errors.Is(err, comments.ErrNotFound), errors.Is(err, reports.ErrNotFound):
+	case errors.Is(err, model.ErrNotFound):
 		return "not_found", "Not found.", false
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		return "canceled", "The command was canceled.", false

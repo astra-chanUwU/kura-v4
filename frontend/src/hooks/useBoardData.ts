@@ -2,18 +2,29 @@ import { keepPreviousData, useQuery, type QueryClient } from "@tanstack/react-qu
 import { useEffect, useState } from "react";
 import { api } from "../api/kura";
 import { queryKeys } from "../api/queryKeys";
-import {
-  isFilterActive,
-  splitTagInput,
-  type BoardFilter,
-  type Neighbors,
-} from "../domain/boardFilter";
+import { isFilterActive, type BoardFilter, type Neighbors } from "../domain/boardFilter";
 import { DEFAULT_PAGE_SIZE, pageOffset } from "../domain/paging";
 
 export function invalidateSearch(client: QueryClient) {
   void client.invalidateQueries({ queryKey: ["board"] });
   void client.invalidateQueries({ queryKey: ["tag-suggestions"] });
   void client.invalidateQueries({ queryKey: ["neighbors"] });
+}
+
+/** Every cache that renders this post, so a favorite, comment, hide, or
+ * delete on one screen does not leave the others stale. */
+export function invalidatePostSurfaces(client: QueryClient, postId: string) {
+  invalidateSearch(client);
+  void client.invalidateQueries({ queryKey: queryKeys.post(postId) });
+  void client.invalidateQueries({ queryKey: queryKeys.comments(postId) });
+  void client.invalidateQueries({ queryKey: queryKeys.postHistory(postId) });
+  void client.invalidateQueries({ queryKey: ["favorites"] });
+  void client.invalidateQueries({ queryKey: ["my-posts"] });
+  void client.invalidateQueries({ queryKey: ["list"] });
+  void client.invalidateQueries({ queryKey: ["profile"] });
+  void client.invalidateQueries({ queryKey: ["post-related"] });
+  void client.invalidateQueries({ queryKey: ["tag-page"] });
+  void client.invalidateQueries({ queryKey: ["hidden-posts"] });
 }
 
 /** Prefetch one board page with the same key/fn as useBoard. */
@@ -82,11 +93,6 @@ export function useDebouncedValue<T>(value: T, delay = 200): T {
     return () => clearTimeout(timer);
   }, [value, delay]);
   return debounced;
-}
-
-export function tagTokens(text: string): string[] {
-  const { include, exclude } = splitTagInput(text);
-  return [...new Set([...include, ...exclude])];
 }
 
 export function usePost(id: string) {

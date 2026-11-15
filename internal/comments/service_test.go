@@ -143,9 +143,9 @@ func TestNSFWHiddenWithoutShowNSFW(t *testing.T) {
 	svc := NewService(repo)
 	viewer := member("mem")
 	_, err := svc.List(context.Background(), &viewer, "p1", 0, 0)
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, err, model.ErrNotFound)
 	_, err = svc.Create(context.Background(), viewer, "p1", "nope")
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, err, model.ErrNotFound)
 
 	viewer.ShowNSFW = true
 	page, err := svc.List(context.Background(), &viewer, "p1", 0, 0)
@@ -161,7 +161,7 @@ func TestHiddenPostVisibility(t *testing.T) {
 		svc := NewService(repo)
 		memberViewer := member("mem")
 		_, err := svc.List(context.Background(), &memberViewer, "p1", 0, 0)
-		require.ErrorIs(t, err, ErrNotFound)
+		require.ErrorIs(t, err, model.ErrNotFound)
 
 		owner := member("owner")
 		page, err := svc.List(context.Background(), &owner, "p1", 0, 0)
@@ -229,14 +229,14 @@ func TestListInvisiblePostNotFound(t *testing.T) {
 	repo := seed(model.CommentPostAccess{OwnerID: "owner", Rating: "sfw", Hidden: true})
 	viewer := member("mem")
 	_, err := NewService(repo).List(context.Background(), &viewer, "p1", 0, 0)
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, err, model.ErrNotFound)
 
 	missing := &fakeRepo{accessErr: model.ErrNotFound}
 	_, err = NewService(missing).List(context.Background(), nil, "missing", 0, 0)
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, err, model.ErrNotFound)
 
 	hidden := seed(model.CommentPostAccess{OwnerID: "owner", Rating: "nsfw", Hidden: true})
 	err = NewService(hidden).Delete(context.Background(), model.User{ID: "mod", Role: model.RoleModerator}, "c1")
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, err, model.ErrNotFound)
 	require.Empty(t, hidden.deleted)
 }

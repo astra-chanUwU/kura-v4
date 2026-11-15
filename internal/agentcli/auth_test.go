@@ -88,7 +88,7 @@ func TestWhoamiExpiredSession(t *testing.T) {
 	require.NoError(t, SaveSession(path, "expired-token"))
 	acc := &authAccounts{
 		session: func(ctx context.Context, token string) (model.User, error) {
-			return model.User{}, accounts.ErrNotFound
+			return model.User{}, model.ErrNotFound
 		},
 	}
 	code, env, _ := authRun(t, Deps{Accounts: acc}, []string{"whoami"}, path)

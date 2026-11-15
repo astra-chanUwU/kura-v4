@@ -41,6 +41,23 @@ func TestReportsCreateRequiresMember(t *testing.T) {
 	require.Equal(t, "reports.create", env.Command)
 }
 
+func TestReportsListUsageAndRole(t *testing.T) {
+	session, accounts := postsSession(t, model.RoleMember)
+	code, env, _ := postsRun(t, Deps{Accounts: accounts, Reports: &fakeReports{}}, []string{"reports", "list"}, session)
+	require.Equal(t, 1, code)
+	require.Equal(t, "forbidden", env.Error.Code)
+
+	session, accounts = postsSession(t, model.RoleModerator)
+	code, env, _ = postsRun(t, Deps{Accounts: accounts, Reports: &fakeReports{}}, []string{"reports", "list", "extra"}, session)
+	require.Equal(t, 2, code)
+	require.Equal(t, "usage", env.Error.Code)
+
+	code, env, _ = postsRun(t, Deps{Accounts: accounts, Reports: &fakeReports{}}, []string{"reports", "list", "--limit", "0"}, session)
+	require.Equal(t, 2, code)
+	require.Equal(t, "usage", env.Error.Code)
+	require.Equal(t, "reports.list", env.Command)
+}
+
 func TestReportsDismissRequiresModerator(t *testing.T) {
 	session, accounts := postsSession(t, model.RoleMember)
 	code, env, _ := postsRun(t, Deps{Accounts: accounts, Reports: &fakeReports{}}, []string{"reports", "dismiss", "r1"}, session)

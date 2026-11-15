@@ -29,9 +29,9 @@
   --surface: #ffffff;
   --surface-soft: #dcebfb;
   --text: #17283c;
-  --muted: #56708c;
+  --muted: #516984;
   --accent: #0b6bcb;
-  --accent-soft: #c2437e;
+  --accent-soft: #ba4079;
   --border: #bcd2ee;
   --border-strong: #8fb0da;
   --danger: #c1272d;
@@ -184,7 +184,7 @@
   --surface: #313244;
   --surface-soft: #45475a;
   --text: #cdd6f4;
-  --muted: #a6adc8;
+  --muted: #b1b7cf;
   --accent: #cba6f7;
   --accent-soft: #f5c2e7;
   --border: #45475a;
@@ -202,9 +202,9 @@
   --surface: #ffffff;
   --surface-soft: #eef4fb;
   --text: #222222;
-  --muted: #6c757d;
-  --accent: #0075f8;
-  --accent-soft: #d6336c;
+  --muted: #687078;
+  --accent: #0069df;
+  --accent-soft: #cd3168;
   --border: #d9e2ec;
   --border-strong: #a8bdd1;
   --danger: #c1272d;
@@ -216,6 +216,13 @@
 @media (max-width: 640px) {
   :root {
     --header-h: 3.5rem;
+  }
+}
+
+/* Theme and font pickers wrap onto a second header row. */
+@media (max-width: 420px) {
+  :root {
+    --header-h: 6.5rem;
   }
 }
 

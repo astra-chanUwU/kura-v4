@@ -72,14 +72,10 @@
     font-size: 1.3rem;
   }
   .tabs {
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .tabs::-webkit-scrollbar {
-    display: none;
+    flex-wrap: wrap;
+    row-gap: 0.15rem;
   }
   .tabs a {
-    flex: none;
     padding: 0.55rem 0.7rem;
   }
 }

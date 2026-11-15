@@ -184,7 +184,7 @@ func writeTagError(c fiber.Ctx, err error) error {
 	switch {
 	case errors.As(err, &vErr):
 		return fiber.NewError(400, vErr.Message)
-	case errors.Is(err, tags.ErrNotFound):
+	case errors.Is(err, model.ErrNotFound):
 		return fiber.NewError(404, "Not found.")
 	case errors.Is(err, tags.ErrForbidden):
 		return fiber.NewError(403, "You don't have permission to do that.")

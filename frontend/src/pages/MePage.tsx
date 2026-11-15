@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
   IconCamera,
   IconHeart,
@@ -16,17 +17,16 @@ import { RecoveryKeyPanel } from "../components/RecoveryKeyPanel";
 import { SavedSearchList } from "../components/SavedSearches";
 import { ShareProfileButton } from "../components/ShareProfileButton";
 import { shortError, useToasts } from "../components/Toasts";
+// oxlint-disable-next-line no-restricted-imports -- browser capability check, not an API call
+import { passkeysSupported } from "../api/webauthn";
 import {
-  passkeysSupported,
-  useAccountActions,
-  useAuthActions,
   useFavorites,
   useInvalidate,
   useListActions,
-  useMe,
   useMyLists,
   useMyPosts,
-} from "../hooks/useKura";
+} from "../hooks/useCollections";
+import { useAccountActions, useAuthActions, useMe } from "../hooks/useSession";
 import { mergeTagEdit, sameTagSet, splitTagInput } from "../domain/boardFilter";
 import { clampPage, clampPostsPerPage, pageCount, resolvePageSize } from "../domain/paging";
 import { usePrefetchPage } from "../hooks/usePrefetchPage";
@@ -75,6 +75,9 @@ export function MePage() {
     if (name === "favorites") setFavoritesPage(1);
   };
   const [listFilter, setListFilter] = useState("");
+  const [pendingSecurity, setPendingSecurity] = useState<
+    null | { kind: "password" } | { kind: "passkey"; id: string; name: string }
+  >(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -179,13 +182,16 @@ export function MePage() {
   const appearanceDirty =
     (themeDraft !== null && normalizeTheme(themeDraft) !== savedTheme) ||
     (fontDraft !== null && normalizeFont(fontDraft) !== savedFont) ||
-    (postsPerPageDraft !== null &&
-      clampPostsPerPage(postsPerPageDraft) !== savedPostsPerPage);
+    (postsPerPageDraft !== null && clampPostsPerPage(postsPerPageDraft) !== savedPostsPerPage);
   const savedIncludeTags = preferences.default_include_tags ?? [];
   const savedExcludeTags = preferences.default_exclude_tags ?? [];
   const tagsDirty =
     (includeDraft !== null && !sameTagSet(includeDraft, savedIncludeTags)) ||
     (excludeDraft !== null && !sameTagSet(excludeDraft, savedExcludeTags));
+  const myListItems = myLists.data ?? [];
+  const shownLists = myListItems.filter((list) =>
+    list.title.toLowerCase().includes(listFilter.trim().toLowerCase()),
+  );
   const stageTags = (kind: "include" | "exclude", raw: string) => {
     const next = mergeTagEdit(
       kind,
@@ -718,21 +724,33 @@ export function MePage() {
             />
           )}
           <div>
-            {(myLists.data ?? [])
-              .filter((list) => list.title.toLowerCase().includes(listFilter.trim().toLowerCase()))
-              .map((list) => (
-                <div key={list.id} className={styles.listRow}>
-                  <span>
-                    <Link to="/lists/$id" params={{ id: list.id }}>
-                      {list.title}
-                    </Link>{" "}
-                    <span className={styles.muted}>
-                      {list.visibility} · {list.item_count} pictures
-                    </span>
+            {shownLists.map((list) => (
+              <div key={list.id} className={styles.listRow}>
+                <span>
+                  <Link to="/lists/$id" params={{ id: list.id }}>
+                    {list.title}
+                  </Link>{" "}
+                  <span className={styles.muted}>
+                    {list.visibility} · {list.item_count} pictures
                   </span>
-                </div>
-              ))}
-            {(myLists.data ?? []).length === 0 && <p className={styles.muted}>No lists yet.</p>}
+                </span>
+              </div>
+            ))}
+            {myLists.isPending && <p className={styles.muted}>Loading…</p>}
+            {myLists.isError && (
+              <p role="alert" className={styles.error}>
+                {shortError(myLists.error)}
+              </p>
+            )}
+            {!myLists.isPending && !myLists.isError && myListItems.length === 0 && (
+              <p className={styles.muted}>No lists yet.</p>
+            )}
+            {!myLists.isPending &&
+              !myLists.isError &&
+              myListItems.length > 0 &&
+              shownLists.length === 0 && (
+                <p className={styles.muted}>No lists match “{listFilter.trim()}”.</p>
+              )}
           </div>
         </div>
       )}
@@ -825,7 +843,9 @@ export function MePage() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => run(account.removePasskey(key.id), "Passkey removed.")}
+                  onClick={() =>
+                    setPendingSecurity({ kind: "passkey", id: key.id, name: key.name })
+                  }
                 >
                   Remove
                 </button>
@@ -873,10 +893,7 @@ export function MePage() {
             </form>
             {security.has_password && (
               <div className={styles.actions}>
-                <button
-                  type="button"
-                  onClick={() => run(account.removePassword(), "Password removed.")}
-                >
+                <button type="button" onClick={() => setPendingSecurity({ kind: "password" })}>
                   Remove password
                 </button>
               </div>
@@ -945,6 +962,29 @@ export function MePage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={pendingSecurity !== null}
+        title={
+          pendingSecurity?.kind === "password" ? "Remove your password?" : "Remove this passkey?"
+        }
+        message={
+          pendingSecurity?.kind === "password"
+            ? "You will sign in with a passkey or recovery key after this. Kura keeps at least one way in."
+            : pendingSecurity?.kind === "passkey"
+              ? `Remove “${pendingSecurity.name}”? You can add it again from this page.`
+              : ""
+        }
+        confirmLabel={pendingSecurity?.kind === "password" ? "Remove password" : "Remove passkey"}
+        destructive
+        onCancel={() => setPendingSecurity(null)}
+        onConfirm={() => {
+          const pending = pendingSecurity;
+          setPendingSecurity(null);
+          if (!pending) return;
+          if (pending.kind === "password") run(account.removePassword(), "Password removed.");
+          else run(account.removePasskey(pending.id), "Passkey removed.");
+        }}
+      />
     </section>
   );
 }

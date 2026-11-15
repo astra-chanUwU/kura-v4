@@ -8,10 +8,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/model"
 )
 
-var (
-	ErrNotFound  = errors.New("not found")
-	ErrForbidden = errors.New("not yours")
-)
+var ErrForbidden = errors.New("not yours")
 
 type ValidationError struct{ Message string }
 
@@ -59,10 +56,10 @@ func (s *Service) Favorites(ctx context.Context, userID string, includeNSFW bool
 	if err != nil {
 		return model.SearchPage{}, err
 	}
-	if posts == nil {
-		posts = []model.Post{}
-	}
-	return model.SearchPage{Total: total, Posts: posts}, nil
+	posts, removed := keepPosts(posts, func(post model.Post) bool {
+		return favoriteVisible(post, userID, includeNSFW)
+	})
+	return model.SearchPage{Total: subtractRemoved(total, removed), Posts: posts}, nil
 }
 func (s *Service) FavoriteIDs(ctx context.Context, userID string) (map[string]bool, error) {
 	ids, err := s.repo.FavoriteIDs(ctx, userID)
@@ -107,14 +104,11 @@ func (s *Service) PublicLists(ctx context.Context, ownerID string) ([]model.List
 // GetList enforces visibility: private lists are only visible to their owner.
 func (s *Service) GetList(ctx context.Context, viewerID *string, id string, includeNSFW bool, exclude []string, limit, offset int) (model.ListDetail, error) {
 	list, err := s.repo.GetList(ctx, id)
-	if errors.Is(err, model.ErrNotFound) {
-		return model.ListDetail{}, ErrNotFound
-	}
 	if err != nil {
 		return model.ListDetail{}, err
 	}
 	if list.Visibility != "public" && (viewerID == nil || *viewerID != list.OwnerID) {
-		return model.ListDetail{}, ErrNotFound // do not leak that a private list exists
+		return model.ListDetail{}, model.ErrNotFound // do not leak that a private list exists
 	}
 	// The owner still sees posts they filed that were later hidden. Everyone
 	// else gets the public board's rule: hidden posts are not in the list.
@@ -128,27 +122,32 @@ func (s *Service) GetList(ctx context.Context, viewerID *string, id string, incl
 		return model.ListDetail{}, err
 	}
 	items, err := s.repo.ListItems(ctx, id, includeNSFW, ownerView, exclude, lim, off)
-	if items == nil {
-		items = []model.Post{}
+	if err != nil {
+		return model.ListDetail{}, err
 	}
+	items, removed := keepPosts(items, func(post model.Post) bool {
+		return listPostVisible(post, includeNSFW, ownerView)
+	})
+	total = subtractRemoved(total, removed)
 	if !ownerView {
 		list.ItemCount = total
 	}
-	return model.ListDetail{List: list, Items: items, Total: total}, err
+	return model.ListDetail{List: list, Items: items, Total: total}, nil
 }
 
 func (s *Service) ownedList(ctx context.Context, ownerID, id string) (model.List, error) {
 	list, err := s.repo.GetList(ctx, id)
-	if errors.Is(err, model.ErrNotFound) {
-		return model.List{}, ErrNotFound
-	}
 	if err != nil {
 		return model.List{}, err
 	}
-	if list.OwnerID != ownerID {
-		return model.List{}, ErrForbidden
+	if list.OwnerID == ownerID {
+		return list, nil
 	}
-	return list, nil
+	// A private list must look missing. "Not yours" would confirm it exists.
+	if list.Visibility != "public" {
+		return model.List{}, model.ErrNotFound
+	}
+	return model.List{}, ErrForbidden
 }
 
 func (s *Service) UpdateList(ctx context.Context, ownerID, id, title, desc, vis string) (model.List, error) {
@@ -159,11 +158,7 @@ func (s *Service) UpdateList(ctx context.Context, ownerID, id, title, desc, vis 
 	if err != nil {
 		return model.List{}, err
 	}
-	updated, err := s.repo.UpdateList(ctx, id, ownerID, title, desc, vis)
-	if errors.Is(err, model.ErrNotFound) {
-		return model.List{}, ErrNotFound
-	}
-	return updated, err
+	return s.repo.UpdateList(ctx, id, ownerID, title, desc, vis)
 }
 
 func (s *Service) DeleteList(ctx context.Context, ownerID, id string) error {
@@ -172,7 +167,7 @@ func (s *Service) DeleteList(ctx context.Context, ownerID, id string) error {
 		return err
 	}
 	if n == 0 {
-		return ErrNotFound
+		return model.ErrNotFound
 	}
 	return nil
 }
@@ -266,4 +261,52 @@ func (s *Service) MoveItem(ctx context.Context, ownerID, listID, postID, afterID
 	next = append(next, postID)
 	next = append(next, rest[insert:]...)
 	return s.repo.Reorder(ctx, listID, next)
+}
+
+// favoriteVisible keeps a favorite the viewer is allowed to see. NSFW needs
+// the opt-in. A hidden or deleted post stays only when this viewer owns it.
+func favoriteVisible(post model.Post, viewerID string, includeNSFW bool) bool {
+	if post.Rating == "nsfw" && !includeNSFW {
+		return false
+	}
+	if !post.Hidden && !post.Deleted {
+		return true
+	}
+	return post.OwnerID != nil && *post.OwnerID == viewerID
+}
+
+// listPostVisible applies the same gate to a list. The list owner still sees
+// posts they filed that were later hidden or deleted.
+func listPostVisible(post model.Post, includeNSFW, includeHidden bool) bool {
+	if post.Rating == "nsfw" && !includeNSFW {
+		return false
+	}
+	if post.Hidden || post.Deleted {
+		return includeHidden
+	}
+	return true
+}
+
+func keepPosts(posts []model.Post, keep func(model.Post) bool) ([]model.Post, int) {
+	if len(posts) == 0 {
+		return []model.Post{}, 0
+	}
+	out := make([]model.Post, 0, len(posts))
+	for _, post := range posts {
+		if keep(post) {
+			out = append(out, post)
+		}
+	}
+	return out, len(posts) - len(out)
+}
+
+func subtractRemoved(total int64, removed int) int64 {
+	if removed <= 0 {
+		return total
+	}
+	n := int64(removed)
+	if total < n {
+		return 0
+	}
+	return total - n
 }

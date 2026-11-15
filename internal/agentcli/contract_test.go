@@ -39,6 +39,17 @@ func TestCatalogRoles(t *testing.T) {
 	require.Contains(t, names, "comments.delete")
 	require.Contains(t, names, "users.role")
 	require.Contains(t, names, "history.rollback")
+	require.NotContains(t, names, "promote")
+	require.NotContains(t, names, "backup")
+	for _, banned := range []string{"promote", "backup"} {
+		var buf bytes.Buffer
+		code := Execute(context.Background(), Deps{}, []string{banned}, &buf, Options{SessionPath: filepath.Join(t.TempDir(), "none")})
+		require.Equal(t, 2, code, banned)
+		var env Envelope
+		require.NoError(t, json.Unmarshal(buf.Bytes(), &env))
+		require.Equal(t, "usage", env.Error.Code)
+		require.NotContains(t, buf.String(), "token")
+	}
 
 	visitor := Allowed("visitor")
 	for _, cmd := range visitor {

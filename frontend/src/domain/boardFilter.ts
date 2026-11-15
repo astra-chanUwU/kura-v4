@@ -71,6 +71,12 @@ export function splitTagInput(text: string): { include: string[]; exclude: strin
   return { include: include.filter((tag) => !seenEx.has(tag)), exclude };
 }
 
+/** Normalized tokens from one tag line, required and excluded together. */
+export function tagTokens(text: string): string[] {
+  const { include, exclude } = splitTagInput(text);
+  return [...new Set([...include, ...exclude])];
+}
+
 /** Saved default lists: at most one home per tag, and the edited list wins. */
 export function mergeTagEdit(
   kind: "include" | "exclude",

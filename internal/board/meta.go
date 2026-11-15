@@ -49,7 +49,7 @@ func (s *Service) setMeta(ctx context.Context, actor *model.User, id, artist str
 	if err != nil {
 		return model.Post{}, err
 	}
-	post.Tags, err = s.applyImplications(ctx, post.Tags)
+	post.Tags, artistTag, err = s.rewriteTags(ctx, post.Tags, artistTag)
 	if err != nil {
 		return model.Post{}, err
 	}
@@ -75,23 +75,87 @@ func (s *Service) setMeta(ctx context.Context, actor *model.User, id, artist str
 	return post, nil
 }
 
-func (s *Service) applyImplications(ctx context.Context, tags []string) ([]string, error) {
-	if len(tags) == 0 {
-		return tags, nil
+// rewriteTags is the tag closure for a save. Aliases and implications are
+// one relation: an implied name that is itself an alias is stored as the
+// canonical tag, and that canonical tag's own implications are included.
+// artistTag is the credit attached just before this call. It stays on the
+// post even when the walk starts from the member's other tags.
+func (s *Service) rewriteTags(ctx context.Context, tags []string, artistTag string) ([]string, string, error) {
+	if tags == nil {
+		tags = []string{}
 	}
 	edges, err := s.repo.ListImplications(ctx)
-	if err != nil || len(edges) == 0 {
-		if tags == nil {
-			tags = []string{}
-		}
-		return tags, err
+	if err != nil {
+		return nil, "", err
 	}
-	return closeImplications(tags, edges), nil
+	if len(edges) == 0 {
+		return tags, artistTag, nil
+	}
+	names := make([]string, 0, len(tags)+len(edges)*2+1)
+	names = append(names, tags...)
+	if artistTag != "" {
+		names = append(names, artistTag)
+	}
+	for _, edge := range edges {
+		names = append(names, edge.Antecedent, edge.Consequent)
+	}
+	mapped, err := s.repo.TagAliasTargets(ctx, names)
+	if err != nil {
+		return nil, "", err
+	}
+	if artistTag != "" {
+		artistTag = aliasOrToken(artistTag, mapped)
+	}
+	input := tags
+	if artistTag != "" && !tagPresent(input, artistTag) {
+		input = append(append([]string{}, tags...), artistTag)
+	}
+	out := closeWithAliases(input, mapped, edges)
+	if artistTag != "" && !tagPresent(out, artistTag) {
+		out = append(out, artistTag)
+		sort.Strings(out)
+	}
+	if out == nil {
+		out = []string{}
+	}
+	return out, artistTag, nil
 }
 
-// closeImplications adds every tag implied by names. The walk lives with the other tag rules.
-func closeImplications(names []string, edges []model.TagImplication) []string {
-	return model.CloseImplications(names, edges)
+// closeWithAliases adds every implied tag and stores alias names as their
+// canonical tags. An implication written on an alias follows the canonical
+// tag, so grey_hair -> long_hair still applies after grey_hair becomes gray_hair.
+func closeWithAliases(tags []string, aliases map[string]string, edges []model.TagImplication) []string {
+	canon := func(tag string) string {
+		return aliasOrToken(tag, aliases)
+	}
+	next := map[string][]string{}
+	for _, edge := range edges {
+		from := canon(edge.Antecedent)
+		to := canon(edge.Consequent)
+		if from == "" || to == "" || from == to {
+			continue
+		}
+		next[from] = append(next[from], to)
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(tags))
+	var walk func(string)
+	walk = func(tag string) {
+		tag = canon(tag)
+		if tag == "" || seen[tag] {
+			return
+		}
+		seen[tag] = true
+		out = append(out, tag)
+		for _, child := range next[tag] {
+			walk(child)
+		}
+	}
+	for _, tag := range tags {
+		walk(tag)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // applyAliases replaces alternate names with the canonical tag and drops

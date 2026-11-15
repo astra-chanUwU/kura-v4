@@ -130,6 +130,24 @@ func TestDerivePostCompletesWhenSampleIsImpossible(t *testing.T) {
 	require.Equal(t, "thumb-existing", repo.post.ThumbnailKey)
 }
 
+func TestDerivePostThumbnailReopenErrorRetries(t *testing.T) {
+	media := &memMedia{
+		files:      map[string][]byte{"orig": []byte("not an image")},
+		failOpenAt: 2,
+	}
+	svc, repo := newDeriveHarness(model.Post{
+		ID: derivePostID, StorageKey: "orig", ContentType: "image/jpeg",
+		SampleKey: "sample-existing", Width: 8, Height: 8,
+	}, media)
+	payload, err := json.Marshal(derivePayload{PostID: derivePostID})
+	require.NoError(t, err)
+	require.Error(t, svc.DerivePost(context.Background(), payload))
+	require.Zero(t, repo.thumbSets)
+	require.Empty(t, repo.post.ThumbnailKey)
+	require.Equal(t, "sample-existing", repo.post.SampleKey)
+	require.Zero(t, repo.sampleSets)
+}
+
 func TestDerivePostHonorsCanceledContext(t *testing.T) {
 	media := &memMedia{files: map[string][]byte{"orig": pngBytes(8, 8)}}
 	svc, repo := newDeriveHarness(model.Post{
@@ -222,10 +240,11 @@ func newDeriveHarness(post model.Post, media *memMedia) (*Service, *deriveRepo) 
 }
 
 type memMedia struct {
-	files  map[string][]byte
-	puts   int
-	opens  int
-	putErr error
+	files      map[string][]byte
+	puts       int
+	opens      int
+	putErr     error
+	failOpenAt int
 }
 
 func (m *memMedia) Put(ctx context.Context, r io.Reader) (string, error) {
@@ -258,6 +277,9 @@ func (m *memMedia) Open(ctx context.Context, key string) (io.ReadCloser, error) 
 		return nil, err
 	}
 	m.opens++
+	if m.failOpenAt > 0 && m.opens >= m.failOpenAt {
+		return nil, errors.New("read failed")
+	}
 	b, ok := m.files[key]
 	if !ok {
 		return nil, errors.New("missing")

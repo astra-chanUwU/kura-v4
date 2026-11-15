@@ -35,7 +35,7 @@ vi.mock("@tanstack/react-router", () => ({
   ),
 }));
 
-vi.mock("../hooks/useKura", () => ({
+vi.mock("../hooks/useSession", () => ({
   useMe: () => ({ signedIn: state.signedIn, loading: state.loading }),
 }));
 

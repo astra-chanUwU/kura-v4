@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { RecoveryKeyPanel } from "../components/RecoveryKeyPanel";
-import { useAuthActions } from "../hooks/useKura";
+import { useAuthActions } from "../hooks/useSession";
 import styles from "./Simple.module.css";
 
 export function RecoverPage() {

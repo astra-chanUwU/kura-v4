@@ -67,16 +67,14 @@ vi.mock("@tanstack/react-router", () => ({
   },
 }));
 
-vi.mock("../hooks/useKura", async () => {
-  const actual = await vi.importActual<typeof import("../hooks/useKura")>("../hooks/useKura");
-  return {
-    useDebouncedValue: actual.useDebouncedValue,
-    useMe: () => ({ user: moderator }),
-    useRecentHistory: (...args: unknown[]) => hoisted.useRecentHistory(...args),
-    useHistoryActors: (...args: unknown[]) => hoisted.useHistoryActors(...args),
-    useStaffActions: () => ({ rollback: vi.fn(() => Promise.resolve()) }),
-  };
-});
+vi.mock("../hooks/useSession", () => ({
+  useMe: () => ({ user: moderator }),
+}));
+vi.mock("../hooks/useStaff", () => ({
+  useRecentHistory: (...args: unknown[]) => hoisted.useRecentHistory(...args),
+  useHistoryActors: (...args: unknown[]) => hoisted.useHistoryActors(...args),
+  useStaffActions: () => ({ rollback: vi.fn(() => Promise.resolve()) }),
+}));
 
 vi.mock("../components/Toasts", () => ({
   useToasts: () => ({ push: vi.fn() }),

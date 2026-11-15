@@ -154,6 +154,29 @@
   }
 }
 
+/* Theme and font pickers wrap instead of clipping off a 390px screen. */
+@media (max-width: 420px) {
+  .header {
+    flex-wrap: wrap;
+    align-content: center;
+    row-gap: 0.35rem;
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+  }
+  .nav {
+    flex: 1 1 auto;
+  }
+  .themeWrap {
+    flex: 1 1 100%;
+    max-width: none;
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+  .userName {
+    max-width: 7rem;
+  }
+}
+
 @media (max-width: 380px) {
   .joinLink {
     display: none;

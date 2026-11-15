@@ -87,7 +87,7 @@ func writeReportError(c fiber.Ctx, err error) error {
 		return fiber.NewError(400, vErr.Message)
 	case errors.Is(err, reports.ErrForbidden):
 		return fiber.NewError(403, "You don't have permission to do that.")
-	case errors.Is(err, reports.ErrNotFound):
+	case errors.Is(err, model.ErrNotFound):
 		return fiber.NewError(404, "Not found.")
 	default:
 		return err

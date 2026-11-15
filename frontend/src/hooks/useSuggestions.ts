@@ -6,7 +6,7 @@ import {
   suggestTag,
 } from "../api/suggestions";
 import type { SuggestionKind, SuggestionStatus } from "../types/suggestion";
-import { useMe } from "./useKura";
+import { useMe } from "./useSession";
 import { atLeast } from "../domain/roles";
 
 const suggestionsKey = ["tag-alias-suggestions"] as const;

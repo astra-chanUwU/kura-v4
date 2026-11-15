@@ -4,7 +4,7 @@ import { PostCard } from "../components/PostCard";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { shortError, useToasts } from "../components/Toasts";
 import { atLeast } from "../domain/roles";
-import { useMe } from "../hooks/useKura";
+import { useMe } from "../hooks/useSession";
 import { useSuggestTag } from "../hooks/useSuggestions";
 import { useTagPage, useTagPageActions } from "../hooks/useTagPage";
 import type { SuggestionKind } from "../types/suggestion";
@@ -25,6 +25,7 @@ export function TagPage({ name }: { name: string }) {
   const [alias, setAlias] = useState("");
   const [consequent, setConsequent] = useState("");
   const [pendingRemove, setPendingRemove] = useState("");
+  const [pendingImplication, setPendingImplication] = useState("");
   const moderator = !!user && atLeast(user.role, "moderator");
   const signedIn = !!user;
 
@@ -194,11 +195,7 @@ export function TagPage({ name }: { name: string }) {
                   <button
                     type="button"
                     aria-label={`Remove implication ${item}`}
-                    onClick={() =>
-                      actions.removeImplication.mutate(item, {
-                        onError: (error) => toasts.push(shortError(error), "error"),
-                      })
-                    }
+                    onClick={() => setPendingImplication(item)}
                   >
                     ×
                   </button>
@@ -297,6 +294,22 @@ export function TagPage({ name }: { name: string }) {
           });
         }}
       />
+      <ConfirmDialog
+        open={pendingImplication !== ""}
+        title={`Remove implication ${pendingImplication}?`}
+        message="This tag will stop adding that one. Pictures that already have it keep it."
+        confirmLabel="Remove implication"
+        destructive
+        onCancel={() => setPendingImplication("")}
+        onConfirm={() => {
+          const removing = pendingImplication;
+          setPendingImplication("");
+          actions.removeImplication.mutate(removing, {
+            onSuccess: () => toasts.push("Implication removed.", "success"),
+            onError: (error: unknown) => toasts.push(shortError(error), "error"),
+          });
+        }}
+      />
     </section>
   );
 }
@@ -335,7 +348,9 @@ function SuggestForm({ tag }: { tag: string }) {
         <select
           aria-label="Suggestion kind"
           value={kind}
-          onChange={(event) => setKind(event.target.value === "implication" ? "implication" : "alias")}
+          onChange={(event) =>
+            setKind(event.target.value === "implication" ? "implication" : "alias")
+          }
         >
           <option value="alias">Alias</option>
           <option value="implication">Implication</option>

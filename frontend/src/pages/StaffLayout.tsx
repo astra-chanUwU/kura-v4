@@ -2,7 +2,8 @@ import { Link, Outlet } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { IconEyeOff, IconHistory, IconShield, IconUser } from "../components/icons";
 import { atLeast, ROLE_DESCRIPTIONS, ROLE_LABELS } from "../domain/roles";
-import { useHiddenPosts, useMe } from "../hooks/useKura";
+import { useMe } from "../hooks/useSession";
+import { useHiddenPosts } from "../hooks/useStaff";
 import styles from "./StaffLayout.module.css";
 import simple from "./Simple.module.css";
 

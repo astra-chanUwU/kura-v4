@@ -8,17 +8,17 @@ import { IconEye, IconEyeOff, IconTrash } from "../components/icons";
 import { PostActions } from "../components/PostCard";
 import { RelatedPosts } from "../components/RelatedPosts";
 import { shortError, useToasts } from "../components/Toasts";
-import { filterFromSearch, isFilterActive, type BoardSearch } from "../domain/boardFilter";
-import { atLeast } from "../domain/roles";
 import {
+  filterFromSearch,
+  isFilterActive,
   tagTokens,
-  useMe,
-  usePost,
-  usePostActions,
-  usePostHistory,
-  usePostNeighbors,
-  useStaffActions,
-} from "../hooks/useKura";
+  type BoardSearch,
+} from "../domain/boardFilter";
+import { atLeast } from "../domain/roles";
+import { usePost, usePostNeighbors } from "../hooks/useBoardData";
+import { usePostActions } from "../hooks/useCollections";
+import { useMe } from "../hooks/useSession";
+import { usePostHistory, useStaffActions } from "../hooks/useStaff";
 import { usePrefetchNeighbors } from "../hooks/usePrefetchPost";
 import type { ChangeEntry } from "../types/api";
 import styles from "./PostPage.module.css";
@@ -97,6 +97,8 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
   const [metaError, setMetaError] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmHide, setConfirmHide] = useState(false);
+  const [idCopied, setIdCopied] = useState(false);
   const [sampleFailedFor, setSampleFailedFor] = useState<string | null>(null);
 
   // Drafts belong to one post; never carry them across pictures.
@@ -111,6 +113,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
     setRatingDraft(null);
     setNewTag("");
     setMetaError("");
+    setIdCopied(false);
   }
 
   // Staged editing: tag/artist/rating changes sit in drafts and only hit
@@ -167,7 +170,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
       if (event.shiftKey || isTypingTarget(event.target)) return;
-      if (document.querySelector('[role="dialog"], [role="menu"]')) return;
+      if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
       const target = event.key === "ArrowLeft" ? nav.prev : nav.next;
       if (!target) return;
       event.preventDefault();
@@ -222,12 +225,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
   return (
     <section className={styles.page} aria-labelledby="post-title">
       <nav className={styles.stepper} aria-label="Browse pictures">
-        <Link
-          to="/"
-          search={search}
-          className={styles.backLink}
-          onClick={backToBoard}
-        >
+        <Link to="/" search={search} className={styles.backLink} onClick={backToBoard}>
           ← Board
           {isFilterActive(filter) && (
             <span className={styles.filterLabel} title={filterLabel}>
@@ -380,12 +378,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
                   <button
                     type="button"
                     className={`${styles.staffBtn} ${styles.hideBtn}`}
-                    onClick={() =>
-                      void staff
-                        .hidePost(post.id)
-                        .then(() => toasts.push("Post hidden from the board.", "success"))
-                        .catch((e: unknown) => toasts.push(shortError(e), "error"))
-                    }
+                    onClick={() => setConfirmHide(true)}
                   >
                     <IconEyeOff /> Hide
                   </button>
@@ -423,6 +416,27 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
             )}
           </div>
           <dl className={styles.facts}>
+            <div>
+              <dt className={styles.detailLabel}>Post ID</dt>
+              <dd className={styles.idLine}>
+                <code className={styles.postId}>{post.id}</code>
+                <button
+                  type="button"
+                  className={styles.copyId}
+                  aria-label="Copy post id"
+                  onClick={() => {
+                    const write = navigator.clipboard?.writeText(post.id);
+                    if (!write) return;
+                    void write.then(
+                      () => setIdCopied(true),
+                      () => setIdCopied(false),
+                    );
+                  }}
+                >
+                  {idCopied ? "Copied" : "Copy"}
+                </button>
+              </dd>
+            </div>
             <div>
               <dt className={styles.detailLabel}>Type</dt>
               <dd>{formatType(post.content_type)}</dd>
@@ -579,25 +593,46 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
             History
           </h2>
           {history.isPending && <p className={styles.muted}>Loading…</p>}
-          {history.error && <p className={styles.muted}>History could not be loaded.</p>}
-          <HistoryList
-            entries={history.data ?? []}
-            busyId={busyId}
-            canRollback={(entry: ChangeEntry) => isModerator && entry.action !== "post.created"}
-            onRollback={(entry: ChangeEntry) => {
-              setBusyId(entry.id);
-              void staff
-                .rollback(entry)
-                .then(() => toasts.push("Change rolled back.", "success"))
-                .catch((e: unknown) => toasts.push(shortError(e), "error"))
-                .finally(() => setBusyId(""));
-            }}
-          />
+          {history.error && (
+            <p role="alert" className={styles.error}>
+              History could not be loaded.
+            </p>
+          )}
+          {!history.isPending && !history.error && (
+            <HistoryList
+              entries={history.data ?? []}
+              busyId={busyId}
+              canRollback={(entry: ChangeEntry) => isModerator && entry.action !== "post.created"}
+              onRollback={(entry: ChangeEntry) => {
+                setBusyId(entry.id);
+                void staff
+                  .rollback(entry)
+                  .then(() => toasts.push("Change rolled back.", "success"))
+                  .catch((e: unknown) => toasts.push(shortError(e), "error"))
+                  .finally(() => setBusyId(""));
+              }}
+            />
+          )}
           {!isModerator && (
             <p className={styles.muted}>Moderators and above can roll a change back.</p>
           )}
         </section>
       )}
+      <ConfirmDialog
+        open={confirmHide}
+        title="Hide this post?"
+        message="Hide this post from the board? Staff and the uploader can still open it, and Restore puts it back."
+        confirmLabel="Hide"
+        destructive
+        onCancel={() => setConfirmHide(false)}
+        onConfirm={() => {
+          setConfirmHide(false);
+          void staff
+            .hidePost(post.id)
+            .then(() => toasts.push("Post hidden from the board.", "success"))
+            .catch((e: unknown) => toasts.push(shortError(e), "error"));
+        }}
+      />
       <ConfirmDialog
         open={confirmDelete}
         title="Delete this post?"

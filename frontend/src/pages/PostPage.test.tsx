@@ -9,6 +9,9 @@ const historyBack = vi.hoisted(() => vi.fn());
 const routerState = vi.hoisted(() => ({
   current: { location: { state: {} as { fromBoard?: boolean } } },
 }));
+const historyQuery = vi.hoisted(() => ({
+  current: { data: [] as unknown[], isPending: false, error: null as Error | null },
+}));
 const neighbors = vi.hoisted(() => ({
   current: { index: -1, total: 0, ready: false } as {
     index: number;
@@ -82,32 +85,24 @@ vi.mock("../components/Toasts", () => ({
   useToasts: () => ({ push: vi.fn() }),
   shortError: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
-vi.mock("../hooks/useKura", () => ({
-  tagTokens: (text: string) => [
-    ...new Set(
-      text
-        .split(/[\s,]+/)
-        .map((token) =>
-          token
-            .toLowerCase()
-            .replace(/[^a-z0-9_-]+/g, "_")
-            .replace(/-/g, "_")
-            .replace(/^_+|_+$/g, ""),
-        )
-        .filter(Boolean),
-    ),
-  ],
+vi.mock("../hooks/useSession", () => ({
   useMe: () => ({
     signedIn: true,
     user: { id: "u1", username: "ana", role: "member" },
     me: { user: { id: "u1", username: "ana", role: "member" } },
     loading: false,
   }),
+}));
+vi.mock("../hooks/useBoardData", () => ({
   usePost: () => ({ data: post, isPending: false, error: null }),
   usePostNeighbors: () => neighbors.current,
   useRelatedPosts: () => ({ data: [], isPending: false, isError: false }),
+}));
+vi.mock("../hooks/useCollections", () => ({
   usePostActions: () => ({ updatePostMeta }),
-  usePostHistory: () => ({ data: [], isPending: false, error: null }),
+}));
+vi.mock("../hooks/useStaff", () => ({
+  usePostHistory: () => historyQuery.current,
   useStaffActions: () => ({
     hidePost: vi.fn(),
     unhidePost: vi.fn(),
@@ -144,7 +139,9 @@ describe("PostPage staged editing", () => {
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled(),
     );
-    expect(screen.queryByRole("img", { name: "Rating has unsaved changes" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("img", { name: "Rating has unsaved changes" }),
+    ).not.toBeInTheDocument();
   });
 
   it("saves a source link with the other staged fields", async () => {
@@ -287,6 +284,43 @@ describe("PostPage staged editing", () => {
       );
     } finally {
       delete post.sample_url;
+    }
+  });
+
+  it("copies the visible post id", async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    render(<PostPage id="p1" />);
+    expect(screen.getByText("p1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Copy post id" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("p1"));
+    expect(screen.getByRole("button", { name: "Copy post id" })).toHaveTextContent("Copied");
+  });
+
+  it("ignores arrows when that neighbor is missing or a modifier is held", () => {
+    neighbors.current = { index: 0, total: 1, ready: true };
+    navigate.mockClear();
+    try {
+      render(<PostPage id="p1" />);
+      fireEvent.keyDown(window, { key: "ArrowLeft" });
+      fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true });
+      expect(navigate).not.toHaveBeenCalled();
+    } finally {
+      neighbors.current = { index: -1, total: 0, ready: false };
+    }
+  });
+
+  it("does not call history empty while it is still loading", () => {
+    historyQuery.current = { data: [], isPending: true, error: null };
+    try {
+      render(<PostPage id="p1" />);
+      expect(screen.getByText("Loading…")).toBeInTheDocument();
+      expect(screen.queryByText("No changes recorded yet.")).not.toBeInTheDocument();
+    } finally {
+      historyQuery.current = { data: [], isPending: false, error: null };
     }
   });
 

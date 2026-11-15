@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/astra-chanUwU/kura-v4/internal/dao"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
@@ -13,10 +12,6 @@ type Comments struct {
 }
 
 func NewComments(d *dao.CommentsDAO) *Comments { return &Comments{dao: d} }
-
-func (r *Comments) DB() *sql.DB { return r.dao.DB() }
-
-func (r *Comments) WithTx(tx *sql.Tx) *dao.CommentsDAO { return r.dao.WithTx(tx) }
 
 func (r *Comments) CommentPostAccess(ctx context.Context, postID string) (model.CommentPostAccess, error) {
 	access, err := r.dao.CommentPostAccess(ctx, postID)

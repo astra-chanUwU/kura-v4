@@ -2,7 +2,7 @@ import { Link, Outlet } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { NotificationBell } from "./NotificationBell";
 import { ThemedSelect } from "./ThemedSelect";
-import { useAccountActions, useMe } from "../hooks/useKura";
+import { useAccountActions, useMe } from "../hooks/useSession";
 import { useAppearance } from "../hooks/useAppearance";
 import {
   FONT_LABELS,

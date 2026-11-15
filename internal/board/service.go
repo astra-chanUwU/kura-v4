@@ -2,15 +2,12 @@ package board
 
 import (
 	"context"
-	"errors"
 	"io"
 	"log/slog"
 	"time"
 
 	"github.com/astra-chanUwU/kura-v4/internal/model"
 )
-
-var ErrNotFound = errors.New("post not found")
 
 // ValidationError is a rejected post field, safe to show to the member.
 type ValidationError struct{ Message string }

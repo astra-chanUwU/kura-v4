@@ -7,8 +7,6 @@ import type { Me, Post } from "../types/api";
 import { invalidateSearch } from "./useBoardData";
 import { useInvalidate } from "./useCollections";
 
-export { passkeysSupported } from "../api/webauthn";
-
 /** The existing post when an upload was a duplicate, else undefined. */
 export function duplicateOf(err: unknown): Post | undefined {
   return err instanceof DuplicatePostError ? err.post : undefined;

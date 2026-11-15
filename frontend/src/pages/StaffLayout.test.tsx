@@ -24,13 +24,15 @@ vi.mock("@tanstack/react-router", () => ({
   ),
   Outlet: () => <div data-testid="staff-outlet" />,
 }));
-vi.mock("../hooks/useKura", () => ({
+vi.mock("../hooks/useSession", () => ({
   useMe: () => {
     const user = hoisted.role
       ? { id: "u1", username: "astra", display_name: "", role: hoisted.role }
       : null;
     return { me: user ? { user } : null, user, loading: false };
   },
+}));
+vi.mock("../hooks/useStaff", () => ({
   useHiddenPosts: () => ({ hidden: hoisted.hiddenCount, deleted: 0, posts: [] }),
 }));
 

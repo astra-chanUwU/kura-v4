@@ -6,7 +6,8 @@ import { ApiError } from "../api/client";
 import { api } from "../api/kura";
 import { readBoardMemory, writeBoardMemory } from "../domain/boardMemory";
 import type { Me, Post } from "../types/api";
-import { useAuthActions, useMe, useToggleFavorite } from "./useKura";
+import { useToggleFavorite } from "./useCollections";
+import { useAuthActions, useMe } from "./useSession";
 
 vi.mock("../api/kura", () => ({
   api: {

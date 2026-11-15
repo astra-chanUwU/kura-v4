@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { duplicateOf, useInvalidate, useMe, usePostActions } from "../hooks/useKura";
+import { useInvalidate, usePostActions } from "../hooks/useCollections";
+import { duplicateOf, useMe } from "../hooks/useSession";
 import type { Post } from "../types/api";
 import { ThemedSelect } from "./ThemedSelect";
 import { shortError, useToasts } from "./Toasts";

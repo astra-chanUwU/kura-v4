@@ -59,9 +59,5 @@ func TestSetMetaRewritesAliasTag(t *testing.T) {
 func TestRandomNotFound(t *testing.T) {
 	repo := &fakeRepo{randomErr: model.ErrNotFound}
 	_, err := NewService(repo, nil).Random(context.Background(), model.PostQuery{Tags: []string{"missing"}})
-	require.ErrorIs(t, err, ErrNotFound)
-
-	repo.randomErr = ErrNotFound
-	_, err = NewService(repo, nil).Random(context.Background(), model.PostQuery{})
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, err, model.ErrNotFound)
 }

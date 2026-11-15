@@ -55,15 +55,13 @@ function usersResult(overrides: Record<string, unknown> = {}) {
   };
 }
 
-vi.mock("../hooks/useKura", async () => {
-  const actual = await vi.importActual<typeof import("../hooks/useKura")>("../hooks/useKura");
-  return {
-    useDebouncedValue: actual.useDebouncedValue,
-    useMe: () => ({ user: actor }),
-    useAdminUsers: (...args: unknown[]) => hoisted.useAdminUsers(...args),
-    useStaffActions: () => ({ setUserRole }),
-  };
-});
+vi.mock("../hooks/useSession", () => ({
+  useMe: () => ({ user: actor }),
+}));
+vi.mock("../hooks/useStaff", () => ({
+  useAdminUsers: (...args: unknown[]) => hoisted.useAdminUsers(...args),
+  useStaffActions: () => ({ setUserRole }),
+}));
 
 describe("AdminPage roles", () => {
   beforeEach(() => {

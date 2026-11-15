@@ -216,7 +216,7 @@
 .modal .modalPrimary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #17131f;
+  color: var(--background);
   font-weight: 650;
 }
 
@@ -369,13 +369,7 @@
     font-size: 1.3rem;
   }
   .tabs {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 0.25rem;
-    scrollbar-width: none;
-  }
-  .tabs::-webkit-scrollbar {
-    display: none;
+    flex-wrap: wrap;
   }
   .tabs .tabLabel {
     display: none;
@@ -387,6 +381,10 @@
   .grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 0.6rem;
+  }
+  .inlineForm,
+  .securityGrid .inlineForm {
+    flex-wrap: wrap;
   }
   .inlineForm {
     align-items: stretch;

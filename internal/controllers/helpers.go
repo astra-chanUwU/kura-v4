@@ -38,7 +38,7 @@ func writeError(c fiber.Ctx, err error) error {
 		return fiber.NewError(400, jErr.Message)
 	case errors.Is(err, moderation.ErrForbidden), errors.Is(err, jobs.ErrForbidden):
 		return fiber.NewError(403, "You don't have permission to do that.")
-	case errors.Is(err, moderation.ErrNotFound), errors.Is(err, jobs.ErrNotFound):
+	case errors.Is(err, model.ErrNotFound):
 		return fiber.NewError(404, "Not found.")
 	case errors.Is(err, accounts.ErrInvalidCredentials):
 		return fiber.NewError(401, "That username and sign-in didn't match. Check it and try again.")
@@ -54,8 +54,6 @@ func writeError(c fiber.Ctx, err error) error {
 		return fiber.NewError(400, err.Error())
 	case errors.Is(err, accounts.ErrCeremonyExpired):
 		return fiber.NewError(400, err.Error())
-	case errors.Is(err, accounts.ErrNotFound), errors.Is(err, collections.ErrNotFound), errors.Is(err, board.ErrNotFound):
-		return fiber.NewError(404, "Not found.")
 	case errors.Is(err, collections.ErrForbidden):
 		return fiber.NewError(403, "That's not yours.")
 	default:

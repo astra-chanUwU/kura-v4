@@ -63,7 +63,7 @@ func TestCreateRejectsVisitorAndDuplicateAndHidden(t *testing.T) {
 
 	hidden := NewService(&memRepo{post: model.ReportPostAccess{Hidden: true, OwnerID: "someone-else", Rating: "sfw"}, open: map[string]bool{}})
 	_, err = hidden.Create(context.Background(), member, "p1", "other", "")
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, err, model.ErrNotFound)
 }
 
 func TestDismissRequiresModerator(t *testing.T) {

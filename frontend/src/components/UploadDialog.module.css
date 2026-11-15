@@ -189,7 +189,7 @@
 .footer .primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #17131f;
+  color: var(--background);
   font-weight: 600;
 }
 .footer button:disabled {

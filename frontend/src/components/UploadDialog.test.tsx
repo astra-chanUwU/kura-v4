@@ -4,10 +4,12 @@ import { UploadDialog } from "./UploadDialog";
 
 const upload = vi.hoisted(() => vi.fn());
 
-vi.mock("../hooks/useKura", () => ({
+vi.mock("../hooks/useSession", () => ({
   duplicateOf: () => undefined,
-  useInvalidate: () => vi.fn(),
   useMe: () => ({ me: undefined }),
+}));
+vi.mock("../hooks/useCollections", () => ({
+  useInvalidate: () => vi.fn(),
   usePostActions: () => ({ upload }),
 }));
 

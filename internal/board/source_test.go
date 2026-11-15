@@ -102,6 +102,23 @@ type fakeRepo struct {
 	aliases        map[string]string
 	lastQuery      model.PostQuery
 	owned          []ownedPost
+	edges          []model.TagImplication
+	found          []model.Post
+	foundTotal     int64
+	listed         []model.Post
+	listLimit      int32
+	listOffset     int32
+	neighbors      model.Neighbors
+	postsByID      map[string]model.Post
+	historyErr     error
+	artistErr      error
+	getErr         error
+	ownedPosts     []model.Post
+	ownedTotal     int64
+	ownerLimit     int32
+	ownerOffset    int32
+	publicPosts    []model.Post
+	publicTotal    int64
 }
 
 func (f *fakeRepo) CreatePost(_ context.Context, p model.Post, _ string) (model.Post, error) {
@@ -113,14 +130,25 @@ func (f *fakeRepo) CreatePost(_ context.Context, p model.Post, _ string) (model.
 }
 
 func (f *fakeRepo) GetPost(_ context.Context, id string) (model.Post, error) {
+	if f.getErr != nil {
+		return model.Post{}, f.getErr
+	}
+	if f.postsByID != nil {
+		if p, ok := f.postsByID[id]; ok {
+			return p, nil
+		}
+		return model.Post{}, model.ErrNotFound
+	}
 	if f.post.ID != id {
 		return model.Post{}, model.ErrNotFound
 	}
 	return f.post, nil
 }
 
-func (f *fakeRepo) ListPosts(context.Context, int32, int32, bool) ([]model.Post, error) {
-	return nil, nil
+func (f *fakeRepo) ListPosts(_ context.Context, limit, offset int32, _ bool) ([]model.Post, error) {
+	f.listLimit = limit
+	f.listOffset = offset
+	return f.listed, nil
 }
 func (f *fakeRepo) ExistsBySHA(context.Context, string) (bool, error) { return false, nil }
 func (f *fakeRepo) SetPostThumbnail(context.Context, string, string) error {
@@ -139,20 +167,24 @@ func (f *fakeRepo) ReplacePostMetaAudited(_ context.Context, p model.Post, entry
 	return nil
 }
 func (f *fakeRepo) InsertHistory(context.Context, model.ChangeEntry) (model.ChangeEntry, error) {
-	return model.ChangeEntry{}, nil
+	return model.ChangeEntry{}, f.historyErr
 }
 func (f *fakeRepo) SearchPosts(_ context.Context, q model.PostQuery) ([]model.Post, error) {
 	f.lastQuery = q
-	return []model.Post{}, nil
+	if f.found == nil {
+		return []model.Post{}, nil
+	}
+	return f.found, nil
 }
 func (f *fakeRepo) CountBoardMatches(context.Context, model.PostQuery) (int64, error) {
-	return 0, nil
+	return f.foundTotal, nil
 }
 func (f *fakeRepo) SuggestTags(context.Context, string, model.PostQuery, int32) ([]model.TagCount, error) {
 	return nil, nil
 }
-func (f *fakeRepo) PostNeighbors(context.Context, string, model.PostQuery) (model.Neighbors, error) {
-	return model.Neighbors{}, nil
+func (f *fakeRepo) PostNeighbors(_ context.Context, _ string, q model.PostQuery) (model.Neighbors, error) {
+	f.lastQuery = q
+	return f.neighbors, nil
 }
 func (f *fakeRepo) GetPostBySHA(context.Context, string) (model.Post, error) {
 	return model.Post{}, model.ErrNotFound
@@ -173,10 +205,12 @@ func (f *fakeRepo) CountPostsByOwnerSince(_ context.Context, ownerID string, wit
 	return n, nil
 }
 func (f *fakeRepo) CountVisiblePostsByOwner(context.Context, string, bool) (int64, error) {
-	return 0, nil
+	return f.ownedTotal, nil
 }
-func (f *fakeRepo) ListPostsByOwner(context.Context, string, bool, int32, int32) ([]model.Post, error) {
-	return nil, nil
+func (f *fakeRepo) ListPostsByOwner(_ context.Context, _ string, _ bool, limit, offset int32) ([]model.Post, error) {
+	f.ownerLimit = limit
+	f.ownerOffset = offset
+	return f.ownedPosts, nil
 }
 func (f *fakeRepo) RelatedPosts(_ context.Context, _ string, includeNSFW bool, exclude []string, limit int32) ([]model.Post, error) {
 	f.relatedLimit = limit
@@ -193,16 +227,16 @@ func (f *fakeRepo) RelatedPosts(_ context.Context, _ string, includeNSFW bool, e
 }
 func (f *fakeRepo) EnsureArtistPage(_ context.Context, tag string) error {
 	f.artistPages = append(f.artistPages, tag)
-	return nil
+	return f.artistErr
 }
 func (f *fakeRepo) ListImplications(context.Context) ([]model.TagImplication, error) {
-	return nil, nil
+	return f.edges, nil
 }
 func (f *fakeRepo) CountPublicPostsByOwner(context.Context, string, bool) (int64, error) {
-	return 0, nil
+	return f.publicTotal, nil
 }
 func (f *fakeRepo) ListPublicPostsByOwner(context.Context, string, bool, int32, int32) ([]model.Post, error) {
-	return nil, nil
+	return f.publicPosts, nil
 }
 func (f *fakeRepo) CountMetaEditsByActor(context.Context, string) (int64, error) { return 0, nil }
 func (f *fakeRepo) LastMetaEditor(context.Context, string) (string, error) {

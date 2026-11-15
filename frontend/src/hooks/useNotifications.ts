@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listNotifications, markNotificationsRead } from "../api/notifications";
-import { useMe } from "./useKura";
+import { useMe } from "./useSession";
 
 const notificationsKey = ["notifications"] as const;
 

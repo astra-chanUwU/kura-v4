@@ -1,7 +1,9 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { RecoveryKeyPanel } from "../components/RecoveryKeyPanel";
-import { passkeysSupported, useAuthActions } from "../hooks/useKura";
+// oxlint-disable-next-line no-restricted-imports -- browser capability check, not an API call
+import { passkeysSupported } from "../api/webauthn";
+import { useAuthActions } from "../hooks/useSession";
 import styles from "./Simple.module.css";
 
 export function AuthPage({ mode }: { mode: "login" | "register" }) {

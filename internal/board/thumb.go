@@ -60,14 +60,23 @@ func (s *Service) MakeThumbnail(ctx context.Context, p model.Post) (string, erro
 		jpegBytes, err = imageThumbnailJPEG(src)
 		if err != nil {
 			// Formats Go cannot decode (animated WebP, AVIF, damaged
-			// GIFs) may still yield a frame via ffmpeg.
-			if src2, openErr := s.media.Open(ctx, p.StorageKey); openErr == nil {
-				defer src2.Close() //nolint:errcheck
-				jpegBytes, err = ffmpegFrameJPEG(ctx, src2)
+			// GIFs) may still yield a frame via ffmpeg. A failed reopen
+			// is a storage error: the job must retry, not finish.
+			src2, openErr := s.media.Open(ctx, p.StorageKey)
+			if openErr != nil {
+				if ctx.Err() != nil {
+					return "", ctx.Err()
+				}
+				return "", openErr
 			}
+			defer src2.Close() //nolint:errcheck
+			jpegBytes, err = ffmpegFrameJPEG(ctx, src2)
 		}
 	}
 	if err != nil || len(jpegBytes) == 0 {
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
 		return "", nil // best-effort: caller falls back to the original
 	}
 	key, err := s.media.Put(ctx, bytes.NewReader(jpegBytes))

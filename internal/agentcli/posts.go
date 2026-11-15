@@ -243,7 +243,7 @@ func (e *Engine) postsUpload(ctx context.Context, args []string) int {
 		}
 		return e.failData(cmd, "duplicate_post", "Already on the board.", data)
 	}
-	if !errors.Is(err, board.ErrNotFound) {
+	if !errors.Is(err, model.ErrNotFound) {
 		return e.failErr(cmd, err)
 	}
 	rating := ""

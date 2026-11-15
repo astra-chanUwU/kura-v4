@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
@@ -133,4 +134,58 @@ func TestAvatarConvertsLegacyOversizedPictureOnce(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, file.Close())
 	require.Equal(t, served, again)
+}
+
+func TestSetAvatarRejectsPathAndContentType(t *testing.T) {
+	repo := NewMockRepository(t)
+	svc, err := NewService(repo, "http://localhost:5174", nil)
+	require.NoError(t, err)
+	cases := []struct{ key, contentType string }{
+		{key: "../secret", contentType: "image/png"},
+		{key: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", contentType: "text/html"},
+	}
+	for _, tc := range cases {
+		err := svc.SetAvatar(context.Background(), "u1", tc.key, tc.contentType)
+		var vErr *ValidationError
+		require.ErrorAs(t, err, &vErr, "key %q type %q", tc.key, tc.contentType)
+	}
+}
+
+func TestAvatarDoesNotServeUntrustedType(t *testing.T) {
+	ctx := context.Background()
+	media := newFakeMedia()
+	key := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	media.blobs[key] = []byte("<html>hi</html>")
+	repo := NewMockRepository(t)
+	repo.EXPECT().GetUserByID(ctx, "u1").Return(model.User{ID: "u1", AvatarKey: key, AvatarType: "text/html"}, nil)
+	svc, err := NewService(repo, "http://localhost:5174", media)
+	require.NoError(t, err)
+
+	_, file, err := svc.Avatar(ctx, "u1")
+	require.ErrorIs(t, err, model.ErrNotFound)
+	require.Nil(t, file)
+	require.Contains(t, media.blobs, key)
+}
+
+type noOpenMedia struct{}
+
+func (noOpenMedia) PutHashed(context.Context, io.Reader) (string, string, error) {
+	return "", "", io.ErrClosedPipe
+}
+
+func (noOpenMedia) Open(context.Context, string) (io.ReadCloser, error) {
+	return nil, errors.New("opened")
+}
+
+func TestAvatarDoesNotOpenPathKeys(t *testing.T) {
+	repo := NewMockRepository(t)
+	repo.EXPECT().GetUserByID(mock.Anything, "u1").Return(model.User{
+		ID: "u1", AvatarKey: "../secret", AvatarType: "image/png",
+	}, nil)
+	svc, err := NewService(repo, "http://localhost:5174", noOpenMedia{})
+	require.NoError(t, err)
+
+	_, file, err := svc.Avatar(context.Background(), "u1")
+	require.ErrorIs(t, err, model.ErrNotFound)
+	require.Nil(t, file)
 }

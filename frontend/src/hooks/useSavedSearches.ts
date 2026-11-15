@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createSavedSearch, deleteSavedSearch, listSavedSearches } from "../api/savedSearches";
 import { queryKeys } from "../api/queryKeys";
 import type { CreateSavedSearch } from "../types/savedSearch";
-import { useMe } from "./useKura";
+import { useMe } from "./useSession";
 
 export function useSavedSearches() {
   const { signedIn } = useMe();

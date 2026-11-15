@@ -24,10 +24,13 @@ func (f *fakeJobs) RetryFailed(context.Context, int64) (int64, error) {
 }
 
 func TestRetryRejectsJobThatIsNotFailed(t *testing.T) {
-	svc := NewService(&fakeJobs{state: "queued"})
 	actor := model.User{Role: model.RoleModerator}
-	err := svc.Retry(context.Background(), actor, 7)
-	require.ErrorIs(t, err, ErrNotFound)
+	for _, state := range []string{"queued", "running", "complete"} {
+		t.Run(state, func(t *testing.T) {
+			err := NewService(&fakeJobs{state: state}).Retry(context.Background(), actor, 7)
+			require.ErrorIs(t, err, model.ErrNotFound)
+		})
+	}
 }
 
 func TestRetryRequeuesFailedJob(t *testing.T) {

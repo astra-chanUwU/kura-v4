@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createComment, deleteComment, listComments, updateComment } from "../api/comments";
 import { queryKeys } from "../api/queryKeys";
-import { useMe } from "./useKura";
+import { invalidatePostSurfaces } from "./useBoardData";
+import { useMe } from "./useSession";
 
 export function useComments(postId: string) {
   const { signedIn } = useMe();
@@ -22,7 +23,7 @@ export function useComments(postId: string) {
 export function useCommentActions() {
   const client = useQueryClient();
   const invalidate = (postId: string) => {
-    void client.invalidateQueries({ queryKey: queryKeys.comments(postId) });
+    invalidatePostSurfaces(client, postId);
   };
   const create = useMutation({
     mutationFn: ({ postId, body }: { postId: string; body: string }) => createComment(postId, body),

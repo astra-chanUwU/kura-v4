@@ -32,7 +32,7 @@ vi.mock("../api/comments", () => ({
   deleteComment: vi.fn(),
 }));
 
-vi.mock("../hooks/useKura", () => ({
+vi.mock("../hooks/useSession", () => ({
   useMe: () => ({ signedIn: true, user: { id: "u1", username: "ada" } }),
 }));
 

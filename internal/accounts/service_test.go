@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/astra-chanUwU/kura-v4/internal/model"
+	"github.com/astra-chanUwU/kura-v4/internal/repository"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -118,7 +119,7 @@ func TestLoginWrongPasswordIsInvalidCredentials(t *testing.T) {
 
 func TestRemovePasswordBlockedAsLastMethod(t *testing.T) {
 	repo := NewMockRepository(t)
-	repo.EXPECT().ListCredentials(mock.Anything, "u1").Return([]model.StoredCredential{}, nil)
+	repo.EXPECT().DeletePassword(mock.Anything, "u1").Return(repository.ErrLastSignInMethod)
 	svc, err := NewService(repo, "http://localhost:5174", nil)
 	require.NoError(t, err)
 	require.ErrorIs(t, svc.RemovePassword(context.Background(), "u1"), ErrLastSignInMethod)
@@ -126,8 +127,7 @@ func TestRemovePasswordBlockedAsLastMethod(t *testing.T) {
 
 func TestRemovePasskeyBlockedAsLastMethod(t *testing.T) {
 	repo := NewMockRepository(t)
-	repo.EXPECT().ListCredentials(mock.Anything, "u1").Return([]model.StoredCredential{{RowID: "p1"}}, nil)
-	repo.EXPECT().HasPassword(mock.Anything, "u1").Return(false, nil)
+	repo.EXPECT().DeleteCredential(mock.Anything, "p1", "u1").Return(int64(0), repository.ErrLastSignInMethod)
 	svc, err := NewService(repo, "http://localhost:5174", nil)
 	require.NoError(t, err)
 	require.ErrorIs(t, svc.RemovePasskey(context.Background(), "u1", "p1"), ErrLastSignInMethod)
@@ -220,17 +220,18 @@ func TestUserForSessionNotFound(t *testing.T) {
 	svc, err := NewService(repo, "http://localhost:5174", nil)
 	require.NoError(t, err)
 	_, err = svc.UserForSession(context.Background(), "bogus")
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, err, model.ErrNotFound)
 }
 
 func TestSetAndRemoveAvatar(t *testing.T) {
 	ctx := context.Background()
 	repo := NewMockRepository(t)
-	repo.EXPECT().SetAvatar(ctx, "u1", "abc123", "image/png").Return(nil)
+	const key = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	repo.EXPECT().SetAvatar(ctx, "u1", key, "image/png").Return(nil)
 	repo.EXPECT().SetAvatar(ctx, "u1", "", "").Return(nil)
 	svc, err := NewService(repo, "http://localhost:5174", nil)
 	require.NoError(t, err)
-	require.NoError(t, svc.SetAvatar(ctx, "u1", "abc123", "image/png"))
+	require.NoError(t, svc.SetAvatar(ctx, "u1", key, "image/png"))
 	require.NoError(t, svc.RemoveAvatar(ctx, "u1"))
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/astra-chanUwU/kura-v4/internal/dao"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
+	"github.com/google/uuid"
 )
 
 type Posts struct {
@@ -166,6 +167,9 @@ func (r *Posts) LastMetaEditor(ctx context.Context, postID string) (string, erro
 }
 
 func (r *Posts) GetPost(ctx context.Context, id string) (model.Post, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return model.Post{}, model.ErrNotFound
+	}
 	post, err := r.dao.GetPost(ctx, id)
 	return post, NotFound(err)
 }

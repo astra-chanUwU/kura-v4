@@ -218,9 +218,11 @@ func (h *Auth) setPassword(c fiber.Ctx) error {
 	if err := c.Bind().Body(&in); err != nil {
 		return fiber.NewError(400, "Invalid request.")
 	}
-	if err := h.accounts.SetPassword(c.Context(), user.ID, in.Password); err != nil {
+	token, err := h.accounts.SetPassword(c.Context(), user.ID, in.Password)
+	if err != nil {
 		return writeError(c, err)
 	}
+	h.setSession(c, token)
 	return h.meResponse(c, *user)
 }
 
@@ -402,7 +404,9 @@ func (h *Auth) setAvatar(c fiber.Ctx) error {
 	defer src.Close() //nolint:errcheck
 	head := make([]byte, 512)
 	n, _ := src.Read(head)
-	contentType := board.SniffContentType(head[:n], fileHeader.Filename)
+	// The filename is chosen by the client. Sniff from the bytes only,
+	// so a non-image named ".png" is not treated as an image.
+	contentType := board.SniffContentType(head[:n], "")
 	if !strings.HasPrefix(contentType, "image/") {
 		return fiber.NewError(400, "Profile pictures must be an image (JPEG, PNG, GIF, WebP or AVIF).")
 	}

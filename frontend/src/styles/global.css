@@ -6,6 +6,10 @@ html,
 body {
   overflow-x: clip;
 }
+/* Sticky header: paging and in-page jumps should land below it. */
+html {
+  scroll-padding-top: calc(var(--header-h) + 0.75rem);
+}
 body {
   margin: 0;
   background: var(--background);
@@ -17,25 +21,32 @@ img,
 video {
   max-width: 100%;
 }
-/* Phones: 16px form text stops iOS Safari auto-zooming on focus, and
-   controls get a comfortable touch height. */
-@media (max-width: 640px) {
-  input,
-  textarea,
-  select {
-    font-size: 1rem;
-  }
-  select,
-  input[type="search"],
-  input[type="text"] {
-    min-height: 2.75rem;
-  }
-}
 button,
 input,
 textarea,
 select {
   font: inherit;
+}
+/* Phones: 16px form text stops iOS Safari auto-zooming on focus, and
+   controls get a comfortable touch height. The size is forced because
+   `font: inherit` and CSS-module font sizes would otherwise win. */
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+      [type="button"]
+    ):not([type="submit"]):not([type="reset"]):not([type="image"]):not([type="hidden"]),
+  textarea,
+  select {
+    font-size: 1rem !important;
+  }
+  select,
+  input[type="search"],
+  input[type="text"],
+  input[type="password"],
+  input[type="email"],
+  input[type="url"],
+  textarea {
+    min-height: 2.75rem;
+  }
 }
 a {
   color: inherit;

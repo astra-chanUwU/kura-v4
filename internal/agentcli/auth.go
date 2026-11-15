@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/astra-chanUwU/kura-v4/internal/accounts"
 	"github.com/astra-chanUwU/kura-v4/internal/dto"
+	"github.com/astra-chanUwU/kura-v4/internal/model"
 )
 
 func (e *Engine) login(ctx context.Context, args []string) int {
@@ -62,7 +62,7 @@ func (e *Engine) logout(ctx context.Context) int {
 	}
 	if e.deps.Accounts != nil {
 		err := e.deps.Accounts.Logout(ctx, token)
-		if err != nil && !errors.Is(err, accounts.ErrNotFound) {
+		if err != nil && !errors.Is(err, model.ErrNotFound) {
 			return e.failErr(cmd, err)
 		}
 	}

@@ -44,7 +44,10 @@ vi.mock("../components/Toasts", () => ({
   shortError: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
 vi.mock("../hooks/usePrefetchPost", () => ({ usePrefetchPost: () => ({}) }));
-vi.mock("../hooks/useKura", () => ({
+vi.mock("../hooks/useSession", () => ({
+  useMe: () => ({ user: { username: "ana" }, me: undefined }),
+}));
+vi.mock("../hooks/useCollections", () => ({
   useList: () => ({
     data: {
       list: {
@@ -65,7 +68,6 @@ vi.mock("../hooks/useKura", () => ({
     isSuccess: true,
     prefetchPage: vi.fn(),
   }),
-  useMe: () => ({ user: { username: "ana" }, me: undefined }),
   useListActions: () => ({
     reorderList: hoisted.reorderList,
     removeFromList: vi.fn(() => Promise.resolve()),

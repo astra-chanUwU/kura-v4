@@ -11,10 +11,7 @@ import (
 
 const maxCommentRunes = 2000
 
-var (
-	ErrNotFound  = errors.New("not found")
-	ErrForbidden = errors.New("you don't have permission to do that")
-)
+var ErrForbidden = errors.New("you don't have permission to do that")
 
 type ValidationError struct{ Message string }
 
@@ -79,11 +76,7 @@ func (s *Service) Update(ctx context.Context, viewer model.User, commentID, body
 	if err != nil {
 		return model.Comment{}, err
 	}
-	updated, err := s.repo.UpdateCommentBody(ctx, commentID, body)
-	if errors.Is(err, model.ErrNotFound) {
-		return model.Comment{}, ErrNotFound
-	}
-	return updated, err
+	return s.repo.UpdateCommentBody(ctx, commentID, body)
 }
 
 func (s *Service) Delete(ctx context.Context, viewer model.User, commentID string) error {
@@ -99,30 +92,24 @@ func (s *Service) Delete(ctx context.Context, viewer model.User, commentID strin
 		return err
 	}
 	if n == 0 {
-		return ErrNotFound
+		return model.ErrNotFound
 	}
 	return nil
 }
 
 func (s *Service) visiblePost(ctx context.Context, viewer *model.User, postID string) error {
 	post, err := s.repo.CommentPostAccess(ctx, postID)
-	if errors.Is(err, model.ErrNotFound) {
-		return ErrNotFound
-	}
 	if err != nil {
 		return err
 	}
 	if !canSeePost(viewer, post) {
-		return ErrNotFound
+		return model.ErrNotFound
 	}
 	return nil
 }
 
 func (s *Service) visibleComment(ctx context.Context, viewer *model.User, commentID string) (model.Comment, error) {
 	comment, err := s.repo.GetComment(ctx, commentID)
-	if errors.Is(err, model.ErrNotFound) {
-		return model.Comment{}, ErrNotFound
-	}
 	if err != nil {
 		return model.Comment{}, err
 	}

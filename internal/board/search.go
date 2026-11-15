@@ -3,6 +3,7 @@ package board
 import (
 	"context"
 	"errors"
+	"math"
 	"strings"
 	"unicode/utf8"
 
@@ -114,16 +115,21 @@ func (s *Service) PublicByOwner(ctx context.Context, userID string, includeNSFW 
 	if err != nil {
 		return nil, 0, err
 	}
-	if posts == nil {
-		posts = []model.Post{}
-	}
-	return posts, total, nil
+	posts, removed := filterPosts(posts, func(p model.Post) bool {
+		return publicPost(p, includeNSFW)
+	})
+	return posts, shrinkTotal(total, removed), nil
 }
 
 // ListByOwner returns one page of a user's own posts, newest first.
 // Hidden posts stay. NSFW is included only when includeNSFW is set,
 // so the page size matches what the viewer is allowed to see.
 func (s *Service) ListByOwner(ctx context.Context, userID string, includeNSFW bool, limit, offset int) (model.SearchPage, error) {
+	// PageBounds casts to int32. A page past MaxInt32 must stay past the
+	// end; wrapping it produces a negative OFFSET and the first page.
+	if offset > math.MaxInt32 {
+		offset = math.MaxInt32
+	}
 	lim, off := model.PageBounds(limit, offset)
 	total, err := s.repo.CountVisiblePostsByOwner(ctx, userID, includeNSFW)
 	if err != nil {
@@ -133,10 +139,12 @@ func (s *Service) ListByOwner(ctx context.Context, userID string, includeNSFW bo
 	if err != nil {
 		return model.SearchPage{}, err
 	}
-	if posts == nil {
-		posts = []model.Post{}
-	}
-	return model.SearchPage{Total: total, Posts: posts}, nil
+	// The owner still sees hidden and deleted uploads. NSFW stays off
+	// unless this viewer opted in, and the count drops with the page.
+	posts, removed := filterPosts(posts, func(p model.Post) bool {
+		return includeNSFW || p.Rating != "nsfw"
+	})
+	return model.SearchPage{Total: shrinkTotal(total, removed), Posts: posts}, nil
 }
 
 // Search returns one page of public posts matching q, plus the full
@@ -152,7 +160,7 @@ func (s *Service) Search(ctx context.Context, q model.PostQuery) (model.SearchPa
 			return model.SearchPage{}, ErrBadCursor
 		}
 		post, err := s.repo.GetPost(ctx, q.AfterID)
-		if errors.Is(err, model.ErrNotFound) || errors.Is(err, ErrNotFound) {
+		if errors.Is(err, model.ErrNotFound) {
 			return model.SearchPage{}, ErrBadCursor
 		}
 		if err != nil {
@@ -171,10 +179,10 @@ func (s *Service) Search(ctx context.Context, q model.PostQuery) (model.SearchPa
 	if err != nil {
 		return model.SearchPage{}, err
 	}
-	if posts == nil {
-		posts = []model.Post{}
-	}
-	return model.SearchPage{Total: total, Posts: posts}, nil
+	posts, removed := filterPosts(posts, func(p model.Post) bool {
+		return publicPost(p, prepared.IncludeNSFW)
+	})
+	return model.SearchPage{Total: shrinkTotal(total, removed), Posts: posts}, nil
 }
 
 // SuggestTags lists tags inside filter, most common first.
@@ -206,7 +214,23 @@ func (s *Service) Neighbors(ctx context.Context, id string, q model.PostQuery) (
 	if err != nil {
 		return model.Neighbors{}, err
 	}
-	return s.repo.PostNeighbors(ctx, id, prepared)
+	n, err := s.repo.PostNeighbors(ctx, id, prepared)
+	if err != nil {
+		return model.Neighbors{}, err
+	}
+	// The sequence is the prepared sort. A neighbor the viewer cannot
+	// open is not a link, even if the query returned its id.
+	prev, err := s.visibleNeighbor(ctx, n.PrevID, prepared.IncludeNSFW)
+	if err != nil {
+		return model.Neighbors{}, err
+	}
+	next, err := s.visibleNeighbor(ctx, n.NextID, prepared.IncludeNSFW)
+	if err != nil {
+		return model.Neighbors{}, err
+	}
+	n.PrevID = prev
+	n.NextID = next
+	return n, nil
 }
 
 // Related lists visible posts that share a tag with id, most overlap first.
@@ -214,16 +238,22 @@ func (s *Service) Neighbors(ctx context.Context, id string, q model.PostQuery) (
 // the viewer may see the anchor.
 func (s *Service) Related(ctx context.Context, id string, includeNSFW bool, exclude []string, limit int) ([]model.Post, error) {
 	if strings.TrimSpace(id) == "" {
-		return nil, ErrNotFound
+		return nil, model.ErrNotFound
 	}
 	if exclude == nil {
 		exclude = []string{}
 	}
 	posts, err := s.repo.RelatedPosts(ctx, id, includeNSFW, exclude, clampRelated(limit))
-	if posts == nil {
-		posts = []model.Post{}
+	if err != nil {
+		if posts == nil {
+			posts = []model.Post{}
+		}
+		return posts, err
 	}
-	return posts, err
+	filtered, _ := filterPosts(posts, func(p model.Post) bool {
+		return publicPost(p, includeNSFW)
+	})
+	return filtered, nil
 }
 
 func clampRelated(limit int) int32 {
@@ -236,18 +266,18 @@ func clampRelated(limit int) int32 {
 	return int32(limit)
 }
 
-// Random returns one visible post matching q. No match is ErrNotFound.
+// Random returns one visible post matching q. No match is model.ErrNotFound.
 func (s *Service) Random(ctx context.Context, q model.PostQuery) (model.Post, error) {
 	prepared, err := s.prepareSearch(ctx, q)
 	if err != nil {
 		return model.Post{}, err
 	}
 	post, err := s.repo.RandomPost(ctx, prepared)
-	if errors.Is(err, model.ErrNotFound) || errors.Is(err, ErrNotFound) {
-		return model.Post{}, ErrNotFound
-	}
 	if err != nil {
 		return model.Post{}, err
+	}
+	if !publicPost(post, prepared.IncludeNSFW) {
+		return model.Post{}, model.ErrNotFound
 	}
 	return post, nil
 }
@@ -267,26 +297,109 @@ func (s *Service) prepareSearch(ctx context.Context, q model.PostQuery) (model.P
 	if err != nil {
 		return model.PostQuery{}, err
 	}
+	// Alias resolution can put one tag on both lists. The excluded name wins,
+	// matching the rule PrepareQuery applies before aliases are rewritten.
+	prepared.Tags = withoutTags(prepared.Tags, prepared.Exclude)
 	return prepared, nil
 }
 
 func (s *Service) Get(ctx context.Context, id string) (model.Post, error) {
 	p, err := s.repo.GetPost(ctx, id)
-	if errors.Is(err, model.ErrNotFound) {
-		return model.Post{}, ErrNotFound
-	}
 	if err != nil {
-		return p, err
+		// A non-UUID never names a row. Callers that surface the raw
+		// parse error would turn a missing post into a server error.
+		if _, parseErr := uuid.Parse(id); parseErr != nil {
+			return model.Post{}, model.ErrNotFound
+		}
+		return model.Post{}, err
 	}
 	return s.ensureDimensions(ctx, p), nil
 }
 
 func (s *Service) List(ctx context.Context, limit, offset int32, includeNSFW bool) ([]model.Post, error) {
+	// A negative offset is a wrapped page number. The library audit walks
+	// this method in full pages and stops when a page is short, so rows
+	// are not dropped here. The public list route filters them.
+	if offset < 0 {
+		offset = 0
+	}
 	posts, err := s.repo.ListPosts(ctx, limit, offset, includeNSFW)
 	if posts == nil {
 		posts = []model.Post{}
 	}
 	return posts, err
+}
+
+// publicPost is a row a signed-out viewer, or a member who has not opted
+// into NSFW, is allowed to see on the board, related posts, random, and
+// a public profile. Hidden and deleted stay off those surfaces.
+func publicPost(p model.Post, includeNSFW bool) bool {
+	if p.Hidden || p.Deleted {
+		return false
+	}
+	return includeNSFW || p.Rating != "nsfw"
+}
+
+func (s *Service) visibleNeighbor(ctx context.Context, id string, includeNSFW bool) (string, error) {
+	if id == "" {
+		return "", nil
+	}
+	p, err := s.repo.GetPost(ctx, id)
+	if errors.Is(err, model.ErrNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if !publicPost(p, includeNSFW) {
+		return "", nil
+	}
+	return id, nil
+}
+
+func filterPosts(posts []model.Post, keep func(model.Post) bool) ([]model.Post, int) {
+	out := make([]model.Post, 0, len(posts))
+	removed := 0
+	for _, p := range posts {
+		if keep(p) {
+			out = append(out, p)
+		} else {
+			removed++
+		}
+	}
+	return out, removed
+}
+
+func shrinkTotal(total int64, removed int) int64 {
+	if removed <= 0 {
+		return total
+	}
+	n := int64(removed)
+	if total < n {
+		return 0
+	}
+	return total - n
+}
+
+func withoutTags(tags, skip []string) []string {
+	if len(skip) == 0 {
+		if tags == nil {
+			return []string{}
+		}
+		return tags
+	}
+	drop := map[string]bool{}
+	for _, tag := range skip {
+		drop[tag] = true
+	}
+	out := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		if tag == "" || drop[tag] {
+			continue
+		}
+		out = append(out, tag)
+	}
+	return out
 }
 
 func (s *Service) ExistsBySHA(ctx context.Context, sha string) (bool, error) {

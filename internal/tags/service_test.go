@@ -24,6 +24,7 @@ type fakeRepo struct {
 	suggestions []model.TagSuggestion
 	removed     []string
 	resolveErr  error
+	authorNames map[string]string
 }
 
 func (f *fakeRepo) GetPage(_ context.Context, tag string) (model.TagWiki, bool, error) {
@@ -107,9 +108,15 @@ func (f *fakeRepo) CreateSuggestion(_ context.Context, kind, source, target, rea
 			return model.TagSuggestion{}, errors.New("duplicate key value violates unique constraint 23505")
 		}
 	}
+	author := authorID
+	if f.authorNames != nil {
+		if name, ok := f.authorNames[authorID]; ok {
+			author = name
+		}
+	}
 	item := model.TagSuggestion{
 		ID: fmt.Sprintf("s%d", len(f.suggestions)+1), Kind: kind, SourceTag: source, TargetTag: target,
-		Reason: reason, Status: "pending", AuthorUsername: authorID, CreatedAt: time.Unix(10, 0).UTC(),
+		Reason: reason, Status: "pending", AuthorUsername: author, CreatedAt: time.Unix(10, 0).UTC(),
 	}
 	f.suggestions = append(f.suggestions, item)
 	return item, nil
@@ -156,7 +163,7 @@ func (f *fakeRepo) DeleteAlias(_ context.Context, alias, target string) (int64, 
 
 func TestGetUnknownTag(t *testing.T) {
 	_, err := NewService(&fakeRepo{}).Get(context.Background(), nil, "no_such_tag")
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, err, model.ErrNotFound)
 }
 
 func TestGetRejectsBlankTag(t *testing.T) {
@@ -254,7 +261,7 @@ func TestRemoveAlias(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, page.Aliases)
 	_, err = NewService(repo).RemoveAlias(context.Background(), mod, "gray_hair", "grey_hair")
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, err, model.ErrNotFound)
 }
 
 func TestGetPassesViewerExcludeTags(t *testing.T) {
@@ -326,6 +333,64 @@ func TestAddImplicationBackfillsTheChain(t *testing.T) {
 	require.NotContains(t, repo.backfilled, "school_uniform")
 	require.NotContains(t, repo.backfilled, "other_uniform")
 	require.NotContains(t, repo.backfilled, "uniform")
+}
+
+func TestTagPageHidesGatedPosts(t *testing.T) {
+	repo := &fakeRepo{
+		counts: map[string]int64{"cat": 4},
+		posts: map[string][]model.Post{"cat": {
+			{ID: "ok", Rating: "sfw"},
+			{ID: "nsfw", Rating: "nsfw"},
+			{ID: "hidden", Rating: "sfw", Hidden: true},
+			{ID: "deleted", Rating: "sfw", Deleted: true},
+		}},
+	}
+	page, err := NewService(repo).Get(context.Background(), nil, "cat")
+	require.NoError(t, err)
+	require.Equal(t, []string{"ok"}, tagPostIDs(page.Posts))
+	require.Equal(t, int64(1), page.PostCount)
+
+	viewer := &model.User{ID: "u", ShowNSFW: true}
+	page, err = NewService(repo).Get(context.Background(), viewer, "cat")
+	require.NoError(t, err)
+	require.Equal(t, []string{"ok", "nsfw"}, tagPostIDs(page.Posts))
+	require.Equal(t, int64(2), page.PostCount)
+
+	hiddenOnly := &fakeRepo{
+		counts: map[string]int64{"secret": 1},
+		posts:  map[string][]model.Post{"secret": {{ID: "h", Rating: "sfw", Deleted: true}}},
+	}
+	_, err = NewService(hiddenOnly).Get(context.Background(), viewer, "secret")
+	require.ErrorIs(t, err, model.ErrNotFound)
+}
+
+func TestAuthorCannotResolveOwnSuggestion(t *testing.T) {
+	author := model.User{ID: "mod-author", Username: "kiri", Role: model.RoleModerator}
+	other := model.User{ID: "mod-other", Username: "sora", Role: model.RoleModerator}
+	repo := &fakeRepo{authorNames: map[string]string{author.ID: author.Username}}
+	svc := NewService(repo)
+
+	item, err := svc.Suggest(context.Background(), author, "silver_hair", "alias", "silverhair", "same")
+	require.NoError(t, err)
+
+	_, err = svc.AcceptSuggestion(context.Background(), author, item.ID)
+	require.ErrorIs(t, err, ErrForbidden)
+	require.Empty(t, repo.aliases)
+	require.Empty(t, repo.moved)
+
+	_, err = svc.RejectSuggestion(context.Background(), author, item.ID)
+	require.ErrorIs(t, err, ErrForbidden)
+	require.Equal(t, "pending", repo.suggestions[0].Status)
+
+	accepted, err := svc.AcceptSuggestion(context.Background(), other, item.ID)
+	require.NoError(t, err)
+	require.Equal(t, "accepted", accepted.Status)
+	require.Len(t, repo.moved, 1)
+
+	again, err := svc.AcceptSuggestion(context.Background(), other, item.ID)
+	require.NoError(t, err)
+	require.Equal(t, "accepted", again.Status)
+	require.Len(t, repo.moved, 1)
 }
 
 func TestSuggestAndAccept(t *testing.T) {
@@ -534,7 +599,15 @@ func TestSuggestionResolveConflict(t *testing.T) {
 	require.Equal(t, item.ID, repo.suggestions[0].ID)
 
 	_, err = svc.AcceptSuggestion(context.Background(), mod, "missing")
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, err, model.ErrNotFound)
+}
+
+func tagPostIDs(posts []model.Post) []string {
+	out := make([]string, 0, len(posts))
+	for _, post := range posts {
+		out = append(out, post.ID)
+	}
+	return out
 }
 
 func suggestionIDs(items []model.TagSuggestion) []string {

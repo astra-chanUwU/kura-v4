@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useId } from "react";
 import type { BoardSearch } from "../domain/boardFilter";
 import { usePrefetchPost } from "../hooks/usePrefetchPost";
-import { useRelatedPosts } from "../hooks/useKura";
+import { useRelatedPosts } from "../hooks/useBoardData";
 import type { Post } from "../types/api";
 import styles from "./RelatedPosts.module.css";
 

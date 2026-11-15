@@ -8,7 +8,7 @@ const hoisted = vi.hoisted(() => ({
   retryFailedJob: vi.fn(),
 }));
 
-vi.mock("../hooks/useKura", () => ({
+vi.mock("../hooks/useSession", () => ({
   useMe: () => ({ user: { id: "u1", username: "ada", role: "moderator" }, loading: false }),
 }));
 vi.mock("../components/Toasts", () => ({
@@ -49,6 +49,13 @@ describe("FailedJobsPage", () => {
       ],
     });
     hoisted.retryFailedJob.mockResolvedValue(undefined);
+  });
+
+  it("does not say the queue is empty when the load fails", async () => {
+    hoisted.failedJobs.mockRejectedValue(new Error("queue down"));
+    renderPage();
+    expect(await screen.findByRole("alert")).toHaveTextContent("queue down");
+    expect(screen.queryByText("No failed jobs.")).not.toBeInTheDocument();
   });
 
   it("lists a failed job and retries it", async () => {

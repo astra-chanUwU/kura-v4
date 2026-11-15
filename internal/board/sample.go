@@ -27,7 +27,7 @@ var grabStill = ffmpegStill
 // that is the post.derive job. Callers fall back to the original.
 func (s *Service) OpenSample(ctx context.Context, p model.Post) (io.ReadCloser, error) {
 	if p.SampleKey == "" || s.media == nil {
-		return nil, ErrNotFound
+		return nil, model.ErrNotFound
 	}
 	return s.media.Open(ctx, p.SampleKey)
 }

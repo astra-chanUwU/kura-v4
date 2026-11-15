@@ -7,7 +7,9 @@ import { ThemedSelect } from "../components/ThemedSelect";
 import { shortError, useToasts } from "../components/Toasts";
 import { atLeast } from "../domain/roles";
 import { clampPage, pageCount, resolvePageSize } from "../domain/paging";
-import { useDebouncedValue, useHiddenPosts, useMe, useStaffActions } from "../hooks/useKura";
+import { useDebouncedValue } from "../hooks/useBoardData";
+import { useMe } from "../hooks/useSession";
+import { useHiddenPosts, useStaffActions } from "../hooks/useStaff";
 import { usePrefetchPage } from "../hooks/usePrefetchPage";
 import { StaffSection } from "./StaffLayout";
 import styles from "./HiddenPostsPage.module.css";
@@ -42,12 +44,7 @@ export function HiddenPostsPage() {
   const submittedQ = debouncedQ.trim();
   const isStaff = !!user && atLeast(user.role, "moderator");
   const isAdmin = !!user && atLeast(user.role, "admin");
-  const hidden = useHiddenPosts(
-    isStaff,
-    { kind, q: submittedQ, rating, sort },
-    page,
-    pageSize,
-  );
+  const hidden = useHiddenPosts(isStaff, { kind, q: submittedQ, rating, sort }, page, pageSize);
   usePrefetchPage(hidden.prefetchPage, page, pageCount(hidden.total, pageSize), hidden.isSuccess);
   useEffect(() => {
     if (!hidden.isSuccess) return;
@@ -137,7 +134,7 @@ export function HiddenPostsPage() {
           {shortError(hidden.error)}
         </p>
       )}
-      {!hidden.isPending && shown.length === 0 && (
+      {!hidden.isPending && !hidden.error && shown.length === 0 && (
         <p className={simple.muted}>
           {submittedQ !== "" || rating !== ""
             ? "Nothing matches."

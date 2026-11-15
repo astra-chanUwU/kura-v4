@@ -65,7 +65,7 @@ vi.mock("@tanstack/react-router", async () => {
     },
   };
 });
-vi.mock("../hooks/useKura", () => ({
+vi.mock("../hooks/useSession", () => ({
   useMe: () => ({ user: undefined, signedIn: false, loading: false }),
 }));
 vi.mock("../hooks/useTagPage", () => ({
@@ -98,7 +98,10 @@ describe("TagPage", () => {
       "href",
       "/?tags=gray_hair",
     );
-    expect(screen.getByRole("link", { name: "long_hair" })).toHaveAttribute("href", "/tags/long_hair");
+    expect(screen.getByRole("link", { name: "long_hair" })).toHaveAttribute(
+      "href",
+      "/tags/long_hair",
+    );
     expect(screen.getByRole("article")).toHaveTextContent("gray_hair");
     expect(screen.queryByRole("button", { name: "Save description" })).not.toBeInTheDocument();
   });
