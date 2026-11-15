@@ -223,13 +223,6 @@
   }
 }
 
-/* Theme and font pickers wrap onto a second header row. */
-@media (max-width: 420px) {
-  :root {
-    --header-h: 6.5rem;
-  }
-}
-
 [data-theme="kura"] {
   color-scheme: dark;
   --background: #100f15;

@@ -35,6 +35,7 @@ const me: Me = {
     show_nsfw: false,
     default_include_tags: [],
     default_exclude_tags: [],
+    share_default_tags: false,
     theme: "kura",
     font: "system",
     tag_suggestion_rows: 8,

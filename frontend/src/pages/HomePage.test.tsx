@@ -61,6 +61,7 @@ vi.mock("../hooks/useSession", () => ({
             show_nsfw: false,
             default_include_tags: board.includeTags,
             default_exclude_tags: board.excludeTags,
+            share_default_tags: false,
             tag_suggestion_rows: 1,
             theme: "kura",
             font: "system",

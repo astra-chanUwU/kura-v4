@@ -197,6 +197,114 @@ export function IconUndo() {
   );
 }
 
+export function IconFilter() {
+  return (
+    <Base>
+      <path d="M4 5h16l-6.2 7.1V19l-3.6 1.6v-8.5L4 5Z" />
+    </Base>
+  );
+}
+
+export function IconSliders() {
+  return (
+    <Base>
+      <path d="M4 8h16M4 16h16" />
+      <circle cx="9" cy="8" r="2.1" fill="var(--surface)" />
+      <circle cx="15" cy="16" r="2.1" fill="var(--surface)" />
+    </Base>
+  );
+}
+
+export function IconX() {
+  return (
+    <Base>
+      <path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5" />
+    </Base>
+  );
+}
+
+export function IconBookmark() {
+  return (
+    <Base>
+      <path d="M7 4.2h10a1 1 0 0 1 1 1V20l-6-3.3L6 20V5.2a1 1 0 0 1 1-1Z" />
+    </Base>
+  );
+}
+
+export function IconCopy() {
+  return (
+    <Base>
+      <rect x="8" y="8" width="11" height="11" rx="1.6" />
+      <path d="M6.2 15.2V6.4A1.4 1.4 0 0 1 7.6 5H15" />
+    </Base>
+  );
+}
+
+export function IconPaste() {
+  return (
+    <Base>
+      <rect x="6" y="5.8" width="12" height="14.2" rx="1.6" />
+      <path d="M9 5.8V4.6A1 1 0 0 1 10 3.6h4a1 1 0 0 1 1 1v1.2" />
+      <path d="M9 11.2h6M9 14.6h4.5" />
+    </Base>
+  );
+}
+
+export function IconDice() {
+  return (
+    <Base>
+      <rect x="4" y="4" width="16" height="16" rx="2.4" />
+      <circle cx="9" cy="9" r="1.05" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="15" r="1.05" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="9" r="1.05" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="15" r="1.05" fill="currentColor" stroke="none" />
+    </Base>
+  );
+}
+
+export function IconGrid() {
+  return (
+    <Base>
+      <rect x="4" y="4" width="6.5" height="6.5" rx="1.1" />
+      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.1" />
+      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.1" />
+      <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.1" />
+    </Base>
+  );
+}
+
+export function IconRows() {
+  return (
+    <Base>
+      <rect x="4" y="5" width="4.2" height="3.2" rx="0.6" />
+      <path d="M10.5 6.6H20" />
+      <rect x="4" y="10.4" width="4.2" height="3.2" rx="0.6" />
+      <path d="M10.5 12H20" />
+      <rect x="4" y="15.8" width="4.2" height="3.2" rx="0.6" />
+      <path d="M10.5 17.4H20" />
+    </Base>
+  );
+}
+
+export function IconNarrow() {
+  return (
+    <Base>
+      <path d="M8 4.5v15M16 4.5v15" />
+      <rect x="9.2" y="4.5" width="5.6" height="15" rx="1" />
+    </Base>
+  );
+}
+
+export function IconWide() {
+  return (
+    <Base>
+      <path d="M3.2 12H8M3.2 12 5.6 9.6M3.2 12 5.6 14.4" />
+      <path d="M20.8 12H16M20.8 12 18.4 9.6M20.8 12 18.4 14.4" />
+      <rect x="8.2" y="6" width="7.6" height="12" rx="1" />
+    </Base>
+  );
+}
+
 export function IconHistory() {
   return (
     <Base>

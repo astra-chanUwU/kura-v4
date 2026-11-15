@@ -250,6 +250,15 @@ func TestSetTagPreferencesNormalizesAndExcludeWins(t *testing.T) {
 		[]string{"gif"}))
 }
 
+func TestSetShareDefaultTagsPersistsTheFlag(t *testing.T) {
+	ctx := context.Background()
+	repo := NewMockRepository(t)
+	repo.EXPECT().UpdateShareDefaultTags(ctx, "u1", true).Return(nil)
+	svc, err := NewService(repo, "http://localhost:5174", nil)
+	require.NoError(t, err)
+	require.NoError(t, svc.SetShareDefaultTags(ctx, "u1", true))
+}
+
 func TestSetAppearanceValidatesAndPersists(t *testing.T) {
 	ctx := context.Background()
 	repo := NewMockRepository(t)

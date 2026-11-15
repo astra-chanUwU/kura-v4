@@ -215,6 +215,7 @@ type User struct {
 	PreferredFont      string
 	TagSuggestionRows  int32
 	PostsPerPage       int32
+	ShareDefaultTags   bool
 }
 
 type WebauthnChallenge struct {

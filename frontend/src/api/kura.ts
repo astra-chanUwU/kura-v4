@@ -179,8 +179,12 @@ export const api = {
   ) => sendJSON<Post>(`/posts/${postId}/meta`, "PATCH", { artist, tags, rating, source_url }),
   setPreferences: (show_nsfw: boolean, over_18: boolean) =>
     sendJSON<Me>("/me/preferences", "PATCH", { show_nsfw, over_18 }),
-  setTagPreferences: (include_tags: string[], exclude_tags: string[]) =>
-    sendJSON<Me>("/me/tag-preferences", "PATCH", { include_tags, exclude_tags }),
+  setTagPreferences: (include_tags: string[], exclude_tags: string[], share?: boolean) =>
+    sendJSON<Me>("/me/tag-preferences", "PATCH", {
+      include_tags,
+      exclude_tags,
+      ...(share === undefined ? {} : { share }),
+    }),
   setAppearance: (theme: string, font: string) =>
     sendJSON<Me>("/me/appearance", "PATCH", { theme, font }),
   setPostsPerPage: (posts_per_page: number) =>

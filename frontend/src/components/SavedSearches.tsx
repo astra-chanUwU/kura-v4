@@ -9,6 +9,7 @@ import {
 import { useMe } from "../hooks/useSession";
 import type { SavedSearch } from "../types/savedSearch";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { IconSave } from "./icons";
 import { shortError, useToasts } from "./Toasts";
 import styles from "./SavedSearches.module.css";
 
@@ -56,8 +57,14 @@ export function SaveCurrentSearchButton({
 
   if (!open) {
     return (
-      <button type="button" className={styles.button} onClick={() => setOpen(true)}>
-        Save search
+      <button
+        type="button"
+        className={styles.iconButton}
+        aria-label="Save search"
+        title="Save search"
+        onClick={() => setOpen(true)}
+      >
+        <IconSave />
       </button>
     );
   }

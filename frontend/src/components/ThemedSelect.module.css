@@ -32,6 +32,27 @@
   outline-offset: 1px;
 }
 
+.button.compact {
+  flex: none;
+  justify-content: center;
+  gap: 0;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  max-width: 2.75rem;
+  padding: 0;
+}
+
+.button.compact .swatch {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.button.compact .sample {
+  width: auto;
+  text-align: center;
+}
+
 .label {
   flex: 1 1 auto;
   min-width: 0;
@@ -137,6 +158,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.dialog .optionLabel {
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: unset;
+}
 
 .check {
   flex: none;
@@ -175,5 +201,260 @@
 @media (prefers-reduced-motion: reduce) {
   .menu {
     animation: none;
+  }
+  .dialog {
+    animation: none;
+  }
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 0.75rem;
+  background: rgb(0 0 0 / 0.55);
+}
+
+.dialog {
+  width: min(68rem, 100%);
+  max-height: min(36rem, calc(100dvh - 2.5rem));
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.15rem;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.75rem;
+  background: var(--background);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  animation: menu-in 0.12s ease;
+}
+
+.dialogTitle {
+  flex: none;
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 650;
+}
+
+.search {
+  flex: none;
+  width: 100%;
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.55rem;
+  background: var(--background);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+}
+
+.search::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.search:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.dialogScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.4rem;
+}
+
+.empty {
+  margin: 0;
+  padding: 1rem 0.25rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.dialogGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dialogGrid > li {
+  min-width: 0;
+}
+
+.dialog .option {
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--background);
+}
+
+.dialog .swatch {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.dialog .option[aria-selected="true"] {
+  border-color: var(--accent);
+  background: var(--selection);
+}
+
+.embedded {
+  display: block;
+  width: 100%;
+}
+
+.embeddedBody {
+  display: grid;
+  gap: 0.55rem;
+  width: 100%;
+}
+
+.embedded .dialogScroll {
+  max-height: 18rem;
+}
+
+.embedded .dialogGrid {
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+}
+
+.fontGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fontGrid > li {
+  width: auto;
+}
+
+.option.fontChip {
+  width: auto;
+  border: 0;
+  border-radius: 0.4rem;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  padding: 0.45rem 0.75rem;
+  min-height: 2.25rem;
+}
+
+.option.fontChip .check {
+  display: none;
+}
+
+.option.fontChip .optionLabel {
+  font-family: inherit;
+}
+
+.option.fontChip:hover,
+.option.fontChip.active {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.option.fontChip[aria-selected="true"],
+.option.fontChip[aria-selected="true"]:hover,
+.option.fontChip[aria-selected="true"].active {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.option.themeTile {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, auto) 1fr;
+  align-items: center;
+  justify-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  min-width: 0;
+  min-height: 2.25rem;
+  padding: 0.3rem 0.45rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: var(--background);
+  color: var(--accent);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.themeName {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bubbles {
+  grid-column: 3;
+  justify-self: end;
+  display: inline-flex;
+  gap: 0.18rem;
+  opacity: 0;
+}
+
+.option.themeTile:hover .bubbles,
+.option.themeTile.active .bubbles,
+.option.themeTile[aria-selected="true"] .bubbles {
+  opacity: 1;
+}
+
+.bubbles span {
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #000 20%, transparent);
+}
+
+.bubbles span:nth-child(1) {
+  background: var(--accent);
+}
+
+.bubbles span:nth-child(2) {
+  background: var(--text);
+}
+
+.bubbles span:nth-child(3) {
+  background: var(--muted);
+}
+
+.option.themeTile:hover,
+.option.themeTile.active {
+  background: var(--background);
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.option.themeTile[aria-selected="true"],
+.option.themeTile[aria-selected="true"]:hover,
+.option.themeTile[aria-selected="true"].active {
+  background: var(--background);
+  color: var(--accent);
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .dialogGrid {
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
   }
 }

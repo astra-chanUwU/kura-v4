@@ -92,6 +92,7 @@ export function MePage() {
   const [postsPerPageDraft, setPostsPerPageDraft] = useState<number | null>(null);
   const [includeDraft, setIncludeDraft] = useState<string[] | null>(null);
   const [excludeDraft, setExcludeDraft] = useState<string[] | null>(null);
+  const [shareDraft, setShareDraft] = useState<boolean | null>(null);
   const [includeInput, setIncludeInput] = useState("");
   const [excludeInput, setExcludeInput] = useState("");
   const [showAgeGate, setShowAgeGate] = useState(false);
@@ -186,9 +187,11 @@ export function MePage() {
     (postsPerPageDraft !== null && clampPostsPerPage(postsPerPageDraft) !== savedPostsPerPage);
   const savedIncludeTags = preferences.default_include_tags ?? [];
   const savedExcludeTags = preferences.default_exclude_tags ?? [];
+  const savedShareTags = preferences.share_default_tags ?? false;
   const tagsDirty =
     (includeDraft !== null && !sameTagSet(includeDraft, savedIncludeTags)) ||
-    (excludeDraft !== null && !sameTagSet(excludeDraft, savedExcludeTags));
+    (excludeDraft !== null && !sameTagSet(excludeDraft, savedExcludeTags)) ||
+    (shareDraft !== null && shareDraft !== savedShareTags);
   const myListItems = myLists.data ?? [];
   const shownLists = myListItems.filter((list) =>
     list.title.toLowerCase().includes(listFilter.trim().toLowerCase()),
@@ -442,47 +445,45 @@ export function MePage() {
             </button>
           </form>
 
+          <div className={styles.prefStack}>
           <div className={styles.card}>
-            <h2>Appearance</h2>
+            <h2 className={styles.sectionHead}>Theme</h2>
             <p className={styles.muted}>
-              Your default theme and font on every device. Anyone who opens your public profile sees
-              that page in this theme and font, too.
+              Your public profile uses this theme. Search the list if you know the name.
             </p>
+            <ThemedSelect
+              label="Theme"
+              embedded
+              value={themeDraft ?? savedTheme}
+              onChange={setThemeDraft}
+            >
+              {THEMES.map((id) => (
+                <option
+                  key={id}
+                  value={id}
+                  data-swatch={THEME_SWATCHES[id]}
+                  data-paper={THEME_PAPERS[id]}
+                >
+                  {THEME_LABELS[id]}
+                </option>
+              ))}
+            </ThemedSelect>
+          </div>
+          <div className={styles.card}>
+            <h2 className={styles.sectionHead}>Font</h2>
+            <p className={styles.muted}>Your public profile uses this typeface.</p>
+            <ThemedSelect label="Font" embedded value={fontDraft ?? savedFont} onChange={setFontDraft}>
+              {FONTS.map((id) => (
+                <option key={id} value={id} data-font={id}>
+                  {FONT_LABELS[id]}
+                </option>
+              ))}
+            </ThemedSelect>
+          </div>
+          <div className={styles.card}>
+            <h2 className={styles.sectionHead}>Pictures per page</h2>
+            <p className={styles.muted}>How many pictures each page loads.</p>
             <label className={styles.choice}>
-              Theme
-              <ThemedSelect
-                label="Default theme"
-                value={themeDraft ?? savedTheme}
-                onChange={setThemeDraft}
-              >
-                {THEMES.map((id) => (
-                  <option
-                    key={id}
-                    value={id}
-                    data-swatch={THEME_SWATCHES[id]}
-                    data-paper={THEME_PAPERS[id]}
-                  >
-                    {THEME_LABELS[id]}
-                  </option>
-                ))}
-              </ThemedSelect>
-            </label>
-            <label className={styles.choice}>
-              Font
-              <ThemedSelect
-                label="Default font"
-                value={fontDraft ?? savedFont}
-                onChange={setFontDraft}
-              >
-                {FONTS.map((id) => (
-                  <option key={id} value={id} data-font={id}>
-                    {FONT_LABELS[id]}
-                  </option>
-                ))}
-              </ThemedSelect>
-            </label>
-            <label className={styles.choice}>
-              Pictures per page
               <ThemedSelect
                 label="Pictures per page"
                 value={String(postsPerPageDraft ?? savedPostsPerPage)}
@@ -495,7 +496,6 @@ export function MePage() {
                 ))}
               </ThemedSelect>
             </label>
-            <p className={styles.muted}>How many pictures each page loads.</p>
             <div
               className={styles.preview}
               data-theme={normalizeTheme(themeDraft ?? savedTheme)}
@@ -536,6 +536,7 @@ export function MePage() {
               </button>
             </div>
           </div>
+          </div>
 
           <div className={`${styles.card} ${styles.tagCard}`}>
             <h2>Default board tags</h2>
@@ -543,6 +544,16 @@ export function MePage() {
               A fresh homepage opens on this filter. Tags you set on the board are written into the
               address bar, so Back from a picture returns to them. The Kura logo starts from this
               filter again. Type <code>-tag</code> to exclude.
+            </p>
+            <VisibilityToggle
+              label="Who can copy these tags"
+              value={(shareDraft ?? savedShareTags) ? "public" : "private"}
+              onChange={(value) => setShareDraft(value === "public")}
+            />
+            <p className={styles.muted}>
+              {(shareDraft ?? savedShareTags)
+                ? "Public. Your profile shows these tags and a button that copies them."
+                : "Private. These tags stay on your account. Your profile does not show them."}
             </p>
             <div className={styles.tagFields}>
               {(
@@ -629,15 +640,21 @@ export function MePage() {
                 type="button"
                 className={tagsDirty ? styles.saveDirty : undefined}
                 onClick={() => {
-                  run(
-                    account.setTagPreferences(
-                      includeDraft ?? preferences.default_include_tags ?? [],
-                      excludeDraft ?? preferences.default_exclude_tags ?? [],
-                    ),
-                    "Default board tags saved.",
-                  );
-                  setIncludeDraft(null);
-                  setExcludeDraft(null);
+                  const include = includeDraft ?? preferences.default_include_tags ?? [];
+                  const exclude = excludeDraft ?? preferences.default_exclude_tags ?? [];
+                  const share = shareDraft ?? savedShareTags;
+                  setError("");
+                  setNotice("");
+                  void account
+                    .setTagPreferences(include, exclude, share)
+                    .then(() => {
+                      toasts.push("Default board tags saved.", "success");
+                      invalidate();
+                      setIncludeDraft(null);
+                      setExcludeDraft(null);
+                      setShareDraft(null);
+                    })
+                    .catch((e: unknown) => toasts.push(shortError(e), "error"));
                 }}
               >
                 Save board tags

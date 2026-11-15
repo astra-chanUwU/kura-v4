@@ -311,6 +311,11 @@ func (h *Auth) updateTagPreferences(c fiber.Ctx) error {
 	if err := h.accounts.SetTagPreferences(c.Context(), user.ID, in.IncludeTags, in.ExcludeTags); err != nil {
 		return writeError(c, err)
 	}
+	if in.Share != nil {
+		if err := h.accounts.SetShareDefaultTags(c.Context(), user.ID, *in.Share); err != nil {
+			return writeError(c, err)
+		}
+	}
 	updated, err := h.accounts.GetUser(c.Context(), user.ID)
 	if err != nil {
 		return writeError(c, err)
@@ -500,9 +505,14 @@ func (h *Auth) publicProfile(c fiber.Ctx) error {
 		}
 	}
 	prefs := preferencesDTO(user)
-	return c.JSON(dto.Profile{
+	profile := dto.Profile{
 		User: userDTO(user), PublicLists: listsDTO(lists), Contributions: contributions,
 		UploadTotal: uploadTotal, EditCount: editCount, Uploads: postsDTO(uploads, favs),
 		Theme: prefs.Theme, Font: prefs.Font,
-	})
+	}
+	if user.ShareDefaultTags && (len(prefs.DefaultIncludeTags) > 0 || len(prefs.DefaultExcludeTags) > 0) {
+		profile.DefaultIncludeTags = prefs.DefaultIncludeTags
+		profile.DefaultExcludeTags = prefs.DefaultExcludeTags
+	}
+	return c.JSON(profile)
 }

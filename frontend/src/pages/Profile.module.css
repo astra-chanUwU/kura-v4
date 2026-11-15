@@ -100,6 +100,54 @@
 .card h3 {
   margin: 0 0 0.4rem;
 }
+.defaults {
+  display: grid;
+  gap: 0.55rem;
+  max-width: 42rem;
+}
+.defaults h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+.tagExcluded {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border-strong));
+  color: var(--danger);
+}
+.tagActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+.tagActions button {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.tagActions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 @media (max-width: 640px) {
   .grid {
@@ -117,5 +165,11 @@
   .headerText h1 {
     font-size: 1.3rem;
     overflow-wrap: anywhere;
+  }
+  .tagActions button,
+  .tagActions a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
   }
 }

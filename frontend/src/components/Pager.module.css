@@ -65,7 +65,7 @@
 
 .jumpInput {
   box-sizing: border-box;
-  width: 3.5rem;
+  width: 3.25rem;
   padding: 0.4rem 0.45rem;
   border: 1px solid var(--border-strong);
   border-radius: 0.4rem;
@@ -73,6 +73,13 @@
   color: var(--text);
   font-size: 0.9rem;
   text-align: center;
+  /* The browser's number stepper sits inside the field and doesn't match the pager buttons. */
+  appearance: textfield;
+}
+.jumpInput::-webkit-outer-spin-button,
+.jumpInput::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
 }
 
 .jumpInput:focus {

@@ -176,7 +176,7 @@ func preferencesDTO(u model.User) dto.Preferences {
 	if perPage < 12 || perPage > 100 {
 		perPage = 40
 	}
-	return dto.Preferences{ShowNSFW: u.ShowNSFW, DefaultIncludeTags: include, DefaultExcludeTags: exclude, Theme: theme, Font: font, TagSuggestionRows: rows, PostsPerPage: perPage}
+	return dto.Preferences{ShowNSFW: u.ShowNSFW, DefaultIncludeTags: include, DefaultExcludeTags: exclude, ShareDefaultTags: u.ShareDefaultTags, Theme: theme, Font: font, TagSuggestionRows: rows, PostsPerPage: perPage}
 }
 
 func securityDTO(sec model.AccountSecurity) dto.Security {

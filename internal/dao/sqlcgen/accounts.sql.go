@@ -131,7 +131,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (username, display_name) VALUES ($1, $2) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role
+INSERT INTO users (username, display_name) VALUES ($1, $2) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, share_default_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role
 `
 
 type CreateUserParams struct {
@@ -152,6 +152,7 @@ type CreateUserRow struct {
 	ShowNsfw           bool
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
+	ShareDefaultTags   bool
 	PreferredTheme     string
 	PreferredFont      string
 	TagSuggestionRows  int32
@@ -175,6 +176,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 		&i.ShowNsfw,
 		pq.Array(&i.DefaultIncludeTags),
 		pq.Array(&i.DefaultExcludeTags),
+		&i.ShareDefaultTags,
 		&i.PreferredTheme,
 		&i.PreferredFont,
 		&i.TagSuggestionRows,
@@ -185,7 +187,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 }
 
 const createUserWithID = `-- name: CreateUserWithID :one
-INSERT INTO users (id, username, display_name) VALUES ($1, $2, $3) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role
+INSERT INTO users (id, username, display_name) VALUES ($1, $2, $3) RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, share_default_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role
 `
 
 type CreateUserWithIDParams struct {
@@ -207,6 +209,7 @@ type CreateUserWithIDRow struct {
 	ShowNsfw           bool
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
+	ShareDefaultTags   bool
 	PreferredTheme     string
 	PreferredFont      string
 	TagSuggestionRows  int32
@@ -230,6 +233,7 @@ func (q *Queries) CreateUserWithID(ctx context.Context, arg CreateUserWithIDPara
 		&i.ShowNsfw,
 		pq.Array(&i.DefaultIncludeTags),
 		pq.Array(&i.DefaultExcludeTags),
+		&i.ShareDefaultTags,
 		&i.PreferredTheme,
 		&i.PreferredFont,
 		&i.TagSuggestionRows,
@@ -331,7 +335,7 @@ func (q *Queries) GetSessionUserID(ctx context.Context, tokenHash []byte) (uuid.
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role FROM users WHERE id = $1
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, share_default_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role FROM users WHERE id = $1
 `
 
 type GetUserByIDRow struct {
@@ -347,6 +351,7 @@ type GetUserByIDRow struct {
 	ShowNsfw           bool
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
+	ShareDefaultTags   bool
 	PreferredTheme     string
 	PreferredFont      string
 	TagSuggestionRows  int32
@@ -370,6 +375,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow
 		&i.ShowNsfw,
 		pq.Array(&i.DefaultIncludeTags),
 		pq.Array(&i.DefaultExcludeTags),
+		&i.ShareDefaultTags,
 		&i.PreferredTheme,
 		&i.PreferredFont,
 		&i.TagSuggestionRows,
@@ -380,7 +386,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role FROM users WHERE username = $1
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, share_default_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role FROM users WHERE username = $1
 `
 
 type GetUserByUsernameRow struct {
@@ -396,6 +402,7 @@ type GetUserByUsernameRow struct {
 	ShowNsfw           bool
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
+	ShareDefaultTags   bool
 	PreferredTheme     string
 	PreferredFont      string
 	TagSuggestionRows  int32
@@ -419,6 +426,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUs
 		&i.ShowNsfw,
 		pq.Array(&i.DefaultIncludeTags),
 		pq.Array(&i.DefaultExcludeTags),
+		&i.ShareDefaultTags,
 		&i.PreferredTheme,
 		&i.PreferredFont,
 		&i.TagSuggestionRows,
@@ -480,7 +488,7 @@ func (q *Queries) InsertWebauthnCredential(ctx context.Context, arg InsertWebaut
 }
 
 const listFilteredUsers = `-- name: ListFilteredUsers :many
-SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, share_default_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role
 FROM users
 WHERE (
     $1::text = ''
@@ -519,6 +527,7 @@ type ListFilteredUsersRow struct {
 	ShowNsfw           bool
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
+	ShareDefaultTags   bool
 	PreferredTheme     string
 	PreferredFont      string
 	TagSuggestionRows  int32
@@ -554,6 +563,7 @@ func (q *Queries) ListFilteredUsers(ctx context.Context, arg ListFilteredUsersPa
 			&i.ShowNsfw,
 			pq.Array(&i.DefaultIncludeTags),
 			pq.Array(&i.DefaultExcludeTags),
+			&i.ShareDefaultTags,
 			&i.PreferredTheme,
 			&i.PreferredFont,
 			&i.TagSuggestionRows,
@@ -574,7 +584,7 @@ func (q *Queries) ListFilteredUsers(ctx context.Context, arg ListFilteredUsersPa
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role FROM users ORDER BY created_at, username
+SELECT id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, share_default_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role FROM users ORDER BY created_at, username
 `
 
 type ListUsersRow struct {
@@ -590,6 +600,7 @@ type ListUsersRow struct {
 	ShowNsfw           bool
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
+	ShareDefaultTags   bool
 	PreferredTheme     string
 	PreferredFont      string
 	TagSuggestionRows  int32
@@ -619,6 +630,7 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 			&i.ShowNsfw,
 			pq.Array(&i.DefaultIncludeTags),
 			pq.Array(&i.DefaultExcludeTags),
+			&i.ShareDefaultTags,
 			&i.PreferredTheme,
 			&i.PreferredFont,
 			&i.TagSuggestionRows,
@@ -812,7 +824,7 @@ func (q *Queries) UpdatePostsPerPage(ctx context.Context, arg UpdatePostsPerPage
 
 const updateProfile = `-- name: UpdateProfile :one
 UPDATE users SET display_name=$2, bio=$3, location=$4, website=$5, updated_at=now()
-WHERE id=$1 RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role
+WHERE id=$1 RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, share_default_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role
 `
 
 type UpdateProfileParams struct {
@@ -836,6 +848,7 @@ type UpdateProfileRow struct {
 	ShowNsfw           bool
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
+	ShareDefaultTags   bool
 	PreferredTheme     string
 	PreferredFont      string
 	TagSuggestionRows  int32
@@ -865,6 +878,7 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (U
 		&i.ShowNsfw,
 		pq.Array(&i.DefaultIncludeTags),
 		pq.Array(&i.DefaultExcludeTags),
+		&i.ShareDefaultTags,
 		&i.PreferredTheme,
 		&i.PreferredFont,
 		&i.TagSuggestionRows,
@@ -872,6 +886,20 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (U
 		&i.Role,
 	)
 	return i, err
+}
+
+const updateShareDefaultTags = `-- name: UpdateShareDefaultTags :exec
+UPDATE users SET share_default_tags=$2, updated_at=now() WHERE id=$1
+`
+
+type UpdateShareDefaultTagsParams struct {
+	ID               uuid.UUID
+	ShareDefaultTags bool
+}
+
+func (q *Queries) UpdateShareDefaultTags(ctx context.Context, arg UpdateShareDefaultTagsParams) error {
+	_, err := q.db.ExecContext(ctx, updateShareDefaultTags, arg.ID, arg.ShareDefaultTags)
+	return err
 }
 
 const updateShowNSFW = `-- name: UpdateShowNSFW :exec
@@ -918,7 +946,7 @@ func (q *Queries) UpdateTagSuggestionRows(ctx context.Context, arg UpdateTagSugg
 }
 
 const updateUserRole = `-- name: UpdateUserRole :one
-UPDATE users SET role=$2, updated_at=now() WHERE id=$1 RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role
+UPDATE users SET role=$2, updated_at=now() WHERE id=$1 RETURNING id, username, display_name, bio, location, website, created_at, avatar_key, avatar_type, show_nsfw, default_include_tags, default_exclude_tags, share_default_tags, preferred_theme, preferred_font, tag_suggestion_rows, posts_per_page, role
 `
 
 type UpdateUserRoleParams struct {
@@ -939,6 +967,7 @@ type UpdateUserRoleRow struct {
 	ShowNsfw           bool
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
+	ShareDefaultTags   bool
 	PreferredTheme     string
 	PreferredFont      string
 	TagSuggestionRows  int32
@@ -962,6 +991,7 @@ func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) 
 		&i.ShowNsfw,
 		pq.Array(&i.DefaultIncludeTags),
 		pq.Array(&i.DefaultExcludeTags),
+		&i.ShareDefaultTags,
 		&i.PreferredTheme,
 		&i.PreferredFont,
 		&i.TagSuggestionRows,

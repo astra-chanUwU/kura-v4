@@ -1768,6 +1768,69 @@ func (_c *MockRepository_UpdateProfile_Call) RunAndReturn(run func(ctx context.C
 	return _c
 }
 
+// UpdateShareDefaultTags provides a mock function for the type MockRepository
+func (_mock *MockRepository) UpdateShareDefaultTags(ctx context.Context, userID string, share bool) error {
+	ret := _mock.Called(ctx, userID, share)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateShareDefaultTags")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) error); ok {
+		r0 = returnFunc(ctx, userID, share)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_UpdateShareDefaultTags_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateShareDefaultTags'
+type MockRepository_UpdateShareDefaultTags_Call struct {
+	*mock.Call
+}
+
+// UpdateShareDefaultTags is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID string
+//   - share bool
+func (_e *MockRepository_Expecter) UpdateShareDefaultTags(ctx any, userID any, share any) *MockRepository_UpdateShareDefaultTags_Call {
+	return &MockRepository_UpdateShareDefaultTags_Call{Call: _e.mock.On("UpdateShareDefaultTags", ctx, userID, share)}
+}
+
+func (_c *MockRepository_UpdateShareDefaultTags_Call) Run(run func(ctx context.Context, userID string, share bool)) *MockRepository_UpdateShareDefaultTags_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_UpdateShareDefaultTags_Call) Return(err error) *MockRepository_UpdateShareDefaultTags_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_UpdateShareDefaultTags_Call) RunAndReturn(run func(ctx context.Context, userID string, share bool) error) *MockRepository_UpdateShareDefaultTags_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateShowNSFW provides a mock function for the type MockRepository
 func (_mock *MockRepository) UpdateShowNSFW(ctx context.Context, userID string, show bool) error {
 	ret := _mock.Called(ctx, userID, show)

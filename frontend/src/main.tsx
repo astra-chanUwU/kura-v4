@@ -15,6 +15,7 @@ import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/700.css";
 import "hack-font/build/web/hack.css";
 import "./styles/global.css";
+import "./styles/themeCatalog.css";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },

@@ -60,6 +60,7 @@ type Repository interface {
 	SetAvatar(ctx context.Context, userID, key, contentType string) error
 	UpdateShowNSFW(ctx context.Context, userID string, show bool) error
 	UpdateTagPreferences(ctx context.Context, userID string, includeTags, excludeTags []string) error
+	UpdateShareDefaultTags(ctx context.Context, userID string, share bool) error
 	UpdateAppearance(ctx context.Context, userID, theme, font string) error
 	UpdateTagSuggestionRows(ctx context.Context, userID string, rows int) error
 	UpdatePostsPerPage(ctx context.Context, userID string, n int) error
@@ -501,8 +502,9 @@ func (s *Service) SetShowNSFW(ctx context.Context, userID string, show, over18 b
 	return s.repo.UpdateShowNSFW(ctx, userID, show)
 }
 
-// Appearance ids, mirrored in frontend/src/domain/appearance.ts.
-var Themes = []string{"kura", "safebooru", "rule34", "umineko", "bernkastel", "lambdadelta", "beatrice", "erika", "battler", "virgilia", "catppuccin", "danbooru"}
+// Appearance ids, mirrored in frontend/src/domain/themeCatalog.ts.
+// AllThemes is generated in themes_gen.go.
+var Themes = AllThemes
 var Fonts = []string{"system", "serif", "rounded", "mono", "hack"}
 
 // SetAppearance records the account's default theme and font. Unknown
@@ -560,6 +562,12 @@ func (s *Service) SetTagPreferences(ctx context.Context, userID string, includeT
 		}
 	}
 	return s.repo.UpdateTagPreferences(ctx, userID, kept, excludeTags)
+}
+
+// SetShareDefaultTags publishes or hides the saved default tags on the
+// public profile. The lists themselves are unchanged.
+func (s *Service) SetShareDefaultTags(ctx context.Context, userID string, share bool) error {
+	return s.repo.UpdateShareDefaultTags(ctx, userID, share)
 }
 
 var tagCleanRE = regexp.MustCompile(`[^a-z0-9_-]+`)

@@ -297,7 +297,7 @@ describe("PostPage staged editing", () => {
     expect(screen.getByText("p1")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Copy post id" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("p1"));
-    expect(screen.getByRole("button", { name: "Copy post id" })).toHaveTextContent("Copied");
+    expect(screen.getByRole("button", { name: "Copy post id" })).toHaveAttribute("title", "Copied");
   });
 
   it("ignores arrows when that neighbor is missing or a modifier is held", () => {
@@ -353,7 +353,7 @@ describe("PostPage copy link", () => {
       const copyId = screen.getByRole("button", { name: "Copy post id" });
       const copyLink = screen.getByRole("button", { name: "Copy link" });
       expect(copyId.parentElement).toBe(copyLink.parentElement);
-      expect(copyLink).toHaveTextContent("Copy link");
+      expect(copyLink).toHaveAttribute("title", "Copy link");
 
       fireEvent.click(copyLink);
       const pageUrl = `${window.location.origin}/posts/p1?tags=yuri`;
@@ -361,17 +361,21 @@ describe("PostPage copy link", () => {
       expect(writeText).toHaveBeenCalledWith(pageUrl);
       expect(writeText).toHaveBeenCalledWith(window.location.href);
       expect(writeText).not.toHaveBeenCalledWith("p1");
-      expect(copyLink).toHaveTextContent("Copied");
-      expect(copyId).toHaveTextContent("Copy");
+      expect(copyLink).toHaveAttribute("title", "Copied");
+      expect(copyId).toHaveAttribute("title", "Copy post id");
 
       fireEvent.click(copyId);
       await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
       expect(writeText).toHaveBeenLastCalledWith("p1");
-      expect(copyId).toHaveTextContent("Copied");
+      expect(copyId).toHaveAttribute("title", "Copied");
+      expect(copyLink).toHaveAttribute("title", "Copy link");
 
       rerender(<PostPage id="p2" />);
-      expect(screen.getByRole("button", { name: "Copy link" })).toHaveTextContent("Copy link");
-      expect(screen.getByRole("button", { name: "Copy post id" })).toHaveTextContent("Copy");
+      expect(screen.getByRole("button", { name: "Copy link" })).toHaveAttribute("title", "Copy link");
+      expect(screen.getByRole("button", { name: "Copy post id" })).toHaveAttribute(
+        "title",
+        "Copy post id",
+      );
     } finally {
       window.history.pushState({}, "", previous || "/");
     }

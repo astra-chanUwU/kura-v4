@@ -39,6 +39,9 @@ type Profile struct {
 	// in it (scoped to that page).
 	Theme string `json:"theme"`
 	Font  string `json:"font"`
+	// Default board tags, set only when the owner shares them.
+	DefaultIncludeTags []string `json:"default_include_tags,omitempty"`
+	DefaultExcludeTags []string `json:"default_exclude_tags,omitempty"`
 }
 
 type Post struct {
@@ -96,10 +99,12 @@ type Preferences struct {
 	ShowNSFW           bool     `json:"show_nsfw"`
 	DefaultIncludeTags []string `json:"default_include_tags"`
 	DefaultExcludeTags []string `json:"default_exclude_tags"`
-	Theme              string   `json:"theme"`
-	Font               string   `json:"font"`
-	TagSuggestionRows  int      `json:"tag_suggestion_rows"`
-	PostsPerPage       int      `json:"posts_per_page"`
+	// ShareDefaultTags is true when the public profile may show those tags.
+	ShareDefaultTags  bool   `json:"share_default_tags"`
+	Theme             string `json:"theme"`
+	Font              string `json:"font"`
+	TagSuggestionRows int    `json:"tag_suggestion_rows"`
+	PostsPerPage      int    `json:"posts_per_page"`
 }
 
 // UpdateTagSuggestionRows sets how many rows of board tag suggestions
@@ -123,6 +128,8 @@ type UpdateAppearance struct {
 type UpdateTagPreferences struct {
 	IncludeTags []string `json:"include_tags"`
 	ExcludeTags []string `json:"exclude_tags"`
+	// Share is omitted when the caller is only replacing the tag lists.
+	Share *bool `json:"share,omitempty"`
 }
 
 // UpdatePreferences changes content settings; enabling NSFW requires

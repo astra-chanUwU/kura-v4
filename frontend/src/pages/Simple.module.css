@@ -124,6 +124,16 @@
   margin: 0;
   font-size: 1rem;
 }
+.card h2.sectionHead {
+  font-size: 1.35rem;
+  font-weight: 550;
+  letter-spacing: -0.03em;
+}
+.prefStack {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
 .actions {
   display: flex;
   gap: 0.5rem;

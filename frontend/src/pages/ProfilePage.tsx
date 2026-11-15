@@ -1,8 +1,9 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { Pager } from "../components/Pager";
 import { PostCard } from "../components/PostCard";
 import { ShareProfileButton } from "../components/ShareProfileButton";
+import { formatTagLine } from "../domain/boardFilter";
 import { PROFILE_PAGE_SIZE } from "../domain/profileSearch";
 import { useProfile } from "../hooks/useCollections";
 import styles from "./Profile.module.css";
@@ -19,6 +20,7 @@ import {
 export function ProfilePage({ username, page = 1 }: { username: string; page?: number }) {
   const navigate = useNavigate();
   const { data, isPending, error } = useProfile(username, page);
+  const [copiedTags, setCopiedTags] = useState(false);
   const goToPage = (next: number) => {
     if (!Number.isInteger(next) || next < 1 || next === page) return;
     void navigate({
@@ -35,6 +37,9 @@ export function ProfilePage({ username, page = 1 }: { username: string; page?: n
   const uploads = data.uploads ?? [];
   const theme = normalizeTheme(data.theme);
   const font = normalizeFont(data.font);
+  const defaultInclude = data.default_include_tags ?? [];
+  const defaultExclude = data.default_exclude_tags ?? [];
+  const sharedTags = defaultInclude.length > 0 || defaultExclude.length > 0;
   return (
     <section
       className={`${styles.page} ${styles.themed}`}
@@ -80,6 +85,48 @@ export function ProfilePage({ username, page = 1 }: { username: string; page?: n
           <ShareProfileButton username={user.username} />
         </div>
       </div>
+      {sharedTags && (
+        <div className={styles.defaults}>
+          <h2>Default board tags</h2>
+          <p className={styles.muted}>The filter this account opens the board on.</p>
+          <div className={styles.tagRow}>
+            {defaultInclude.map((tag) => (
+              <span key={tag} className={styles.tag}>
+                {tag}
+              </span>
+            ))}
+            {defaultExclude.map((tag) => (
+              <span key={tag} className={`${styles.tag} ${styles.tagExcluded}`}>
+                −{tag}
+              </span>
+            ))}
+          </div>
+          <div className={styles.tagActions}>
+            <button
+              type="button"
+              aria-label="Copy default tags"
+              onClick={() => {
+                const line = formatTagLine(defaultInclude, defaultExclude);
+                void navigator.clipboard?.writeText(line).then(() => {
+                  setCopiedTags(true);
+                  window.setTimeout(() => setCopiedTags(false), 2000);
+                });
+              }}
+            >
+              {copiedTags ? "Copied" : "Copy default tags"}
+            </button>
+            <Link
+              to="/"
+              search={{
+                ...(defaultInclude.length > 0 ? { tags: defaultInclude.join(",") } : {}),
+                ...(defaultExclude.length > 0 ? { exclude: defaultExclude.join(",") } : {}),
+              }}
+            >
+              Open on the board
+            </Link>
+          </div>
+        </div>
+      )}
       {user.bio && <p className={styles.bio}>{user.bio}</p>}
       {user.website && (
         <p>

@@ -26,6 +26,9 @@ type User struct {
 	// Default board tag filters, applied when the board loads.
 	DefaultIncludeTags []string
 	DefaultExcludeTags []string
+	// ShareDefaultTags publishes those filters on the public profile
+	// so someone else can copy them. Off until the owner turns it on.
+	ShareDefaultTags bool
 }
 
 // UserPage is one page of the staff people directory.

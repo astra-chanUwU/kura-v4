@@ -1,10 +1,10 @@
 import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { PostComments } from "../components/PostComments";
 import { PostReport } from "../components/PostReport";
 import { HistoryList } from "../components/HistoryList";
-import { IconEye, IconEyeOff, IconTrash } from "../components/icons";
+import { IconCheck, IconCopy, IconEye, IconEyeOff, IconLink, IconTrash } from "../components/icons";
 import { PostActions } from "../components/PostCard";
 import { RelatedPosts } from "../components/RelatedPosts";
 import { shortError, useToasts } from "../components/Toasts";
@@ -107,6 +107,8 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
   const [confirmHide, setConfirmHide] = useState(false);
   const [idCopied, setIdCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const copyTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(copyTimer.current), []);
   const [sampleFailedFor, setSampleFailedFor] = useState<string | null>(null);
 
   // Drafts belong to one post; never carry them across pictures.
@@ -123,7 +125,17 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
     setMetaError("");
     setIdCopied(false);
     setLinkCopied(false);
+    window.clearTimeout(copyTimer.current);
   }
+  const flashCopied = (which: "id" | "link") => {
+    window.clearTimeout(copyTimer.current);
+    setIdCopied(which === "id");
+    setLinkCopied(which === "link");
+    copyTimer.current = window.setTimeout(() => {
+      setIdCopied(false);
+      setLinkCopied(false);
+    }, 2000);
+  };
 
   // Staged editing: tag/artist/rating changes sit in drafts and only hit
   // the server on Save — one save, one history entry, one rollback point.
@@ -429,36 +441,40 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
               <dt className={styles.detailLabel}>Post ID</dt>
               <dd className={styles.idLine}>
                 <code className={styles.postId}>{post.id}</code>
-                <button
-                  type="button"
-                  className={styles.copyId}
-                  aria-label="Copy post id"
-                  onClick={() => {
-                    const write = navigator.clipboard?.writeText(post.id);
-                    if (!write) return;
-                    void write.then(
-                      () => setIdCopied(true),
-                      () => setIdCopied(false),
-                    );
-                  }}
-                >
-                  {idCopied ? "Copied" : "Copy"}
-                </button>
-                <button
-                  type="button"
-                  className={styles.copyId}
-                  aria-label="Copy link"
-                  onClick={() => {
-                    const write = navigator.clipboard?.writeText(absolutePostUrl(post.id));
-                    if (!write) return;
-                    void write.then(
-                      () => setLinkCopied(true),
-                      () => setLinkCopied(false),
-                    );
-                  }}
-                >
-                  {linkCopied ? "Copied" : "Copy link"}
-                </button>
+                <span className={styles.copyPair}>
+                  <button
+                    type="button"
+                    className={idCopied ? styles.copyDone : styles.copyId}
+                    aria-label="Copy post id"
+                    title={idCopied ? "Copied" : "Copy post id"}
+                    onClick={() => {
+                      const write = navigator.clipboard?.writeText(post.id);
+                      if (!write) return;
+                      void write.then(
+                        () => flashCopied("id"),
+                        () => setIdCopied(false),
+                      );
+                    }}
+                  >
+                    {idCopied ? <IconCheck /> : <IconCopy />}
+                  </button>
+                  <button
+                    type="button"
+                    className={linkCopied ? styles.copyDone : styles.copyId}
+                    aria-label="Copy link"
+                    title={linkCopied ? "Copied" : "Copy link"}
+                    onClick={() => {
+                      const write = navigator.clipboard?.writeText(absolutePostUrl(post.id));
+                      if (!write) return;
+                      void write.then(
+                        () => flashCopied("link"),
+                        () => setLinkCopied(false),
+                      );
+                    }}
+                  >
+                    {linkCopied ? <IconCheck /> : <IconLink />}
+                  </button>
+                </span>
               </dd>
             </div>
             <div>

@@ -102,8 +102,8 @@ export function useAccountActions() {
         invalidateSearch(client);
         return me;
       }),
-    setTagPreferences: (includeTags: string[], excludeTags: string[]) =>
-      api.setTagPreferences(includeTags, excludeTags).then(refresh),
+    setTagPreferences: (includeTags: string[], excludeTags: string[], share?: boolean) =>
+      api.setTagPreferences(includeTags, excludeTags, share).then(refresh),
     setAppearance: (theme: string, font: string) => api.setAppearance(theme, font).then(refresh),
     setPostsPerPage: (postsPerPage: number) =>
       api.setPostsPerPage(postsPerPage).then((me) => {

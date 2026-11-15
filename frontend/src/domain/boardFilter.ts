@@ -71,6 +71,36 @@ export function splitTagInput(text: string): { include: string[]; exclude: strin
   return { include: include.filter((tag) => !seenEx.has(tag)), exclude };
 }
 
+/** One line the search box can read back: `long_hair yuri -comic`. */
+export function formatTagLine(include: string[], exclude: string[]): string {
+  return [...include, ...exclude.map((tag) => `-${tag}`)].join(" ");
+}
+
+/**
+ * Tags from a clipboard paste. A board URL (`?tags=&exclude=`) wins.
+ * Anything else is read as a tag line. A link with no tag params is empty,
+ * so pasting a picture URL does not become tags.
+ */
+export function tagsFromClipboard(text: string): { include: string[]; exclude: string[] } {
+  const trimmed = text.trim();
+  if (trimmed === "") return { include: [], exclude: [] };
+  try {
+    const url = new URL(trimmed);
+    if (url.searchParams.has("tags") || url.searchParams.has("exclude")) {
+      return {
+        include: parseTagList(url.searchParams.get("tags") ?? undefined),
+        exclude: parseTagList(url.searchParams.get("exclude") ?? undefined),
+      };
+    }
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return { include: [], exclude: [] };
+    }
+  } catch {
+    // A tag line, not a URL.
+  }
+  return splitTagInput(trimmed);
+}
+
 /** Normalized tokens from one tag line, required and excluded together. */
 export function tagTokens(text: string): string[] {
   const { include, exclude } = splitTagInput(text);

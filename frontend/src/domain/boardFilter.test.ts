@@ -4,10 +4,12 @@ import {
   boardPageFromSearch,
   filterFromSearch,
   filterPosts,
+  formatTagLine,
   mergeTagEdit,
   neighborsOf,
   searchFromFilter,
   splitTagInput,
+  tagsFromClipboard,
   validateBoardSearch,
 } from "./boardFilter";
 
@@ -102,6 +104,27 @@ describe("board filter URL round trip", () => {
     expect(boardPageFromSearch({})).toBe(1);
     expect(boardPageFromSearch({ page: 4 })).toBe(4);
     expect(searchFromFilter({ tags: ["yuri"], exclude: [], q: "" }).page).toBeUndefined();
+  });
+});
+
+describe("formatTagLine", () => {
+  it("writes a line the search box can paste back", () => {
+    expect(formatTagLine(["long_hair", "yuri"], ["comic"])).toBe("long_hair yuri -comic");
+    expect(formatTagLine([], [])).toBe("");
+    expect(tagsFromClipboard("long_hair yuri -comic")).toEqual({
+      include: ["long_hair", "yuri"],
+      exclude: ["comic"],
+    });
+    expect(
+      tagsFromClipboard("http://localhost:5174/?tags=silver_hair,long_hair&exclude=comic"),
+    ).toEqual({
+      include: ["silver_hair", "long_hair"],
+      exclude: ["comic"],
+    });
+    expect(tagsFromClipboard("https://example.com/picture")).toEqual({
+      include: [],
+      exclude: [],
+    });
   });
 });
 

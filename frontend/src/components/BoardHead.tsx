@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   boardSort,
+  formatTagLine,
   isFilterActive,
+  mergeTagEdit,
   tagTokens,
+  tagsFromClipboard,
   type BoardFilter,
   type BoardSort,
 } from "../domain/boardFilter";
@@ -12,7 +15,28 @@ import type { BoardView } from "../hooks/useBoardView";
 import styles from "./board.module.css";
 import { BoardTagPanel } from "./BoardTagPanel";
 import { BoardViewControls } from "./BoardViewControls";
+import {
+  IconBookmark,
+  IconCheck,
+  IconCopy,
+  IconDice,
+  IconFilter,
+  IconPaste,
+  IconSliders,
+  IconUpload,
+  IconX,
+} from "./icons";
 import { SaveCurrentSearchButton } from "./SavedSearches";
+
+const TOOLS_KEY = "kura-board-tools";
+
+function readToolsOpen(): boolean {
+  try {
+    return localStorage.getItem(TOOLS_KEY) === "open";
+  } catch {
+    return false;
+  }
+}
 
 type BoardHeadProps = {
   selectedTags: string[];
@@ -88,6 +112,11 @@ export function BoardHead({
   const [searchText, setSearchText] = useState(appliedQuery);
   const [searchFocused, setSearchFocused] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  const [clipNote, setClipNote] = useState("");
+  const [toolsOpen, setToolsOpen] = useState(readToolsOpen);
+  const toolsId = useId();
+  const clipTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(clipTimer.current), []);
   const [seenKey, setSeenKey] = useState(appliedKey);
   if (seenKey !== appliedKey) {
     setSeenKey(appliedKey);
@@ -107,6 +136,33 @@ export function BoardHead({
     (searchText.trim() !== appliedQuery ? 1 : 0);
   const filtersDirty = pendingCount > 0;
   const filterActive = isFilterActive(appliedFilter);
+  const resultSummary = searching
+    ? "Searching…"
+    : `${total} result${total === 1 ? "" : "s"}${
+        appliedTags.length > 0 ? " with all selected tags" : ""
+      }${
+        appliedExcludedTags.length > 0
+          ? `, excluding ${appliedExcludedTags.length} tag${appliedExcludedTags.length === 1 ? "" : "s"}`
+          : ""
+      }${filtersDirty ? " · unapplied changes" : ""}`;
+  const showClear =
+    selectedTags.length > 0 ||
+    excludedTags.length > 0 ||
+    appliedTags.length > 0 ||
+    appliedExcludedTags.length > 0 ||
+    searchText.trim() !== "" ||
+    appliedQuery !== "";
+  const toggleTools = () => {
+    setToolsOpen((open) => {
+      const next = !open;
+      try {
+        localStorage.setItem(TOOLS_KEY, next ? "open" : "closed");
+      } catch {
+        // The toggle still works for this visit.
+      }
+      return next;
+    });
+  };
   const applyFilters = () => {
     const q = searchText.trim();
     setSearchText(q);
@@ -126,6 +182,52 @@ export function BoardHead({
     setHighlight(0);
     if (exclude) addExcludedTag(tag);
     else addTag(tag);
+  };
+  const flashClip = (note: string) => {
+    window.clearTimeout(clipTimer.current);
+    setClipNote(note);
+    clipTimer.current = window.setTimeout(() => setClipNote(""), 2000);
+  };
+  const applyClipboardTags = (text: string) => {
+    const parsed = tagsFromClipboard(text);
+    if (parsed.include.length + parsed.exclude.length === 0) return false;
+    const next = mergeTagEdit(
+      "include",
+      formatTagLine(parsed.include, parsed.exclude),
+      selectedTags,
+      excludedTags,
+    );
+    setSearchText("");
+    setHighlight(0);
+    commitFilter(next.include, next.exclude, appliedQuery, true);
+    return true;
+  };
+  const hasTags = selectedTags.length > 0 || excludedTags.length > 0;
+  const copyTags = () => {
+    const line = formatTagLine(selectedTags, excludedTags);
+    const write = navigator.clipboard?.writeText(line);
+    if (!write) {
+      flashClip("Couldn't copy");
+      return;
+    }
+    void write.then(
+      () => flashClip("Copied"),
+      () => flashClip("Couldn't copy"),
+    );
+  };
+  const pasteTags = () => {
+    const read = navigator.clipboard?.readText();
+    if (!read) {
+      flashClip("Couldn't paste");
+      return;
+    }
+    void read.then(
+      (text) => {
+        if (applyClipboardTags(text)) flashClip("Pasted");
+        else flashClip("No tags");
+      },
+      () => flashClip("Couldn't paste"),
+    );
   };
 
   return (
@@ -178,6 +280,7 @@ export function BoardHead({
               ))}
             </div>
           )}
+          <div className={styles.searchLine}>
           <div className={styles.searchBox}>
             <input
               type="search"
@@ -190,6 +293,15 @@ export function BoardHead({
               onBlur={() => {
                 // Delay so a suggestion click registers first.
                 setTimeout(() => setSearchFocused(false), 120);
+              }}
+              onPaste={(e) => {
+                const text = e.clipboardData.getData("text");
+                const parsed = tagsFromClipboard(text);
+                const count = parsed.include.length + parsed.exclude.length;
+                const multi = /[\s,]/.test(text.trim()) || parsed.exclude.length > 0;
+                if (count === 0 || !multi) return;
+                e.preventDefault();
+                applyClipboardTags(text);
               }}
               onKeyDown={(e) => {
                 if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -278,102 +390,179 @@ export function BoardHead({
               </ul>
             )}
           </div>
-        </div>
-
-        <div className={styles.controlsRow}>
-          <div className={styles.filterControls}>
             <button
               type="button"
-              className={filtersDirty ? styles.filterActive : styles.filterButton}
+              className={filtersDirty ? styles.searchSubmitDirty : styles.searchSubmit}
               onClick={applyFilters}
+              title={
+                filtersDirty
+                  ? `Apply ${pendingCount} unapplied change${pendingCount === 1 ? "" : "s"}`
+                  : "Apply the filter"
+              }
               aria-label={
                 filtersDirty
                   ? `Filter (${pendingCount} unapplied change${pendingCount === 1 ? "" : "s"})`
                   : "Filter"
               }
             >
-              Filter
+              <IconFilter />
+              <span className={styles.searchSubmitLabel}>Filter</span>
             </button>
-            {(selectedTags.length > 0 ||
-              excludedTags.length > 0 ||
-              appliedTags.length > 0 ||
-              appliedExcludedTags.length > 0 ||
-              searchText.trim() !== "" ||
-              appliedQuery !== "") && (
-              <button type="button" className={styles.clearButton} onClick={clearFilters}>
-                Clear
-              </button>
+          </div>
+        </div>
+
+        <div className={styles.controlsRow} data-tools={toolsOpen ? "open" : "closed"}>
+          <button
+            type="button"
+            className={styles.toolsToggle}
+            aria-expanded={toolsOpen}
+            aria-controls={toolsId}
+            aria-label={filterActive ? `Board tools, ${resultSummary}` : "Board tools"}
+            onClick={toggleTools}
+          >
+            <span className={styles.toolsMain}>
+              <IconSliders />
+              Board tools
+            </span>
+            <span className={styles.toolsAside}>
+              {filterActive && (
+                <span className={styles.toolsCount}>{searching ? "…" : total}</span>
+              )}
+              <span className={styles.toolsChevron} aria-hidden="true">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <path d="m6 9.5 6 6 6-6" />
+                </svg>
+              </span>
+            </span>
+          </button>
+          <div className={styles.toolbar} id={toolsId}>
+            {(showClear || differsFromDefaults) && (
+            <div className={styles.iconGroup} role="group" aria-label="Filter actions">
+              {showClear && (
+                <button
+                  type="button"
+                  className={styles.clearButton}
+                  onClick={clearFilters}
+                  aria-label="Clear"
+                  title="Clear the filter"
+                >
+                  <IconX />
+                </button>
+              )}
+              {differsFromDefaults && (
+                <button
+                  type="button"
+                  className={styles.defaultsButton}
+                  aria-label="My defaults"
+                  title="Restore my default tags"
+                  onClick={() => {
+                    setSearchText("");
+                    applyDefaults();
+                  }}
+                >
+                  <IconBookmark />
+                </button>
+              )}
+            </div>
             )}
-            {differsFromDefaults && (
+            <div className={styles.iconGroup} role="group" aria-label="Clipboard">
+              {hasTags && (
+                <button
+                  type="button"
+                  className={clipNote === "Couldn't copy" ? styles.clipBad : undefined}
+                  aria-label="Copy these tags"
+                  title={
+                    clipNote === "Copied" || clipNote === "Couldn't copy"
+                      ? clipNote
+                      : "Copy these tags"
+                  }
+                  onClick={copyTags}
+                >
+                  {clipNote === "Copied" ? <IconCheck /> : <IconCopy />}
+                </button>
+              )}
               <button
                 type="button"
-                className={styles.defaultsButton}
-                onClick={() => {
-                  setSearchText("");
-                  applyDefaults();
-                }}
+                className={
+                  clipNote === "No tags" || clipNote === "Couldn't paste"
+                    ? styles.clipBad
+                    : undefined
+                }
+                aria-label="Paste tags"
+                title={
+                  clipNote === "Pasted" || clipNote === "No tags" || clipNote === "Couldn't paste"
+                    ? clipNote
+                    : "Paste tags"
+                }
+                onClick={pasteTags}
               >
-                My defaults
+                {clipNote === "Pasted" ? <IconCheck /> : <IconPaste />}
               </button>
-            )}
-          </div>
-          <div className={styles.sortGroup} role="group" aria-label="Sort">
-            <button
-              type="button"
-              aria-pressed={boardSort(appliedFilter.sort) === "newest"}
-              className={boardSort(appliedFilter.sort) === "newest" ? styles.viewActive : ""}
-              onClick={() => changeSort("newest")}
-            >
-              Newest
-            </button>
-            <button
-              type="button"
-              aria-pressed={boardSort(appliedFilter.sort) === "oldest"}
-              className={boardSort(appliedFilter.sort) === "oldest" ? styles.viewActive : ""}
-              onClick={() => changeSort("oldest")}
-            >
-              Oldest
-            </button>
-            <button
-              type="button"
-              aria-pressed={boardSort(appliedFilter.sort) === "favorites"}
-              className={boardSort(appliedFilter.sort) === "favorites" ? styles.viewActive : ""}
-              onClick={() => changeSort("favorites")}
-            >
-              Favorites
-            </button>
-          </div>
-          {filterActive &&
-            (searching ? (
-              <span className={styles.searchMeta}>Searching…</span>
-            ) : (
-              <span className={styles.searchMeta}>
-                {total} result{total === 1 ? "" : "s"}
-                {appliedTags.length > 0 ? " with all selected tags" : ""}
-                {appliedExcludedTags.length > 0
-                  ? `, excluding ${appliedExcludedTags.length} tag${appliedExcludedTags.length === 1 ? "" : "s"}`
-                  : ""}
-                {filtersDirty ? " · unapplied changes" : ""}
-              </span>
-            ))}
-          <div className={styles.viewControls}>
+            </div>
+            <div className={styles.sortGroup} role="group" aria-label="Sort">
+              <button
+                type="button"
+                aria-pressed={boardSort(appliedFilter.sort) === "newest"}
+                className={boardSort(appliedFilter.sort) === "newest" ? styles.viewActive : ""}
+                onClick={() => changeSort("newest")}
+              >
+                Newest
+              </button>
+              <button
+                type="button"
+                aria-pressed={boardSort(appliedFilter.sort) === "oldest"}
+                className={boardSort(appliedFilter.sort) === "oldest" ? styles.viewActive : ""}
+                onClick={() => changeSort("oldest")}
+              >
+                Oldest
+              </button>
+              <button
+                type="button"
+                aria-pressed={boardSort(appliedFilter.sort) === "favorites"}
+                className={boardSort(appliedFilter.sort) === "favorites" ? styles.viewActive : ""}
+                onClick={() => changeSort("favorites")}
+              >
+                Favorites
+              </button>
+            </div>
             <BoardViewControls view={view} onChange={changeView} />
-            <SaveCurrentSearchButton filter={appliedFilter} />
-            <button
-              type="button"
-              className={styles.uploadButton}
-              onClick={pickRandom}
-              disabled={randomBusy}
-              aria-busy={randomBusy}
-            >
-              Random
-            </button>
-            {signedIn && (
-              <button type="button" className={styles.uploadButton} onClick={openUpload}>
-                ⬆ Upload
-              </button>
-            )}
+            <div className={styles.actions}>
+              <SaveCurrentSearchButton filter={appliedFilter} />
+              <div className={styles.iconGroup} role="group" aria-label="Board actions">
+                <button
+                  type="button"
+                  onClick={pickRandom}
+                  disabled={randomBusy}
+                  aria-busy={randomBusy}
+                  aria-label="Random"
+                  title="Open a random picture"
+                >
+                  <IconDice />
+                </button>
+                {signedIn && (
+                  <button type="button" onClick={openUpload} aria-label="Upload" title="Upload">
+                    <IconUpload />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
+          {filterActive && (
+            <p className={styles.searchMeta} role="status">
+              {resultSummary}
+            </p>
+          )}
+          <span className={styles.srOnly} role="status">
+            {clipNote}
+          </span>
         </div>
 
         {showTagPanel && (

@@ -20,6 +20,7 @@
 }
 
 .button,
+.iconButton,
 .save,
 .cancel,
 .delete {
@@ -43,7 +44,23 @@
   color: var(--danger);
 }
 
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border-color: var(--border-strong);
+  border-radius: 0.45rem;
+  color: var(--muted);
+}
+.iconButton:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
 .button:focus-visible,
+.iconButton:focus-visible,
 .save:focus-visible,
 .cancel:focus-visible,
 .delete:focus-visible,
@@ -52,6 +69,12 @@
   outline-offset: 2px;
 }
 
+@media (max-width: 700px) {
+  .iconButton {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}
 .button:disabled,
 .save:disabled,
 .cancel:disabled,

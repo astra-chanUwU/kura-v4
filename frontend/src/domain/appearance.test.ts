@@ -16,7 +16,7 @@ import {
 
 describe("appearance", () => {
   it("lists every theme and real font with labels", () => {
-    expect(THEMES).toEqual([
+    expect(THEMES.slice(0, 12)).toEqual([
       "kura",
       "safebooru",
       "rule34",
@@ -30,6 +30,12 @@ describe("appearance", () => {
       "catppuccin",
       "danbooru",
     ]);
+    expect(THEMES).toContain("8008");
+    expect(THEMES).toContain("dracula");
+    expect(THEMES).toContain("night_library");
+    expect(THEMES).toContain("matcha_room");
+    expect(new Set(THEMES).size).toBe(THEMES.length);
+    expect(THEMES.length).toBeGreaterThan(100);
     expect(FONTS).toEqual(["system", "serif", "rounded", "mono", "hack"]);
     expect(THEME_LABELS.umineko).toBe("Umineko");
     expect(THEME_LABELS.catppuccin).toBe("Catppuccin");
@@ -46,6 +52,7 @@ describe("appearance", () => {
 
   it("fails closed to defaults for unknown values", () => {
     expect(isThemeId("kura")).toBe(true);
+    expect(isThemeId("dracula")).toBe(true);
     expect(isThemeId("neon")).toBe(false);
     expect(isFontId("mono")).toBe(true);
     expect(isFontId("comic")).toBe(false);

@@ -251,6 +251,10 @@ func (r *Accounts) UpdateTagPreferences(ctx context.Context, userID string, incl
 	return r.dao.UpdateTagPreferences(ctx, userID, includeTags, excludeTags)
 }
 
+func (r *Accounts) UpdateShareDefaultTags(ctx context.Context, userID string, share bool) error {
+	return r.dao.UpdateShareDefaultTags(ctx, userID, share)
+}
+
 func (r *Accounts) UpdateAppearance(ctx context.Context, userID, theme, font string) error {
 	return r.dao.UpdateAppearance(ctx, userID, theme, font)
 }

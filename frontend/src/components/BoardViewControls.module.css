@@ -11,13 +11,17 @@
   overflow: hidden;
 }
 .viewGroup button {
-  padding: 0.35rem 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
   border: none;
   border-right: 1px solid var(--border);
   background: var(--surface);
   color: var(--muted);
   cursor: pointer;
-  font-size: 0.8rem;
 }
 .viewGroup button:last-child {
   border-right: none;
@@ -33,7 +37,8 @@
   color: var(--text);
 }
 @media (max-width: 700px) {
-  .viewGroup {
-    display: none;
+  .viewGroup button {
+    width: 2.75rem;
+    height: 2.75rem;
   }
 }

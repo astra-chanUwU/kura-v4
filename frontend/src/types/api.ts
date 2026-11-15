@@ -112,6 +112,9 @@ export interface Profile {
   uploads: Post[];
   theme: ThemeId;
   font: FontId;
+  /** Set only when this account shares its default board tags. */
+  default_include_tags?: string[];
+  default_exclude_tags?: string[];
 }
 export interface PasskeyInfo {
   id: string;
@@ -129,6 +132,8 @@ export interface Preferences {
   show_nsfw: boolean;
   default_include_tags: string[];
   default_exclude_tags: string[];
+  /** When true, the public profile offers these tags to copy. */
+  share_default_tags: boolean;
   theme: ThemeId;
   font: FontId;
   tag_suggestion_rows: number;
