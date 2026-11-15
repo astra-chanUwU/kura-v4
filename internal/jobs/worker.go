@@ -2,7 +2,6 @@ package jobs
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,7 +43,7 @@ func Run(ctx context.Context, queue Queue, handlers map[string]Handler, concurre
 				case <-ticker.C:
 				}
 				job, err := queue.Claim(ctx, kinds)
-				if errors.Is(err, sql.ErrNoRows) {
+				if errors.Is(err, model.ErrEmpty) {
 					continue
 				}
 				if err != nil {

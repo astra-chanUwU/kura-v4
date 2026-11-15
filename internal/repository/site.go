@@ -1,9 +1,19 @@
 package repository
 
-import "github.com/astra-chanUwU/kura-v4/internal/dao"
+import (
+	"context"
 
-// Promoted DAO methods avoid forwarding boilerplate. Composite operations and
-// transactions belong here when a feature needs them.
-type Site struct{ *dao.SiteDAO }
+	"github.com/astra-chanUwU/kura-v4/internal/dao"
+	"github.com/astra-chanUwU/kura-v4/internal/model"
+)
 
-func NewSite(d *dao.SiteDAO) *Site { return &Site{SiteDAO: d} }
+// Site is the concrete store behind site.Repository.
+type Site struct {
+	dao *dao.SiteDAO
+}
+
+func NewSite(d *dao.SiteDAO) *Site { return &Site{dao: d} }
+
+func (r *Site) Get(ctx context.Context) (model.Site, error) {
+	return r.dao.Get(ctx)
+}

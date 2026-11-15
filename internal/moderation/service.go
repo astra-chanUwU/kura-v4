@@ -2,7 +2,6 @@ package moderation
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
 	"unicode/utf8"
@@ -49,7 +48,7 @@ type Service struct{ repo Repository }
 
 func NewService(repo Repository) *Service { return &Service{repo: repo} }
 
-func notFound(err error) bool { return errors.Is(err, sql.ErrNoRows) }
+func notFound(err error) bool { return errors.Is(err, model.ErrNotFound) }
 
 func clampLimit(limit int32) int32 {
 	if limit <= 0 {

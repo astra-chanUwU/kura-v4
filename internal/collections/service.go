@@ -2,7 +2,6 @@ package collections
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
 
@@ -108,7 +107,7 @@ func (s *Service) PublicLists(ctx context.Context, ownerID string) ([]model.List
 // GetList enforces visibility: private lists are only visible to their owner.
 func (s *Service) GetList(ctx context.Context, viewerID *string, id string, includeNSFW bool, exclude []string, limit, offset int) (model.ListDetail, error) {
 	list, err := s.repo.GetList(ctx, id)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, model.ErrNotFound) {
 		return model.ListDetail{}, ErrNotFound
 	}
 	if err != nil {
@@ -140,7 +139,7 @@ func (s *Service) GetList(ctx context.Context, viewerID *string, id string, incl
 
 func (s *Service) ownedList(ctx context.Context, ownerID, id string) (model.List, error) {
 	list, err := s.repo.GetList(ctx, id)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, model.ErrNotFound) {
 		return model.List{}, ErrNotFound
 	}
 	if err != nil {
@@ -161,7 +160,7 @@ func (s *Service) UpdateList(ctx context.Context, ownerID, id, title, desc, vis 
 		return model.List{}, err
 	}
 	updated, err := s.repo.UpdateList(ctx, id, ownerID, title, desc, vis)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, model.ErrNotFound) {
 		return model.List{}, ErrNotFound
 	}
 	return updated, err

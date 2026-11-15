@@ -1,13 +1,10 @@
 import { useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { BoardTagPanel } from "../components/BoardTagPanel";
-import { BoardViewControls } from "../components/BoardViewControls";
+import { BoardHead } from "../components/BoardHead";
+import { BoardResults } from "../components/BoardResults";
 import { Pager } from "../components/Pager";
-import { PostCard } from "../components/PostCard";
-import { PostRow } from "../components/PostRow";
 import { shortError, useToasts } from "../components/Toasts";
-import { SaveCurrentSearchButton } from "../components/SavedSearches";
 import { UploadDialog } from "../components/UploadDialog";
 import uploadStyles from "../components/UploadDialog.module.css";
 import {
@@ -25,7 +22,6 @@ import { clampPage, pageCount, resolvePageSize, snapPageSize } from "../domain/p
 import {
   normalizeTagToken,
   prefetchBoardPage,
-  tagTokens,
   useBoard,
   useDebouncedValue,
   useMe,
@@ -595,266 +591,52 @@ export function HomePage() {
           </button>
         </p>
       )}
-      {/* Sticky board head: centered search → controls → page-tag panel. */}
-      <div className={styles.boardHead}>
-        <div className={styles.searchRow}>
-          {(selectedTags.length > 0 || excludedTags.length > 0) && (
-            <div className={styles.chipRow} aria-label="Tag filters">
-              {selectedTags.map((tag) => (
-                <span
-                  key={`in-${tag}`}
-                  className={`${styles.chip} ${appliedTags.includes(tag) ? "" : styles.chipPending}`}
-                >
-                  {tag}
-                  <button
-                    type="button"
-                    aria-label={`Remove tag ${tag}`}
-                    onClick={() =>
-                      commitFilter(
-                        selectedTags.filter((t) => t !== tag),
-                        excludedTags,
-                        appliedQuery,
-                      )
-                    }
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              {excludedTags.map((tag) => (
-                <span
-                  key={`ex-${tag}`}
-                  className={`${styles.chip} ${styles.chipExcluded} ${appliedExcludedTags.includes(tag) ? "" : styles.chipPending}`}
-                >
-                  −{tag}
-                  <button
-                    type="button"
-                    aria-label={`Remove excluded tag ${tag}`}
-                    onClick={() =>
-                      commitFilter(
-                        selectedTags,
-                        excludedTags.filter((t) => t !== tag),
-                        appliedQuery,
-                      )
-                    }
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-          <div className={styles.searchBox}>
-            <input
-              type="search"
-              value={searchText}
-              onChange={(e) => {
-                setSearchText(e.target.value);
-                setHighlight(0);
-              }}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => {
-                // Delay so a suggestion click registers first.
-                setTimeout(() => setSearchFocused(false), 120);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-                  e.preventDefault();
-                  const delta = e.key === "ArrowDown" ? 1 : -1;
-                  setHighlight((h) => Math.max(0, Math.min(suggestions.length - 1, h + delta)));
-                } else if (e.key === "Enter" && searchFocused) {
-                  e.preventDefault();
-                  if (searchText.trim() === "") {
-                    // Enter on an empty box submits the staged filter.
-                    applyFilters();
-                  } else if (
-                    searchText.trim().startsWith("-") ||
-                    searchText.trim().includes(" -") ||
-                    tagTokens(searchText).length > 1
-                  ) {
-                    addTagsFromText(searchText);
-                  } else {
-                    const pick = suggestions[highlight] ?? suggestions[0];
-                    if (pick) addTag(pick.tag);
-                    else addTagsFromText(searchText);
-                  }
-                } else if (
-                  e.key === "Backspace" &&
-                  searchText === "" &&
-                  (selectedTags.length > 0 || excludedTags.length > 0)
-                ) {
-                  if (selectedTags.length > 0) {
-                    commitFilter(selectedTags.slice(0, -1), excludedTags, appliedQuery);
-                  } else {
-                    commitFilter(selectedTags, excludedTags.slice(0, -1), appliedQuery);
-                  }
-                } else if (e.key === "Escape") {
-                  setSearchFocused(false);
-                }
-              }}
-              placeholder={
-                selectedTags.length > 0 || excludedTags.length > 0
-                  ? "Add a tag… (-tag excludes)"
-                  : "Search tags… (-tag excludes)"
-              }
-              aria-label="Search the board"
-            />
-            {searchFocused && suggestions.length > 0 && (
-              <ul className={styles.suggestions} aria-label="Tag suggestions">
-                {suggestions.map((s, i) => (
-                  <li key={s.tag} className={styles.suggestionRow}>
-                    <button
-                      type="button"
-                      aria-label={`Exclude tag ${s.tag}`}
-                      title={`Exclude ${s.tag}`}
-                      className={`${styles.suggestionSide} ${styles.suggestionExclude}`}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        addExcludedTag(s.tag);
-                      }}
-                    >
-                      −
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Add tag ${s.tag}`}
-                      className={`${styles.suggestionMain} ${i === highlight ? styles.suggestionActive : ""}`}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        addTag(s.tag);
-                      }}
-                    >
-                      <span>{s.tag}</span>
-                      <span className={styles.suggestionCount}>{s.count}</span>
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Include tag ${s.tag}`}
-                      title={`Include ${s.tag}`}
-                      className={`${styles.suggestionSide} ${styles.suggestionInclude}`}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        addTag(s.tag);
-                      }}
-                    >
-                      +
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-
-        <div className={styles.controlsRow}>
-          <div className={styles.filterControls}>
-            <button
-              type="button"
-              className={filtersDirty ? styles.filterActive : styles.filterButton}
-              onClick={applyFilters}
-              aria-label={
-                filtersDirty
-                  ? `Filter (${pendingCount} unapplied change${pendingCount === 1 ? "" : "s"})`
-                  : "Filter"
-              }
-            >
-              Filter
-            </button>
-            {(selectedTags.length > 0 ||
-              excludedTags.length > 0 ||
-              appliedTags.length > 0 ||
-              appliedExcludedTags.length > 0 ||
-              searchText.trim() !== "" ||
-              appliedQuery !== "") && (
-              <button type="button" className={styles.clearButton} onClick={clearFilters}>
-                Clear
-              </button>
-            )}
-            {differsFromDefaults && (
-              <button type="button" className={styles.defaultsButton} onClick={applyDefaults}>
-                My defaults
-              </button>
-            )}
-          </div>
-          <div className={styles.sortGroup} role="group" aria-label="Sort">
-            <button
-              type="button"
-              aria-pressed={boardSort(urlSearch.sort) === "newest"}
-              className={boardSort(urlSearch.sort) === "newest" ? styles.viewActive : ""}
-              onClick={() => changeSort("newest")}
-            >
-              Newest
-            </button>
-            <button
-              type="button"
-              aria-pressed={boardSort(urlSearch.sort) === "oldest"}
-              className={boardSort(urlSearch.sort) === "oldest" ? styles.viewActive : ""}
-              onClick={() => changeSort("oldest")}
-            >
-              Oldest
-            </button>
-            <button
-              type="button"
-              aria-pressed={boardSort(urlSearch.sort) === "favorites"}
-              className={boardSort(urlSearch.sort) === "favorites" ? styles.viewActive : ""}
-              onClick={() => changeSort("favorites")}
-            >
-              Favorites
-            </button>
-          </div>
-          {filterActive &&
-            (board.searching ? (
-              <span className={styles.searchMeta}>Searching…</span>
-            ) : (
-              <span className={styles.searchMeta}>
-                {total} result{total === 1 ? "" : "s"}
-                {appliedTags.length > 0 ? " with all selected tags" : ""}
-                {appliedExcludedTags.length > 0
-                  ? `, excluding ${appliedExcludedTags.length} tag${appliedExcludedTags.length === 1 ? "" : "s"}`
-                  : ""}
-                {filtersDirty ? " · unapplied changes" : ""}
-              </span>
-            ))}
-          <div className={styles.viewControls}>
-            <BoardViewControls view={view} onChange={changeView} />
-            <SaveCurrentSearchButton filter={appliedFilter} />
-            <button
-              type="button"
-              className={styles.uploadButton}
-              onClick={pickRandom}
-              disabled={randomBusy}
-              aria-busy={randomBusy}
-            >
-              Random
-            </button>
-            {signedIn && (
-              <button
-                type="button"
-                className={styles.uploadButton}
-                onClick={() => {
-                  setDroppedFiles([]);
-                  setUploadOpen(true);
-                }}
-              >
-                ⬆ Upload
-              </button>
-            )}
-          </div>
-        </div>
-
-        {showTagPanel && (
-          <div className={styles.tagPanel}>
-            <BoardTagPanel
-              tags={pageTags}
-              activeCount={activeFilterCount}
-              onInclude={stageInclude}
-              onExclude={stageExclude}
-              onClear={clearFilters}
-              loading={loading || defaultsPending}
-            />
-          </div>
-        )}
-      </div>
+      <BoardHead
+        selectedTags={selectedTags}
+        excludedTags={excludedTags}
+        appliedTags={appliedTags}
+        appliedExcludedTags={appliedExcludedTags}
+        appliedQuery={appliedQuery}
+        searchText={searchText}
+        setSearchText={setSearchText}
+        searchFocused={searchFocused}
+        setSearchFocused={setSearchFocused}
+        highlight={highlight}
+        setHighlight={setHighlight}
+        suggestions={suggestions}
+        commitFilter={commitFilter}
+        applyFilters={applyFilters}
+        addTagsFromText={addTagsFromText}
+        addTag={addTag}
+        addExcludedTag={addExcludedTag}
+        filtersDirty={filtersDirty}
+        pendingCount={pendingCount}
+        clearFilters={clearFilters}
+        differsFromDefaults={differsFromDefaults}
+        applyDefaults={applyDefaults}
+        urlSort={urlSearch.sort}
+        changeSort={changeSort}
+        filterActive={filterActive}
+        searching={searching}
+        total={total}
+        view={view}
+        changeView={changeView}
+        appliedFilter={appliedFilter}
+        pickRandom={pickRandom}
+        randomBusy={randomBusy}
+        signedIn={signedIn}
+        openUpload={() => {
+          setDroppedFiles([]);
+          setUploadOpen(true);
+        }}
+        showTagPanel={showTagPanel}
+        pageTags={pageTags}
+        activeFilterCount={activeFilterCount}
+        stageInclude={stageInclude}
+        stageExclude={stageExclude}
+        loading={loading}
+        defaultsPending={defaultsPending}
+      />
 
       {(loading || siteLoading || defaultsPending) && <p className={styles.message}>Loading…</p>}
       {failed && !loading && !defaultsPending && (
@@ -870,55 +652,20 @@ export function HomePage() {
           </button>
         </div>
       )}
-      {!loading && !failed && !defaultsPending && !filterActive && posts.length === 0 && (
-        <div className={styles.empty}>
-          <p>No images yet</p>
-        </div>
-      )}
-      {filterActive && !loading && !defaultsPending && !board.searching && posts.length === 0 && (
-        <div className={styles.empty}>
-          <p>
-            {searchText.trim()
-              ? `Nothing matches “${searchText.trim()}”`
-              : "Nothing matches your tag filters"}
-          </p>
-          <p>Try removing a tag, a different spelling, or a tag like “gif”.</p>
-        </div>
-      )}
-      {view.mode === "rows" && shownPosts.length > 0 && !defaultsPending && (
-        <div className={styles.rows}>
-          {shownPosts.map((post) => (
-            <div key={post.id} data-post-id={post.id}>
-              <PostRow
-                post={post}
-                onTagClick={addTag}
-                search={postSearch}
-                onOpen={commitStaged}
-                fromBoard
-              />
-            </div>
-          ))}
-        </div>
-      )}
-      {view.mode === "grid" && (
-        <div
-          ref={gridRef}
-          className={
-            shownPosts.length > 0 && !defaultsPending
-              ? styles.grid
-              : `${styles.grid} ${styles.gridProbe}`
-          }
-          aria-hidden={shownPosts.length === 0 || defaultsPending}
-        >
-          {shownPosts.length > 0 &&
-            !defaultsPending &&
-            shownPosts.map((post) => (
-              <div key={post.id} data-post-id={post.id}>
-                <PostCard post={post} search={postSearch} onOpen={commitStaged} fromBoard />
-              </div>
-            ))}
-        </div>
-      )}
+      <BoardResults
+        posts={posts}
+        loading={loading}
+        failed={failed}
+        defaultsPending={defaultsPending}
+        filterActive={filterActive}
+        searching={searching}
+        searchText={searchText}
+        view={view}
+        gridRef={gridRef}
+        postSearch={postSearch}
+        addTag={addTag}
+        commitStaged={commitStaged}
+      />
       <button
         type="button"
         aria-label="Back to top"

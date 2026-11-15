@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -156,7 +155,7 @@ func portSuffix(u *url.URL) string {
 	return ""
 }
 
-func isNotFound(err error) bool { return errors.Is(err, sql.ErrNoRows) }
+func isNotFound(err error) bool { return errors.Is(err, model.ErrNotFound) }
 func isUnique(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "23505")
 }

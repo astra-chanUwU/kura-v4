@@ -2,7 +2,6 @@ package tags
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"regexp"
 	"sort"
@@ -52,7 +51,7 @@ type Repository interface {
 	GetSuggestion(ctx context.Context, id string) (model.TagSuggestion, error)
 	ListSuggestions(ctx context.Context, status string) ([]model.TagSuggestion, error)
 	// ResolveSuggestion sets status when the row is still fromStatus.
-	// A row that no longer has that status is sql.ErrNoRows.
+	// A row that no longer has that status is model.ErrNotFound.
 	ResolveSuggestion(ctx context.Context, id, resolverID, status, fromStatus string) (model.TagSuggestion, error)
 }
 
@@ -442,7 +441,7 @@ func (s *Service) suggestionForModerator(ctx context.Context, actor model.User, 
 		return model.TagSuggestion{}, ErrForbidden
 	}
 	current, err := s.repo.GetSuggestion(ctx, id)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, model.ErrNotFound) {
 		return model.TagSuggestion{}, ErrNotFound
 	}
 	if err != nil {
@@ -453,7 +452,7 @@ func (s *Service) suggestionForModerator(ctx context.Context, actor model.User, 
 
 func (s *Service) recordSuggestion(ctx context.Context, actor model.User, current model.TagSuggestion, status string) (model.TagSuggestion, error) {
 	resolved, err := s.repo.ResolveSuggestion(ctx, current.ID, actor.ID, status, current.Status)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, model.ErrNotFound) {
 		return model.TagSuggestion{}, invalid("That suggestion changed. Refresh and try again.")
 	}
 	return resolved, err

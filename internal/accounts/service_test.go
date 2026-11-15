@@ -2,7 +2,6 @@ package accounts
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"testing"
 	"time"
@@ -155,7 +154,7 @@ func TestBeginPasskeyRegistrationBindsRPIDToRequestOrigin(t *testing.T) {
 	require.Contains(t, err.Error(), "localhost:5174")
 
 	repo := NewMockRepository(t)
-	repo.EXPECT().GetUserByUsername(mock.Anything, "new_user").Return(model.User{}, sql.ErrNoRows)
+	repo.EXPECT().GetUserByUsername(mock.Anything, "new_user").Return(model.User{}, model.ErrNotFound)
 	repo.EXPECT().CreateChallenge(mock.Anything, "register", "new_user", mock.Anything, mock.Anything, mock.Anything).Return("ceremony-1", nil)
 	svc, err := NewService(repo, "http://localhost:5174", nil)
 	require.NoError(t, err)
@@ -166,7 +165,7 @@ func TestBeginPasskeyRegistrationBindsRPIDToRequestOrigin(t *testing.T) {
 	require.Contains(t, string(body), `"id":"localhost"`)
 	// Default (no origin) keeps the configured RPID.
 	repo2 := NewMockRepository(t)
-	repo2.EXPECT().GetUserByUsername(mock.Anything, "new_user").Return(model.User{}, sql.ErrNoRows)
+	repo2.EXPECT().GetUserByUsername(mock.Anything, "new_user").Return(model.User{}, model.ErrNotFound)
 	repo2.EXPECT().CreateChallenge(mock.Anything, "register", "new_user", mock.Anything, mock.Anything, mock.Anything).Return("ceremony-2", nil)
 	svc2, err := NewService(repo2, "http://localhost:5174", nil)
 	require.NoError(t, err)
@@ -194,7 +193,7 @@ func TestBeginPasskeyLoginDiscoverableWithoutUsername(t *testing.T) {
 
 func TestBeginPasskeyRegistrationRequiresResidentKeyAndNamesUser(t *testing.T) {
 	repo := NewMockRepository(t)
-	repo.EXPECT().GetUserByUsername(mock.Anything, "new_user").Return(model.User{}, sql.ErrNoRows)
+	repo.EXPECT().GetUserByUsername(mock.Anything, "new_user").Return(model.User{}, model.ErrNotFound)
 	repo.EXPECT().CreateChallenge(mock.Anything, "register", "new_user", mock.Anything, mock.Anything, mock.Anything).Return("ceremony-1", nil)
 	svc, err := NewService(repo, "http://localhost:5174", nil)
 	require.NoError(t, err)
@@ -217,7 +216,7 @@ func TestBeginPasskeyRejectsUnknownOrigin(t *testing.T) {
 
 func TestUserForSessionNotFound(t *testing.T) {
 	repo := NewMockRepository(t)
-	repo.EXPECT().SessionUserID(mock.Anything, mock.Anything).Return("", sql.ErrNoRows)
+	repo.EXPECT().SessionUserID(mock.Anything, mock.Anything).Return("", model.ErrNotFound)
 	svc, err := NewService(repo, "http://localhost:5174", nil)
 	require.NoError(t, err)
 	_, err = svc.UserForSession(context.Background(), "bogus")

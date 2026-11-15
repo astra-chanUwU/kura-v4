@@ -33,10 +33,12 @@ func (r *Moderation) CountUsersByRoles(ctx context.Context) (int64, int64, int64
 	return r.accounts.CountUsersByRoles(ctx)
 }
 func (r *Moderation) GetUser(ctx context.Context, id string) (model.User, error) {
-	return r.accounts.GetUserByID(ctx, id)
+	user, err := r.accounts.GetUserByID(ctx, id)
+	return user, NotFound(err)
 }
 func (r *Moderation) GetPost(ctx context.Context, id string) (model.Post, error) {
-	return r.posts.GetPost(ctx, id)
+	post, err := r.posts.GetPost(ctx, id)
+	return post, NotFound(err)
 }
 func (r *Moderation) CountSuperAdmins(ctx context.Context) (int64, error) {
 	return r.accounts.CountUsersByRole(ctx, model.RoleSuperAdmin)
@@ -78,7 +80,8 @@ func (r *Moderation) CountRemovedPosts(ctx context.Context) (int64, int64, error
 	return r.posts.CountRemovedPosts(ctx)
 }
 func (r *Moderation) GetHistory(ctx context.Context, id string) (model.ChangeEntry, error) {
-	return r.audit.GetChangeHistory(ctx, id)
+	entry, err := r.audit.GetChangeHistory(ctx, id)
+	return entry, NotFound(err)
 }
 func (r *Moderation) ListHistoryForEntity(ctx context.Context, entityType, entityID string, limit int32) ([]model.ChangeEntry, error) {
 	return r.audit.ListChangeHistoryForEntity(ctx, entityType, entityID, limit)

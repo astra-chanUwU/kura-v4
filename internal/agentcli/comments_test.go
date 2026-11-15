@@ -3,7 +3,6 @@ package agentcli
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"path/filepath"
 	"testing"
@@ -242,7 +241,7 @@ func (f *commentRepo) GetComment(_ context.Context, id string) (model.Comment, e
 			return comment, nil
 		}
 	}
-	return model.Comment{}, sql.ErrNoRows
+	return model.Comment{}, model.ErrNotFound
 }
 
 func (f *commentRepo) UpdateCommentBody(_ context.Context, id, body string) (model.Comment, error) {
@@ -253,7 +252,7 @@ func (f *commentRepo) UpdateCommentBody(_ context.Context, id, body string) (mod
 			return comment, nil
 		}
 	}
-	return model.Comment{}, sql.ErrNoRows
+	return model.Comment{}, model.ErrNotFound
 }
 
 func (f *commentRepo) DeleteComment(_ context.Context, id string) (int64, error) {

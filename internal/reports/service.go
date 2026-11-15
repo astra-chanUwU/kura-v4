@@ -2,7 +2,6 @@ package reports
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
 	"unicode/utf8"
@@ -94,7 +93,7 @@ func (s *Service) Dismiss(ctx context.Context, actor model.User, reportID string
 		return model.PostReport{}, ErrForbidden
 	}
 	report, err := s.repo.DismissPostReport(ctx, reportID, actor.ID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, model.ErrNotFound) {
 		return model.PostReport{}, ErrNotFound
 	}
 	return report, err
@@ -102,7 +101,7 @@ func (s *Service) Dismiss(ctx context.Context, actor model.User, reportID string
 
 func (s *Service) visiblePost(ctx context.Context, viewer *model.User, postID string) error {
 	post, err := s.repo.ReportPostAccess(ctx, postID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, model.ErrNotFound) {
 		return ErrNotFound
 	}
 	if err != nil {

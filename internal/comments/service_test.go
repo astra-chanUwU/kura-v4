@@ -2,7 +2,6 @@ package comments
 
 import (
 	"context"
-	"database/sql"
 	"strings"
 	"testing"
 
@@ -59,7 +58,7 @@ func (f *fakeRepo) GetComment(_ context.Context, id string) (model.Comment, erro
 			return c, nil
 		}
 	}
-	return model.Comment{}, sql.ErrNoRows
+	return model.Comment{}, model.ErrNotFound
 }
 
 func (f *fakeRepo) UpdateCommentBody(_ context.Context, id, body string) (model.Comment, error) {
@@ -71,7 +70,7 @@ func (f *fakeRepo) UpdateCommentBody(_ context.Context, id, body string) (model.
 			return c, nil
 		}
 	}
-	return model.Comment{}, sql.ErrNoRows
+	return model.Comment{}, model.ErrNotFound
 }
 
 func (f *fakeRepo) DeleteComment(_ context.Context, id string) (int64, error) {
@@ -232,7 +231,7 @@ func TestListInvisiblePostNotFound(t *testing.T) {
 	_, err := NewService(repo).List(context.Background(), &viewer, "p1", 0, 0)
 	require.ErrorIs(t, err, ErrNotFound)
 
-	missing := &fakeRepo{accessErr: sql.ErrNoRows}
+	missing := &fakeRepo{accessErr: model.ErrNotFound}
 	_, err = NewService(missing).List(context.Background(), nil, "missing", 0, 0)
 	require.ErrorIs(t, err, ErrNotFound)
 

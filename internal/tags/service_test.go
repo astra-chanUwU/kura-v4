@@ -2,7 +2,6 @@ package tags
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"testing"
@@ -121,7 +120,7 @@ func (f *fakeRepo) GetSuggestion(_ context.Context, id string) (model.TagSuggest
 			return item, nil
 		}
 	}
-	return model.TagSuggestion{}, sql.ErrNoRows
+	return model.TagSuggestion{}, model.ErrNotFound
 }
 func (f *fakeRepo) ListSuggestions(_ context.Context, status string) ([]model.TagSuggestion, error) {
 	out := []model.TagSuggestion{}
@@ -144,7 +143,7 @@ func (f *fakeRepo) ResolveSuggestion(_ context.Context, id, _, status, from stri
 			return item, nil
 		}
 	}
-	return model.TagSuggestion{}, sql.ErrNoRows
+	return model.TagSuggestion{}, model.ErrNotFound
 }
 func (f *fakeRepo) DeleteAlias(_ context.Context, alias, target string) (int64, error) {
 	f.removed = append(f.removed, alias+"->"+target)
@@ -522,7 +521,7 @@ func TestReviseImplicationSuggestion(t *testing.T) {
 func TestSuggestionResolveConflict(t *testing.T) {
 	member := model.User{ID: "mem", Role: model.RoleMember}
 	mod := model.User{ID: "mod", Role: model.RoleModerator}
-	repo := &fakeRepo{resolveErr: sql.ErrNoRows}
+	repo := &fakeRepo{resolveErr: model.ErrNotFound}
 	svc := NewService(repo)
 
 	item, err := svc.Suggest(context.Background(), member, "long_hair", "alias", "longhair", "")

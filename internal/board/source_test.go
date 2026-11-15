@@ -2,7 +2,6 @@ package board
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -115,7 +114,7 @@ func (f *fakeRepo) CreatePost(_ context.Context, p model.Post, _ string) (model.
 
 func (f *fakeRepo) GetPost(_ context.Context, id string) (model.Post, error) {
 	if f.post.ID != id {
-		return model.Post{}, sql.ErrNoRows
+		return model.Post{}, model.ErrNotFound
 	}
 	return f.post, nil
 }
@@ -156,7 +155,7 @@ func (f *fakeRepo) PostNeighbors(context.Context, string, model.PostQuery) (mode
 	return model.Neighbors{}, nil
 }
 func (f *fakeRepo) GetPostBySHA(context.Context, string) (model.Post, error) {
-	return model.Post{}, sql.ErrNoRows
+	return model.Post{}, model.ErrNotFound
 }
 func (f *fakeRepo) CountPostsByOwner(context.Context, string) (int64, error) { return 0, nil }
 
@@ -207,7 +206,7 @@ func (f *fakeRepo) ListPublicPostsByOwner(context.Context, string, bool, int32, 
 }
 func (f *fakeRepo) CountMetaEditsByActor(context.Context, string) (int64, error) { return 0, nil }
 func (f *fakeRepo) LastMetaEditor(context.Context, string) (string, error) {
-	return "", sql.ErrNoRows
+	return "", nil
 }
 func (f *fakeRepo) TagAliasTargets(_ context.Context, tags []string) (map[string]string, error) {
 	out := map[string]string{}
@@ -223,7 +222,7 @@ func (f *fakeRepo) RandomPost(context.Context, model.PostQuery) (model.Post, err
 		return model.Post{}, f.randomErr
 	}
 	if f.random.ID == "" {
-		return model.Post{}, sql.ErrNoRows
+		return model.Post{}, model.ErrNotFound
 	}
 	return f.random, nil
 }

@@ -2,7 +2,6 @@ package board
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	"github.com/astra-chanUwU/kura-v4/internal/model"
@@ -58,7 +57,7 @@ func TestSetMetaRewritesAliasTag(t *testing.T) {
 }
 
 func TestRandomNotFound(t *testing.T) {
-	repo := &fakeRepo{randomErr: sql.ErrNoRows}
+	repo := &fakeRepo{randomErr: model.ErrNotFound}
 	_, err := NewService(repo, nil).Random(context.Background(), model.PostQuery{Tags: []string{"missing"}})
 	require.ErrorIs(t, err, ErrNotFound)
 

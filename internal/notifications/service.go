@@ -2,7 +2,6 @@ package notifications
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
 
@@ -37,7 +36,7 @@ func (s *Service) PostOwner(ctx context.Context, postID string) (string, error) 
 		return "", nil
 	}
 	owner, err := s.repo.PostOwner(ctx, postID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, model.ErrNotFound) {
 		return "", nil
 	}
 	return strings.TrimSpace(owner), err

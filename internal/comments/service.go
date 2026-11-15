@@ -2,7 +2,6 @@ package comments
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
 	"unicode/utf8"
@@ -81,7 +80,7 @@ func (s *Service) Update(ctx context.Context, viewer model.User, commentID, body
 		return model.Comment{}, err
 	}
 	updated, err := s.repo.UpdateCommentBody(ctx, commentID, body)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, model.ErrNotFound) {
 		return model.Comment{}, ErrNotFound
 	}
 	return updated, err
@@ -107,7 +106,7 @@ func (s *Service) Delete(ctx context.Context, viewer model.User, commentID strin
 
 func (s *Service) visiblePost(ctx context.Context, viewer *model.User, postID string) error {
 	post, err := s.repo.CommentPostAccess(ctx, postID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, model.ErrNotFound) {
 		return ErrNotFound
 	}
 	if err != nil {
@@ -121,7 +120,7 @@ func (s *Service) visiblePost(ctx context.Context, viewer *model.User, postID st
 
 func (s *Service) visibleComment(ctx context.Context, viewer *model.User, commentID string) (model.Comment, error) {
 	comment, err := s.repo.GetComment(ctx, commentID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, model.ErrNotFound) {
 		return model.Comment{}, ErrNotFound
 	}
 	if err != nil {

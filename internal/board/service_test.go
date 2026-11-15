@@ -73,3 +73,13 @@ func TestSetMetaAsWritesHistoryOnlyWhenChanged(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "new", got.Artist)
 }
+
+func TestSearchMissingCursorIsBadCursor(t *testing.T) {
+	id := "11111111-1111-1111-1111-111111111111"
+	for _, missing := range []error{model.ErrNotFound, ErrNotFound} {
+		repo := NewMockRepository(t)
+		repo.EXPECT().GetPost(mock.Anything, id).Return(model.Post{}, missing)
+		_, err := NewService(repo, nil).Search(context.Background(), model.PostQuery{AfterID: id})
+		require.ErrorIs(t, err, ErrBadCursor)
+	}
+}

@@ -208,12 +208,15 @@ Each job handler must be idempotent: delivery is at least once. The initial runn
 uses a 45-second handler deadline and 60-second lease; handlers must honor context
 cancellation. Add lease renewal before introducing longer-running transcodes.
 Only registered job kinds are claimed. Exhausted expired leases become failed;
-failed jobs are not silently retried forever. No job-management UI exists yet.
+failed jobs are not silently retried forever. Moderators list and retry them
+from Staff → Jobs.
 
 The local adapter writes bytes unchanged under opaque UUID keys. It never guesses
 media visibility from a file path. Future media routes must check access before
-opening a stored object. `.partial` files can remain after process/power loss;
-a future age-bounded staging cleanup must distinguish abandoned and active writes.
+opening a stored object. Storage is not a public directory. `.partial` files
+can remain after process or power loss. The app deletes those older than an
+hour, once at start and every 15 minutes, so an abandoned upload is removed
+and a write still in progress is left alone.
 
 ## VPS deployment
 

@@ -2,7 +2,6 @@ package reports
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	"github.com/astra-chanUwU/kura-v4/internal/model"
@@ -18,7 +17,7 @@ type memRepo struct {
 
 func (m *memRepo) ReportPostAccess(context.Context, string) (model.ReportPostAccess, error) {
 	if m.missing {
-		return model.ReportPostAccess{}, sql.ErrNoRows
+		return model.ReportPostAccess{}, model.ErrNotFound
 	}
 	return m.post, nil
 }
@@ -46,7 +45,7 @@ func (m *memRepo) DismissPostReport(_ context.Context, id, resolverID string) (m
 			return report, nil
 		}
 	}
-	return model.PostReport{}, sql.ErrNoRows
+	return model.PostReport{}, model.ErrNotFound
 }
 
 func TestCreateRejectsVisitorAndDuplicateAndHidden(t *testing.T) {
