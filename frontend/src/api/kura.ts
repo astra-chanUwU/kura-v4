@@ -40,6 +40,12 @@ function boardParams(filter: BoardFilter): URLSearchParams {
   return params;
 }
 
+function profilePath(username: string, page: number): string {
+  const path = `/users/${username}`;
+  if (!Number.isInteger(page) || page <= 1) return path;
+  return `${path}?page=${page}`;
+}
+
 function queryLimit(limit?: number): number {
   if (limit === undefined || !Number.isFinite(limit) || limit < 1) return 40;
   return Math.floor(limit);
@@ -202,8 +208,13 @@ export const api = {
   deletePost: (postId: string) => sendJSON<Post>(`/posts/${postId}/delete`, "POST"),
   removePassword: () => sendJSON<Me>("/me/password", "DELETE"),
   removePasskey: (id: string) => sendJSON<Me>(`/me/passkeys/${id}`, "DELETE"),
-  profile: (username: string, signal?: AbortSignal) =>
-    getJSON<Profile>(`/users/${username}`, signal),
+  // The second argument is a 1-based uploads page, or an AbortSignal from
+  // callers that still fetch page 1 without a page argument.
+  profile: (username: string, pageOrSignal?: number | AbortSignal, signal?: AbortSignal) => {
+    const page = typeof pageOrSignal === "number" ? pageOrSignal : 1;
+    const abort = typeof pageOrSignal === "number" ? signal : pageOrSignal;
+    return getJSON<Profile>(profilePath(username, page), abort);
+  },
   posts: (offset: number, signal?: AbortSignal) =>
     getJSON<Post[]>(`/posts?limit=40&offset=${offset}`, signal),
   search: (filter: BoardFilter, offset: number, limit = 40, signal?: AbortSignal) => {

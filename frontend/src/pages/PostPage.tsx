@@ -61,6 +61,13 @@ function isPlainLeftClick(event: ReactMouseEvent): boolean {
   return event.button === 0 && !event.metaKey && !event.altKey && !event.ctrlKey && !event.shiftKey;
 }
 
+/** Open page when the browser has one; otherwise origin plus /posts/{id}. */
+function absolutePostUrl(id: string): string {
+  if (typeof window !== "undefined" && window.location.href) return window.location.href;
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  return `${origin}/posts/${id}`;
+}
+
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   // Arrow keys belong to text fields, selects and video seeking.
@@ -99,6 +106,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmHide, setConfirmHide] = useState(false);
   const [idCopied, setIdCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [sampleFailedFor, setSampleFailedFor] = useState<string | null>(null);
 
   // Drafts belong to one post; never carry them across pictures.
@@ -114,6 +122,7 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
     setNewTag("");
     setMetaError("");
     setIdCopied(false);
+    setLinkCopied(false);
   }
 
   // Staged editing: tag/artist/rating changes sit in drafts and only hit
@@ -434,6 +443,21 @@ export function PostPage({ id, search = {} }: { id: string; search?: BoardSearch
                   }}
                 >
                   {idCopied ? "Copied" : "Copy"}
+                </button>
+                <button
+                  type="button"
+                  className={styles.copyId}
+                  aria-label="Copy link"
+                  onClick={() => {
+                    const write = navigator.clipboard?.writeText(absolutePostUrl(post.id));
+                    if (!write) return;
+                    void write.then(
+                      () => setLinkCopied(true),
+                      () => setLinkCopied(false),
+                    );
+                  }}
+                >
+                  {linkCopied ? "Copied" : "Copy link"}
                 </button>
               </dd>
             </div>

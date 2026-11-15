@@ -35,6 +35,7 @@ import {
   FONT_LABELS,
   FONTS,
   THEME_LABELS,
+  THEME_PAPERS,
   THEME_SWATCHES,
   THEMES,
   normalizeFont,
@@ -455,7 +456,12 @@ export function MePage() {
                 onChange={setThemeDraft}
               >
                 {THEMES.map((id) => (
-                  <option key={id} value={id} data-swatch={THEME_SWATCHES[id]}>
+                  <option
+                    key={id}
+                    value={id}
+                    data-swatch={THEME_SWATCHES[id]}
+                    data-paper={THEME_PAPERS[id]}
+                  >
                     {THEME_LABELS[id]}
                   </option>
                 ))}
@@ -469,7 +475,7 @@ export function MePage() {
                 onChange={setFontDraft}
               >
                 {FONTS.map((id) => (
-                  <option key={id} value={id}>
+                  <option key={id} value={id} data-font={id}>
                     {FONT_LABELS[id]}
                   </option>
                 ))}
@@ -495,11 +501,14 @@ export function MePage() {
               data-theme={normalizeTheme(themeDraft ?? savedTheme)}
               data-font={normalizeFont(fontDraft ?? savedFont)}
             >
-              <strong>Aa</strong> — The quick brown fox.{" "}
-              <span>
-                {THEME_LABELS[normalizeTheme(themeDraft ?? savedTheme)]} ·{" "}
-                {FONT_LABELS[normalizeFont(fontDraft ?? savedFont)]}
-              </span>
+              <p className={styles.previewLead}>The quick brown fox jumps over the lazy dog.</p>
+              <p className={styles.previewRow}>
+                <span className={styles.previewAccent}>Accent link</span>
+                <span>
+                  {THEME_LABELS[normalizeTheme(themeDraft ?? savedTheme)]} ·{" "}
+                  {FONT_LABELS[normalizeFont(fontDraft ?? savedFont)]}
+                </span>
+              </p>
             </div>
             <div className={styles.actions}>
               <button

@@ -49,23 +49,11 @@ function usePagedPosts(
 }
 
 export function useFavorites(enabled: boolean, page = 1, pageSize = DEFAULT_PAGE_SIZE) {
-  return usePagedPosts(
-    queryKeys.favorites,
-    api.favorites,
-    enabled,
-    page,
-    pageSize,
-  );
+  return usePagedPosts(queryKeys.favorites, api.favorites, enabled, page, pageSize);
 }
 
 export function useMyPosts(enabled: boolean, page = 1, pageSize = DEFAULT_PAGE_SIZE) {
-  return usePagedPosts(
-    queryKeys.myPosts,
-    api.myPosts,
-    enabled,
-    page,
-    pageSize,
-  );
+  return usePagedPosts(queryKeys.myPosts, api.myPosts, enabled, page, pageSize);
 }
 
 export function useMyLists(enabled: boolean) {
@@ -107,10 +95,15 @@ export function useList(id: string, page = 1, pageSize = DEFAULT_PAGE_SIZE) {
   };
 }
 
-export function useProfile(username: string) {
+export function useProfile(username: string, page = 1) {
+  const current = Number.isInteger(page) && page >= 1 ? page : 1;
   return useQuery({
-    queryKey: queryKeys.profile(username),
-    queryFn: ({ signal }) => api.profile(username, signal),
+    queryKey: queryKeys.profile(username, current),
+    queryFn: ({ signal }) => api.profile(username, current, signal),
+    // Keep this person's previous page on screen while the next one loads.
+    // A different username must not briefly show the previous person's uploads.
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[1] === username ? previous : undefined,
   });
 }
 

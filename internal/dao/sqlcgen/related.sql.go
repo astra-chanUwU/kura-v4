@@ -121,6 +121,7 @@ FROM scored s
 JOIN posts p ON p.id = s.post_id
 LEFT JOIN users u ON u.id = p.owner_id
 WHERE p.hidden_at IS NULL
+  AND p.deleted_at IS NULL
   AND ($1::bool OR p.rating = 'sfw')
   AND NOT EXISTS (
     SELECT 1 FROM post_tags blocked

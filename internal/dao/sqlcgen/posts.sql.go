@@ -497,7 +497,7 @@ SELECT p.id, p.owner_id, p.original_name, p.storage_key, p.content_type, p.size_
   p.artist, p.source, p.source_id, p.thumbnail_key, COALESCE(p.sample_key, '')::text AS sample_key, p.width, p.height, p.rating, p.favorite_count, (p.hidden_at IS NOT NULL)::bool AS hidden, (p.deleted_at IS NOT NULL)::bool AS deleted,
   COALESCE(u.username,'')::text AS owner_username,
   COALESCE((SELECT string_agg(t.tag, ',' ORDER BY t.tag) FROM post_tags t WHERE t.post_id = p.id), '')::text AS tags_csv
-FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.hidden_at IS NULL AND ($3::bool OR p.rating='sfw') ORDER BY p.created_at DESC, p.id DESC LIMIT $1 OFFSET $2
+FROM posts p LEFT JOIN users u ON u.id=p.owner_id WHERE p.hidden_at IS NULL AND p.deleted_at IS NULL AND ($3::bool OR p.rating='sfw') ORDER BY p.created_at DESC, p.id DESC LIMIT $1 OFFSET $2
 `
 
 type ListPostsParams struct {

@@ -68,14 +68,21 @@ func (e *Engine) postsList(ctx context.Context, args []string) int {
 	if e.deps.Board == nil {
 		return e.fail(cmd, "internal", "Something went wrong. Please try again.")
 	}
-	posts, err := e.deps.Board.List(ctx, int32(limit), int32(offset), SeesNSFW(actor))
+	page, err := e.deps.Board.Search(ctx, model.PostQuery{
+		Tags:        []string{},
+		Exclude:     []string{},
+		Q:           "",
+		Limit:       int32(limit),
+		Offset:      int32(offset),
+		IncludeNSFW: SeesNSFW(actor),
+	})
 	if err != nil {
 		return e.failErr(cmd, err)
 	}
-	if posts == nil {
-		posts = []model.Post{}
-	}
-	return e.ok(cmd, presentPosts(posts, e.favs(ctx, e.actorID(actor))))
+	return e.ok(cmd, map[string]any{
+		"total": page.Total,
+		"posts": presentPosts(page.Posts, e.favs(ctx, e.actorID(actor))),
+	})
 }
 
 func (e *Engine) postsGet(ctx context.Context, args []string) int {

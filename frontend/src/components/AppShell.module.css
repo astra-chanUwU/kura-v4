@@ -12,7 +12,8 @@
   min-height: var(--header-h);
   padding: 0 clamp(1rem, 4vw, 3.5rem);
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  backdrop-filter: saturate(1.15) blur(14px);
 }
 
 .brand {
@@ -20,9 +21,10 @@
   align-items: center;
   flex: none;
   color: var(--text);
+  font-family: "Atkinson Hyperlegible", sans-serif;
   font-size: 1.05rem;
   font-weight: 700;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
   text-decoration: none;
 }
 

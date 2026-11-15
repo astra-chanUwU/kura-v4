@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Post } from "../types/api";
 import type { TagPage as TagPageData } from "../types/tagPage";
@@ -84,9 +84,27 @@ vi.mock("../components/Toasts", () => ({
   shortError: () => "error",
 }));
 
+function renderTag(overrides: Partial<TagPageData> = {}) {
+  Object.assign(page, {
+    tag: "grey_hair",
+    alias_of: "gray_hair",
+    aliases: ["grey_hair"],
+    implies: ["long_hair"],
+    implied_by: [],
+    category: "general",
+    description: "Hair that is gray.",
+    post_count: 4,
+    updated_by_username: "ada",
+    updated_at: "2026-11-01T00:00:00Z",
+    posts: [post],
+    ...overrides,
+  });
+  return render(<TagPage name="grey_hair" />);
+}
+
 describe("TagPage", () => {
   it("shows an alias notice, the description, and a search for the canonical tag", () => {
-    render(<TagPage name="grey_hair" />);
+    renderTag();
     expect(screen.getByRole("heading", { name: "grey_hair" })).toBeInTheDocument();
     expect(screen.getByText(/is an alias of/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "gray_hair" })).toHaveAttribute(
@@ -102,7 +120,56 @@ describe("TagPage", () => {
       "href",
       "/tags/long_hair",
     );
+    expect(screen.getByRole("heading", { name: "Recent posts" })).toBeInTheDocument();
+    expect(screen.getByText("Showing 1 of 4")).toBeInTheDocument();
     expect(screen.getByRole("article")).toHaveTextContent("gray_hair");
     expect(screen.queryByRole("button", { name: "Save description" })).not.toBeInTheDocument();
+  });
+
+  it("states a short recent list against the full count", () => {
+    renderTag({
+      post_count: 80,
+      posts: Array.from({ length: 12 }, (_, index) => ({ ...post, id: `p${index}` })),
+    });
+    const recent = screen.getByRole("region", { name: "Recent posts" });
+    expect(within(recent).getByText("Showing 12 of 80")).toBeInTheDocument();
+    expect(within(recent).getAllByRole("article")).toHaveLength(12);
+    expect(within(recent).queryByRole("link", { name: "Search this tag" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Search this tag" })).toHaveAttribute(
+      "href",
+      "/?tags=gray_hair",
+    );
+  });
+
+  it("does not repeat the count when every post is already listed", () => {
+    renderTag({
+      post_count: 2,
+      posts: [post, { ...post, id: "p2" }],
+    });
+    expect(screen.getByRole("heading", { name: "Recent posts" })).toBeInTheDocument();
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+    expect(screen.queryByText(/Showing \d+ of \d+/)).not.toBeInTheDocument();
+  });
+
+  it("keeps recent posts and the search link when the payload has no cards", () => {
+    renderTag({ post_count: 80, posts: [] });
+    const recent = screen.getByRole("region", { name: "Recent posts" });
+    expect(within(recent).getByText("Showing 0 of 80")).toBeInTheDocument();
+    expect(within(recent).queryByRole("article")).not.toBeInTheDocument();
+    expect(within(recent).getByRole("link", { name: "Search this tag" })).toHaveAttribute(
+      "href",
+      "/?tags=gray_hair",
+    );
+    expect(screen.getAllByRole("link", { name: "Search this tag" })).toHaveLength(2);
+  });
+
+  it("skips the recent section when the tag has no posts", () => {
+    renderTag({ post_count: 0, posts: [] });
+    expect(screen.queryByRole("heading", { name: "Recent posts" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Showing \d+ of \d+/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Search this tag" })).toHaveAttribute(
+      "href",
+      "/?tags=gray_hair",
+    );
   });
 });

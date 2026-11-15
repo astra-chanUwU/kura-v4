@@ -27,6 +27,24 @@
       // Apply the saved theme/font before first paint (no flash of default).
       try {
         var t = localStorage.getItem("kura-theme");
+        var papers = {
+          kura: "#100f15",
+          safebooru: "#eef4fc",
+          rule34: "#0b0f08",
+          umineko: "#120d10",
+          bernkastel: "#06090f",
+          lambdadelta: "#120810",
+          beatrice: "#0f0a08",
+          erika: "#060a0f",
+          battler: "#0f0608",
+          virgilia: "#e8eaf0",
+          catppuccin: "#1e1e2e",
+          danbooru: "#f5f7fa",
+        };
+        if (t && papers[t]) {
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", papers[t]);
+        }
         if (t && t !== "kura") document.documentElement.dataset.theme = t;
         var f = localStorage.getItem("kura-font");
         if (f && f !== "system") document.documentElement.dataset.font = f;

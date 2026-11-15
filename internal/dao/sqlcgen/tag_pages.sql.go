@@ -19,6 +19,7 @@ FROM post_tags t
 JOIN posts p ON p.id = t.post_id
 WHERE t.tag = $1
   AND p.hidden_at IS NULL
+  AND p.deleted_at IS NULL
   AND ($2::bool OR p.rating = 'sfw')
   AND NOT EXISTS (
     SELECT 1 FROM post_tags blocked
@@ -182,6 +183,7 @@ FROM posts p
 JOIN post_tags mine ON mine.post_id = p.id AND mine.tag = $1
 LEFT JOIN users u ON u.id = p.owner_id
 WHERE p.hidden_at IS NULL
+  AND p.deleted_at IS NULL
   AND ($2::bool OR p.rating = 'sfw')
   AND NOT EXISTS (
     SELECT 1 FROM post_tags blocked

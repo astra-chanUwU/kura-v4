@@ -57,6 +57,8 @@ export function TagPage({ name }: { name: string }) {
   const dirty = categoryValue !== data.category || descriptionValue !== data.description;
   const paragraphs = data.description.trim();
   const otherAliases = data.aliases.filter((item) => item !== data.tag);
+  const shown = data.posts.length;
+  const total = data.post_count;
 
   const save = (event: FormEvent) => {
     event.preventDefault();
@@ -267,14 +269,28 @@ export function TagPage({ name }: { name: string }) {
         </form>
       )}
 
-      {data.posts.length > 0 && (
+      {total > 0 && (
         <section className={styles.section} aria-labelledby="tag-posts-title">
           <h2 id="tag-posts-title">Recent posts</h2>
-          <div className={styles.grid}>
-            {data.posts.map((post) => (
-              <PostCard key={post.id} post={post} search={{ tags: canonical }} />
-            ))}
-          </div>
+          {shown < total && (
+            <p className={styles.muted}>
+              Showing {shown} of {total}
+            </p>
+          )}
+          {shown === 0 && (
+            <p>
+              <Link to="/" search={{ tags: canonical }}>
+                Search this tag
+              </Link>
+            </p>
+          )}
+          {shown > 0 && (
+            <div className={styles.grid}>
+              {data.posts.map((post) => (
+                <PostCard key={post.id} post={post} search={{ tags: canonical }} />
+              ))}
+            </div>
+          )}
         </section>
       )}
 

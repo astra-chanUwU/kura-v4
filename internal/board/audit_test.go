@@ -93,14 +93,17 @@ func TestRelatedAndProfileDropPostsTheViewerCannotSee(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"sfw", "nsfw"}, postIDs(related))
 
-	posts, total, err := svc.PublicByOwner(context.Background(), "u", false, 12)
+	posts, total, err := svc.PublicByOwner(context.Background(), "u", false, 12, 0)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), total)
 	require.Equal(t, []string{"sfw"}, postIDs(posts))
-	posts, total, err = svc.PublicByOwner(context.Background(), "u", true, 12)
+	require.Equal(t, int32(12), repo.publicLimit)
+	require.Equal(t, int32(0), repo.publicOffset)
+	posts, total, err = svc.PublicByOwner(context.Background(), "u", true, 12, 0)
 	require.NoError(t, err)
 	require.Equal(t, int64(2), total)
 	require.Equal(t, []string{"sfw", "nsfw"}, postIDs(posts))
+	require.Equal(t, int32(0), repo.publicOffset)
 }
 
 func TestRandomSkipsPostsTheViewerCannotSee(t *testing.T) {

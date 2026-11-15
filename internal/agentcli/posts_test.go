@@ -16,14 +16,13 @@ import (
 
 func TestPostsListVisitorSkipsNSFW(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "session")
-	var limit, offset int32
-	var includeNSFW bool
+	var got model.PostQuery
 	var called bool
 	b := &postsBoard{
-		list: func(ctx context.Context, lim, off int32, nsfw bool) ([]model.Post, error) {
+		search: func(ctx context.Context, q model.PostQuery) (model.SearchPage, error) {
 			called = true
-			limit, offset, includeNSFW = lim, off, nsfw
-			return nil, nil
+			got = q
+			return model.SearchPage{Total: 3}, nil
 		},
 	}
 	code, env, _ := postsRun(t, Deps{Board: b}, []string{"posts", "list"}, path)
@@ -31,9 +30,81 @@ func TestPostsListVisitorSkipsNSFW(t *testing.T) {
 	require.True(t, env.OK)
 	require.Equal(t, "posts.list", env.Command)
 	require.True(t, called)
-	require.False(t, includeNSFW)
-	require.Equal(t, int32(40), limit)
-	require.Equal(t, int32(0), offset)
+	require.Equal(t, []string{}, got.Tags)
+	require.Equal(t, []string{}, got.Exclude)
+	require.Empty(t, got.Q)
+	require.Empty(t, got.Artist)
+	require.Empty(t, got.Sort)
+	require.False(t, got.IncludeNSFW)
+	require.Equal(t, int32(40), got.Limit)
+	require.Equal(t, int32(0), got.Offset)
+	data := postsData(t, env)
+	require.Equal(t, float64(3), data["total"])
+	posts, ok := data["posts"].([]any)
+	require.True(t, ok)
+	require.Empty(t, posts)
+
+	code, env, _ = postsRun(t, Deps{Board: b}, []string{"posts", "list", "--limit", "10", "--offset", "20"}, path)
+	require.Equal(t, 0, code)
+	require.True(t, env.OK)
+	require.Equal(t, int32(10), got.Limit)
+	require.Equal(t, int32(20), got.Offset)
+	require.False(t, got.IncludeNSFW)
+	require.Equal(t, []string{}, got.Tags)
+	require.Equal(t, []string{}, got.Exclude)
+	require.Empty(t, got.Q)
+}
+
+func TestPostsListOmitsHiddenAndUnoptedNSFW(t *testing.T) {
+	var got model.PostQuery
+	b := &postsBoard{
+		search: func(ctx context.Context, q model.PostQuery) (model.SearchPage, error) {
+			got = q
+			posts := []model.Post{{ID: "sfw-public", Rating: "sfw"}}
+			total := int64(1)
+			if q.IncludeNSFW {
+				posts = append(posts, model.Post{ID: "nsfw-public", Rating: "nsfw"})
+				total = 2
+			}
+			return model.SearchPage{Total: total, Posts: posts}, nil
+		},
+	}
+
+	visitor := filepath.Join(t.TempDir(), "session")
+	code, env, raw := postsRun(t, Deps{Board: b}, []string{"posts", "list"}, visitor)
+	require.Equal(t, 0, code)
+	require.True(t, env.OK)
+	require.Equal(t, "posts.list", env.Command)
+	require.Equal(t, []string{}, got.Tags)
+	require.Equal(t, []string{}, got.Exclude)
+	require.Empty(t, got.Q)
+	require.False(t, got.IncludeNSFW)
+	require.Equal(t, []string{"sfw-public"}, postsIDs(t, env))
+	require.Equal(t, float64(1), postsData(t, env)["total"])
+	require.NotContains(t, raw, "hidden-post")
+	require.NotContains(t, raw, "deleted-post")
+	require.NotContains(t, raw, "nsfw-public")
+
+	session, acc := postsMemberSession(t, false)
+	code, env, raw = postsRun(t, Deps{Accounts: acc, Board: b}, []string{"posts", "list"}, session)
+	require.Equal(t, 0, code)
+	require.True(t, env.OK)
+	require.False(t, got.IncludeNSFW)
+	require.Equal(t, []string{"sfw-public"}, postsIDs(t, env))
+	require.Equal(t, float64(1), postsData(t, env)["total"])
+	require.NotContains(t, raw, "hidden-post")
+	require.NotContains(t, raw, "nsfw-public")
+
+	session, acc = postsMemberSession(t, true)
+	code, env, raw = postsRun(t, Deps{Accounts: acc, Board: b}, []string{"posts", "list"}, session)
+	require.Equal(t, 0, code)
+	require.True(t, env.OK)
+	require.True(t, got.IncludeNSFW)
+	require.Equal(t, []string{"sfw-public", "nsfw-public"}, postsIDs(t, env))
+	require.Equal(t, float64(2), postsData(t, env)["total"])
+	require.Contains(t, raw, "nsfw-public")
+	require.NotContains(t, raw, "hidden-post")
+	require.NotContains(t, raw, "deleted-post")
 }
 
 func TestPostsSearchPassesTheQuery(t *testing.T) {
@@ -435,6 +506,36 @@ func postsData(t *testing.T, env Envelope) map[string]any {
 	data, ok := env.Data.(map[string]any)
 	require.True(t, ok)
 	return data
+}
+
+func postsIDs(t *testing.T, env Envelope) []string {
+	t.Helper()
+	items, ok := postsData(t, env)["posts"].([]any)
+	require.True(t, ok)
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		row, ok := item.(map[string]any)
+		require.True(t, ok)
+		id, ok := row["id"].(string)
+		require.True(t, ok)
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func postsMemberSession(t *testing.T, showNSFW bool) (string, *postsAccounts) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "session")
+	require.NoError(t, SaveSession(path, "member-session"))
+	acc := &postsAccounts{
+		session: func(ctx context.Context, _ string) (model.User, error) {
+			return model.User{
+				ID: "user-1", Username: "ada", DisplayName: "Ada",
+				Role: model.RoleMember, ShowNSFW: showNSFW,
+			}, nil
+		},
+	}
+	return path, acc
 }
 
 func postsSession(t *testing.T, role model.Role) (string, *postsAccounts) {

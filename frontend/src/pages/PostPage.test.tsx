@@ -338,3 +338,42 @@ describe("PostPage staged editing", () => {
     }
   });
 });
+
+describe("PostPage copy link", () => {
+  it("copies the current page url and not the post id", async () => {
+    const previous = `${window.location.pathname}${window.location.search}`;
+    window.history.pushState({}, "", "/posts/p1?tags=yuri");
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    try {
+      const { rerender } = render(<PostPage id="p1" />);
+      const copyId = screen.getByRole("button", { name: "Copy post id" });
+      const copyLink = screen.getByRole("button", { name: "Copy link" });
+      expect(copyId.parentElement).toBe(copyLink.parentElement);
+      expect(copyLink).toHaveTextContent("Copy link");
+
+      fireEvent.click(copyLink);
+      const pageUrl = `${window.location.origin}/posts/p1?tags=yuri`;
+      await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+      expect(writeText).toHaveBeenCalledWith(pageUrl);
+      expect(writeText).toHaveBeenCalledWith(window.location.href);
+      expect(writeText).not.toHaveBeenCalledWith("p1");
+      expect(copyLink).toHaveTextContent("Copied");
+      expect(copyId).toHaveTextContent("Copy");
+
+      fireEvent.click(copyId);
+      await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+      expect(writeText).toHaveBeenLastCalledWith("p1");
+      expect(copyId).toHaveTextContent("Copied");
+
+      rerender(<PostPage id="p2" />);
+      expect(screen.getByRole("button", { name: "Copy link" })).toHaveTextContent("Copy link");
+      expect(screen.getByRole("button", { name: "Copy post id" })).toHaveTextContent("Copy");
+    } finally {
+      window.history.pushState({}, "", previous || "/");
+    }
+  });
+});

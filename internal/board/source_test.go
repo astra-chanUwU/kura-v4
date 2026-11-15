@@ -119,6 +119,8 @@ type fakeRepo struct {
 	ownerOffset    int32
 	publicPosts    []model.Post
 	publicTotal    int64
+	publicLimit    int32
+	publicOffset   int32
 }
 
 func (f *fakeRepo) CreatePost(_ context.Context, p model.Post, _ string) (model.Post, error) {
@@ -235,7 +237,9 @@ func (f *fakeRepo) ListImplications(context.Context) ([]model.TagImplication, er
 func (f *fakeRepo) CountPublicPostsByOwner(context.Context, string, bool) (int64, error) {
 	return f.publicTotal, nil
 }
-func (f *fakeRepo) ListPublicPostsByOwner(context.Context, string, bool, int32, int32) ([]model.Post, error) {
+func (f *fakeRepo) ListPublicPostsByOwner(_ context.Context, _ string, _ bool, limit, offset int32) ([]model.Post, error) {
+	f.publicLimit = limit
+	f.publicOffset = offset
 	return f.publicPosts, nil
 }
 func (f *fakeRepo) CountMetaEditsByActor(context.Context, string) (int64, error) { return 0, nil }

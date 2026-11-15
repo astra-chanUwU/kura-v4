@@ -5,6 +5,8 @@ import {
   FONT_LABELS,
   FONTS,
   THEME_LABELS,
+  THEME_PAPERS,
+  THEME_SWATCHES,
   THEMES,
   isFontId,
   isThemeId,
@@ -36,6 +38,10 @@ describe("appearance", () => {
     expect(FONT_LABELS.hack).toBe("Hack");
     expect(DEFAULT_THEME).toBe("kura");
     expect(DEFAULT_FONT).toBe("system");
+    for (const id of THEMES) {
+      expect(THEME_SWATCHES[id]).toMatch(/^#[0-9a-f]{6}$/);
+      expect(THEME_PAPERS[id]).toMatch(/^#[0-9a-f]{6}$/);
+    }
   });
 
   it("fails closed to defaults for unknown values", () => {

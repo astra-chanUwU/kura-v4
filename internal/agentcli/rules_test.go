@@ -16,9 +16,6 @@ import (
 func TestVisitorReadsStayPublicAndWritesSignIn(t *testing.T) {
 	none := filepath.Join(t.TempDir(), "none")
 	board := &postsBoard{
-		list: func(context.Context, int32, int32, bool) ([]model.Post, error) {
-			return []model.Post{}, nil
-		},
 		get: func(_ context.Context, id string) (model.Post, error) {
 			return model.Post{ID: id, Rating: "sfw"}, nil
 		},
@@ -113,19 +110,19 @@ func TestVisitorReadsStayPublicAndWritesSignIn(t *testing.T) {
 func TestExpiredSessionDoesNotBecomeVisitor(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "session")
 	require.NoError(t, SaveSession(path, "dead-token"))
-	listed := false
+	searched := false
 	acc := &postsAccounts{session: func(context.Context, string) (model.User, error) {
 		return model.User{}, model.ErrNotFound
 	}}
-	board := &postsBoard{list: func(context.Context, int32, int32, bool) ([]model.Post, error) {
-		listed = true
-		return []model.Post{}, nil
+	board := &postsBoard{search: func(context.Context, model.PostQuery) (model.SearchPage, error) {
+		searched = true
+		return model.SearchPage{}, nil
 	}}
 	code, env, raw := postsRun(t, Deps{Accounts: acc, Board: board}, []string{"posts", "list"}, path)
 	require.Equal(t, 1, code)
 	require.Equal(t, "unauthenticated", env.Error.Code)
 	require.NotContains(t, raw, "dead-token")
-	require.False(t, listed)
+	require.False(t, searched)
 }
 
 type auditTags struct{ mutated bool }

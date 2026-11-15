@@ -40,6 +40,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.button[data-font] .label {
+  font-family: var(--font-body);
+}
 
 .chevron {
   flex: none;
@@ -48,11 +51,11 @@
 
 .swatch {
   flex: none;
-  width: 0.7rem;
-  height: 0.7rem;
-  border: 1px solid var(--border-strong);
-  border-radius: 50%;
-  background: var(--swatch);
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 0.28rem;
+  background: linear-gradient(135deg, var(--swatch) 0 50%, var(--paper, var(--surface-soft)) 50% 100%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 28%, transparent);
 }
 
 .menu {
@@ -69,10 +72,41 @@
   padding: 0.25rem;
   list-style: none;
   border: 1px solid var(--border-strong);
-  border-radius: 0.35rem;
+  border-radius: 0.5rem;
   background: var(--surface);
   color: var(--text);
+  box-shadow: var(--shadow);
   animation: menu-in 0.12s ease;
+}
+.alignEnd .menu {
+  left: auto;
+  right: 0;
+}
+/* Header theme menus are wider than the control and sit at the right
+   edge. Pin them to the viewport so they cannot run off either side. */
+.alignEnd .palette {
+  position: fixed;
+  top: calc(var(--header-h) + 0.35rem);
+  right: 0.75rem;
+  left: auto;
+  width: min(22rem, calc(100vw - 1.5rem));
+}
+.palette {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: min(22rem, calc(100vw - 1.5rem));
+  max-height: min(24rem, calc(100dvh - var(--header-h) - 1rem));
+}
+.sample {
+  flex: none;
+  width: 1.6rem;
+  color: var(--accent);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.option[data-font] .optionLabel {
+  font-family: var(--font-body);
 }
 
 .option {

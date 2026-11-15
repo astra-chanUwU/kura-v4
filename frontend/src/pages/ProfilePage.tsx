@@ -1,13 +1,32 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
+import type { CSSProperties } from "react";
+import { Pager } from "../components/Pager";
 import { PostCard } from "../components/PostCard";
 import { ShareProfileButton } from "../components/ShareProfileButton";
+import { PROFILE_PAGE_SIZE } from "../domain/profileSearch";
 import { useProfile } from "../hooks/useCollections";
 import styles from "./Profile.module.css";
 import { ROLE_LABELS } from "../domain/roles";
-import { FONT_LABELS, THEME_LABELS, normalizeFont, normalizeTheme } from "../domain/appearance";
+import {
+  FONT_LABELS,
+  THEME_LABELS,
+  THEME_PAPERS,
+  THEME_SWATCHES,
+  normalizeFont,
+  normalizeTheme,
+} from "../domain/appearance";
 
-export function ProfilePage({ username }: { username: string }) {
-  const { data, isPending, error } = useProfile(username);
+export function ProfilePage({ username, page = 1 }: { username: string; page?: number }) {
+  const navigate = useNavigate();
+  const { data, isPending, error } = useProfile(username, page);
+  const goToPage = (next: number) => {
+    if (!Number.isInteger(next) || next < 1 || next === page) return;
+    void navigate({
+      to: "/u/$username",
+      params: { username },
+      search: next > 1 ? { page: next } : {},
+    });
+  };
   if (isPending) return <p>Loading…</p>;
   if (error || !data) return <p role="alert">That profile could not be found.</p>;
   const { user, public_lists: lists, contributions } = data;
@@ -38,6 +57,16 @@ export function ProfilePage({ username }: { username: string }) {
             {user.location ? ` · ${user.location}` : ""}
           </p>
           <p className={styles.appearance}>
+            <span
+              className={styles.themeChip}
+              style={
+                {
+                  "--swatch": THEME_SWATCHES[theme],
+                  "--paper": THEME_PAPERS[theme],
+                } as CSSProperties
+              }
+              aria-hidden="true"
+            />
             {THEME_LABELS[theme]} · {FONT_LABELS[font]}
           </p>
           <p className={styles.stats}>
@@ -61,18 +90,16 @@ export function ProfilePage({ username }: { username: string }) {
       )}
       <div>
         <h2>Uploads</h2>
-        {uploads.length === 0 && <p className={styles.muted}>No pictures on the board yet.</p>}
+        {uploadTotal === 0 && <p className={styles.muted}>No pictures on the board yet.</p>}
         <div className={styles.uploads}>
           {uploads.map((post) => (
             <PostCard key={post.id} post={post} />
           ))}
         </div>
-        {uploadTotal > uploads.length && (
-          <p className={styles.muted}>
-            {uploadTotal} on the board.{" "}
-            {contributions - uploadTotal > 0 ? "Hidden pictures stay off this page." : ""}
-          </p>
+        {contributions > uploadTotal && (
+          <p className={styles.muted}>Hidden pictures stay off this profile.</p>
         )}
+        <Pager page={page} total={uploadTotal} pageSize={PROFILE_PAGE_SIZE} onPage={goToPage} />
       </div>
       <div>
         <h2>Public lists</h2>

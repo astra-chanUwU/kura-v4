@@ -1,6 +1,7 @@
 import { createRootRoute, createRoute, createRouter, Link } from "@tanstack/react-router";
 import { AppShell } from "../components/AppShell";
 import { validateBoardSearch } from "../domain/boardFilter";
+import { profilePageFromSearch, validateProfileSearch } from "../domain/profileSearch";
 import { AuthPage } from "../pages/AuthPage";
 import { HomePage } from "../pages/HomePage";
 import { ListPage } from "../pages/ListPage";
@@ -112,9 +113,13 @@ const postRoute = createRoute({
 const profileRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/u/$username",
+  // Uploads page lives in ?page= so Back/Forward move between slices.
+  // Page 1 omits the param. A missing or invalid page is page 1.
+  validateSearch: validateProfileSearch,
   component: () => {
     const { username } = profileRoute.useParams();
-    return <ProfilePage username={username} />;
+    const search = profileRoute.useSearch();
+    return <ProfilePage username={username} page={profilePageFromSearch(search)} />;
   },
 });
 const tagRoute = createRoute({

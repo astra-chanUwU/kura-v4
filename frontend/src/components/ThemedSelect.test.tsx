@@ -41,4 +41,19 @@ describe("ThemedSelect", () => {
     fireEvent.click(screen.getByRole("option", { name: /Public/ }));
     expect(new FormData(form as HTMLFormElement).get("visibility")).toBe("public");
   });
+
+  it("draws a font choice in that face and a theme as paper plus accent", () => {
+    render(
+      <ThemedSelect label="Font" value="serif">
+        <option value="serif" data-font="serif">
+          Source Serif 4
+        </option>
+      </ThemedSelect>,
+    );
+    expect(screen.getByRole("button", { name: "Font" })).toHaveAttribute("data-font", "serif");
+    fireEvent.click(screen.getByRole("button", { name: "Font" }));
+    const option = screen.getByRole("option", { name: "Source Serif 4" });
+    expect(option).toHaveAttribute("data-font", "serif");
+    expect(option).toHaveTextContent("Ag");
+  });
 });

@@ -103,15 +103,21 @@ func (s *Service) EditCount(ctx context.Context, userID string) (int64, error) {
 	return s.repo.CountMetaEditsByActor(ctx, userID)
 }
 
-// PublicByOwner is the first page of posts a profile visitor can see.
-// Hidden and deleted posts stay off the public profile.
-func (s *Service) PublicByOwner(ctx context.Context, userID string, includeNSFW bool, limit int) ([]model.Post, int64, error) {
-	lim, _ := model.PageBounds(limit, 0)
+// PublicByOwner is one page of posts a profile visitor can see.
+// Hidden and deleted posts stay off the public profile. NSFW is
+// included only when includeNSFW is set. offset is zero-based.
+func (s *Service) PublicByOwner(ctx context.Context, userID string, includeNSFW bool, limit, offset int) ([]model.Post, int64, error) {
+	// PageBounds casts to int32. A page past MaxInt32 must stay past the
+	// end; wrapping it produces a negative OFFSET and the first page.
+	if offset > math.MaxInt32 {
+		offset = math.MaxInt32
+	}
+	lim, off := model.PageBounds(limit, offset)
 	total, err := s.repo.CountPublicPostsByOwner(ctx, userID, includeNSFW)
 	if err != nil {
 		return nil, 0, err
 	}
-	posts, err := s.repo.ListPublicPostsByOwner(ctx, userID, includeNSFW, lim, 0)
+	posts, err := s.repo.ListPublicPostsByOwner(ctx, userID, includeNSFW, lim, off)
 	if err != nil {
 		return nil, 0, err
 	}

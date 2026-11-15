@@ -44,7 +44,7 @@ FROM lists l LEFT JOIN users u ON u.id=l.owner_id WHERE l.owner_id=$1 ORDER BY l
 -- name: ListPublicListsByOwner :many
 SELECT l.id, l.owner_id, l.title, l.description, l.visibility, l.created_at, l.updated_at,
   COALESCE(u.username,'')::text AS owner_username, COALESCE(u.display_name,'')::text AS owner_display_name,
-  (SELECT count(*) FROM list_items i JOIN posts p ON p.id=i.post_id WHERE i.list_id=l.id AND p.hidden_at IS NULL)::bigint AS item_count
+  (SELECT count(*) FROM list_items i JOIN posts p ON p.id=i.post_id WHERE i.list_id=l.id AND p.hidden_at IS NULL AND p.deleted_at IS NULL)::bigint AS item_count
 FROM lists l LEFT JOIN users u ON u.id=l.owner_id WHERE l.owner_id=$1 AND l.visibility='public' ORDER BY l.updated_at DESC;
 
 -- name: UpdateList :one
@@ -60,6 +60,7 @@ FROM list_items i JOIN posts p ON p.id = i.post_id
 WHERE i.list_id = sqlc.arg(list_id)
   AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw')
   AND (sqlc.arg(include_hidden)::bool OR p.hidden_at IS NULL)
+  AND (sqlc.arg(include_hidden)::bool OR p.deleted_at IS NULL)
   AND NOT EXISTS (
     SELECT 1 FROM post_tags blocked
     WHERE blocked.post_id = p.id
@@ -79,6 +80,7 @@ FROM list_items i JOIN posts p ON p.id=i.post_id LEFT JOIN users u ON u.id=p.own
 WHERE i.list_id = sqlc.arg(list_id)
   AND (sqlc.arg(include_nsfw)::bool OR p.rating = 'sfw')
   AND (sqlc.arg(include_hidden)::bool OR p.hidden_at IS NULL)
+  AND (sqlc.arg(include_hidden)::bool OR p.deleted_at IS NULL)
   AND NOT EXISTS (
     SELECT 1 FROM post_tags blocked
     WHERE blocked.post_id = p.id

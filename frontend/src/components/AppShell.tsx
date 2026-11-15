@@ -8,6 +8,7 @@ import {
   FONT_LABELS,
   FONTS,
   THEME_LABELS,
+  THEME_PAPERS,
   THEME_SWATCHES,
   THEMES,
   normalizeFont,
@@ -91,22 +92,29 @@ export function AppShell() {
         <div className={styles.themeWrap}>
           <ThemedSelect
             label="Theme"
+            align="end"
             value={theme}
             onChange={(id) => change({ theme: normalizeTheme(id) })}
           >
             {THEMES.map((id) => (
-              <option key={id} value={id} data-swatch={THEME_SWATCHES[id]}>
+              <option
+                key={id}
+                value={id}
+                data-swatch={THEME_SWATCHES[id]}
+                data-paper={THEME_PAPERS[id]}
+              >
                 {THEME_LABELS[id]}
               </option>
             ))}
           </ThemedSelect>
           <ThemedSelect
             label="Font"
+            align="end"
             value={font}
             onChange={(id) => change({ font: normalizeFont(id) })}
           >
             {FONTS.map((id) => (
-              <option key={id} value={id}>
+              <option key={id} value={id} data-font={id}>
                 {FONT_LABELS[id]}
               </option>
             ))}

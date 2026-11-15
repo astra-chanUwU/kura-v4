@@ -29,6 +29,7 @@ export function NotificationsPage() {
   const total = query.data?.total ?? 0;
   const unread = query.data?.unread ?? 0;
   const waiting = !!user && query.isPending && items.length === 0;
+  const markFailed = (error: unknown) => toasts.push(shortError(error), "error");
 
   return (
     <section className={styles.page} aria-labelledby="notifications-title">
@@ -39,13 +40,9 @@ export function NotificationsPage() {
             type="button"
             className={styles.button}
             disabled={mark.isPending}
-            onClick={() =>
-              mark.mutate([], {
-                onError: (error: unknown) => toasts.push(shortError(error), "error"),
-              })
-            }
+            onClick={() => mark.mutate([], { onError: markFailed })}
           >
-            Mark as read
+            Mark all as read
           </button>
         )}
       </div>
@@ -64,7 +61,15 @@ export function NotificationsPage() {
         <ul className={styles.list}>
           {items.map((item) => (
             <li key={item.id} className={item.read ? styles.item : styles.unread}>
-              <Link to="/posts/$id" params={{ id: item.post_id }} className={styles.link}>
+              <Link
+                to="/posts/$id"
+                params={{ id: item.post_id }}
+                className={styles.link}
+                onClick={() => {
+                  if (item.read) return;
+                  mark.mutate([item.id], { onError: markFailed });
+                }}
+              >
                 <span>{line(item)}</span>
                 <time className={styles.time} dateTime={item.created_at}>
                   {when(item.created_at)}

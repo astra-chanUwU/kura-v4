@@ -25,6 +25,7 @@ export function ThemedSelect({
   defaultValue,
   value,
   onChange,
+  align = "start",
   children,
 }: {
   name?: string;
@@ -32,6 +33,8 @@ export function ThemedSelect({
   defaultValue?: string;
   value?: string;
   onChange?: (value: string) => void;
+  /** Open toward the end edge so a control at the right of the header stays on screen. */
+  align?: "start" | "end";
   children: React.ReactNode;
 }) {
   const options = useMemo(() => childOptions(children), [children]);
@@ -156,10 +159,19 @@ export function ThemedSelect({
     }
   }
 
+  const palette = options.length > 0 && options.every((option) => option.swatch);
+  const wrapClass = [
+    styles.wrap,
+    open ? styles.open : "",
+    align === "end" ? styles.alignEnd : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div
       ref={wrapRef}
-      className={open ? `${styles.wrap} ${styles.open}` : styles.wrap}
+      className={wrapClass}
       onBlur={(e) => {
         if (open && (!e.relatedTarget || !wrapRef.current?.contains(e.relatedTarget as Node))) {
           setOpen(false);
@@ -176,6 +188,7 @@ export function ThemedSelect({
         // oxlint-disable-next-line jsx-a11y/role-supports-aria-props -- listbox-button pattern: focus stays on this button while aria-activedescendant tracks the active option
         aria-activedescendant={open ? `${listId}-${active}` : undefined}
         aria-label={label}
+        data-font={selected?.font}
         onClick={() => {
           if (open) {
             setOpen(false);
@@ -188,7 +201,7 @@ export function ThemedSelect({
         {selected?.swatch ? (
           <span
             className={styles.swatch}
-            style={{ "--swatch": selected.swatch } as CSSProperties}
+            style={swatchStyle(selected)}
             aria-hidden="true"
           />
         ) : null}
@@ -210,7 +223,12 @@ export function ThemedSelect({
       {name !== undefined ? <input type="hidden" name={name} value={current} /> : null}
       {open ? (
         /* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-to-interactive-role -- ul is the standard listbox container; its options are buttons */
-        <ul id={listId} role="listbox" aria-label={label} className={styles.menu}>
+        <ul
+          id={listId}
+          role="listbox"
+          aria-label={label}
+          className={palette ? `${styles.menu} ${styles.palette}` : styles.menu}
+        >
           {options.map((o, i) => (
             <li key={`${o.value}-${i}`} role="presentation">
               <button
@@ -220,6 +238,7 @@ export function ThemedSelect({
                 aria-selected={i === selectedIndex}
                 tabIndex={-1}
                 className={i === active ? `${styles.option} ${styles.active}` : styles.option}
+                data-font={o.font}
                 onClick={() => {
                   select(o.value);
                 }}
@@ -228,11 +247,12 @@ export function ThemedSelect({
                 }}
               >
                 {o.swatch ? (
-                  <span
-                    className={styles.swatch}
-                    style={{ "--swatch": o.swatch } as CSSProperties}
-                    aria-hidden="true"
-                  />
+                  <span className={styles.swatch} style={swatchStyle(o)} aria-hidden="true" />
+                ) : null}
+                {o.font ? (
+                  <span className={styles.sample} aria-hidden="true">
+                    Ag
+                  </span>
                 ) : null}
                 <span className={styles.optionLabel}>{o.label}</span>
                 <svg
@@ -258,7 +278,20 @@ export function ThemedSelect({
   );
 }
 
-type OptionData = { value: string; label: string; swatch?: string };
+type OptionData = {
+  value: string;
+  label: string;
+  swatch?: string;
+  paper?: string;
+  font?: string;
+};
+
+function swatchStyle(option: OptionData): CSSProperties {
+  return {
+    "--swatch": option.swatch,
+    "--paper": option.paper ?? "var(--surface-soft)",
+  } as CSSProperties;
+}
 
 function textOf(node: ReactNode): string {
   if (node === null || node === undefined || typeof node === "boolean") {
@@ -287,12 +320,15 @@ function childOptions(nodes: ReactNode): OptionData[] {
       value?: unknown;
       children?: ReactNode;
       "data-swatch"?: unknown;
+      "data-paper"?: unknown;
+      "data-font"?: unknown;
     };
     const value = props.value === undefined || props.value === null ? "" : String(props.value);
     const label = textOf(props.children).trim() || value;
-    const swatch =
-      typeof props["data-swatch"] === "string" ? (props["data-swatch"] as string) : undefined;
-    out.push({ value, label, swatch });
+    const swatch = typeof props["data-swatch"] === "string" ? props["data-swatch"] : undefined;
+    const paper = typeof props["data-paper"] === "string" ? props["data-paper"] : undefined;
+    const font = typeof props["data-font"] === "string" ? props["data-font"] : undefined;
+    out.push({ value, label, swatch, paper, font });
   });
   return out;
 }

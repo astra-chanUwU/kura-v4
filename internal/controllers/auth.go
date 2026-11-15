@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"math"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -438,6 +440,32 @@ func (h *Auth) removeAvatar(c fiber.Ctx) error {
 	return h.meResponse(c, updated)
 }
 
+// publicProfilePageSize is how many uploads one public profile page shows.
+// Page 1 is the same first slice the profile returned before paging.
+const publicProfilePageSize = 24
+
+// publicProfileOffset reads the 1-based page query. A missing or invalid
+// page is page 1, so the offset is 0. Offset is (page-1)*publicProfilePageSize.
+// A page whose offset would pass MaxInt32 stays at MaxInt32 so it cannot
+// wrap into a negative OFFSET and come back as the first page.
+func publicProfileOffset(raw string) int {
+	page := int64(1)
+	if raw != "" {
+		n, err := strconv.ParseInt(raw, 10, 64)
+		if err == nil && n >= 1 {
+			page = n
+		}
+	}
+	if page <= 1 {
+		return 0
+	}
+	maxPage := int64(math.MaxInt32)/publicProfilePageSize + 1
+	if page > maxPage {
+		return math.MaxInt32
+	}
+	return int((page - 1) * publicProfilePageSize)
+}
+
 func (h *Auth) publicProfile(c fiber.Ctx) error {
 	user, err := h.accounts.GetByUsername(c.Context(), c.Params("username"))
 	if err != nil {
@@ -458,7 +486,9 @@ func (h *Auth) publicProfile(c fiber.Ctx) error {
 		if err != nil {
 			return writeError(c, err)
 		}
-		uploads, uploadTotal, err = h.board.PublicByOwner(c.Context(), user.ID, viewerSeesNSFW(c), 24)
+		uploads, uploadTotal, err = h.board.PublicByOwner(
+			c.Context(), user.ID, viewerSeesNSFW(c), publicProfilePageSize, publicProfileOffset(c.Query("page")),
+		)
 		if err != nil {
 			return writeError(c, err)
 		}

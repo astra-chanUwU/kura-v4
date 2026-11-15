@@ -20,6 +20,7 @@
   --warning: #f0c674;
   --success: #a8d08d;
   --selection: #493d62;
+  --shadow: 0 16px 40px rgb(0 0 0 / 0.38);
 }
 
 /* Safebooru: the classic light blue-and-white booru look. */
@@ -38,6 +39,7 @@
   --warning: #9a6200;
   --success: #2e7d32;
   --selection: #a9ccf5;
+  --shadow: 0 12px 28px rgb(23 40 60 / 0.14);
 }
 
 /* Rule34: near-black with the signature green. */
@@ -50,12 +52,12 @@
   --muted: #9db38a;
   --accent: #8bc34a;
   --accent-soft: #cdeea6;
-  --border: #2c3d22;
-  --border-strong: #48622f;
+  --border: #35502a;
+  --border-strong: #527338;
   --danger: #ff9a9a;
   --warning: #f0c674;
   --success: #cdeea6;
-  --selection: #334d24;
+  --selection: #3d5c2c;
 }
 
 /* Umineko — City of Books: black-plum, burgundy and gold, serif voice. */
@@ -68,12 +70,12 @@
   --muted: #bb9f88;
   --accent: #c9a227;
   --accent-soft: #e59a7a;
-  --border: #3d2a30;
-  --border-strong: #61434c;
+  --border: #4a343c;
+  --border-strong: #6d4c56;
   --danger: #ff8f8f;
   --warning: #e5b95f;
   --success: #b5c99a;
-  --selection: #4a2f35;
+  --selection: #5c3a42;
 }
 
 /* Character themes adapted from VictoriqueMoe's umineko_city_of_books
@@ -88,12 +90,12 @@
   --muted: #9bb5d0;
   --accent: #4a90d9;
   --accent-soft: #7eb3f0;
-  --border: #1a2a40;
+  --border: #243656;
   --border-strong: #3d5a80;
   --danger: #ff6b6b;
   --warning: #f0c674;
   --success: #a8d08d;
-  --selection: #1a2a40;
+  --selection: #1c3d66;
 }
 [data-theme="lambdadelta"] {
   color-scheme: dark;
@@ -104,12 +106,12 @@
   --muted: #d09bb8;
   --accent: #ff69b4;
   --accent-soft: #ffb6d9;
-  --border: #4a2038;
-  --border-strong: #6a3a5a;
+  --border: #5a2844;
+  --border-strong: #7a4464;
   --danger: #ff6b6b;
   --warning: #f0c674;
   --success: #a8d08d;
-  --selection: #4a2038;
+  --selection: #5c2848;
 }
 [data-theme="beatrice"] {
   color-scheme: dark;
@@ -120,12 +122,12 @@
   --muted: #c9b8a0;
   --accent: #d4a84b;
   --accent-soft: #f0d590;
-  --border: #3d2a1a;
+  --border: #4a3422;
   --border-strong: #6b4c3a;
   --danger: #ff6b6b;
   --warning: #f0c674;
   --success: #a8d08d;
-  --selection: #3d2a1a;
+  --selection: #5c4030;
 }
 [data-theme="erika"] {
   color-scheme: dark;
@@ -136,12 +138,12 @@
   --muted: #90c0d8;
   --accent: #00b4d8;
   --accent-soft: #e27599;
-  --border: #1a2a40;
+  --border: #1c3a52;
   --border-strong: #4a3060;
   --danger: #ff6b6b;
   --warning: #f0c674;
   --success: #a8d08d;
-  --selection: #1a2a40;
+  --selection: #123044;
 }
 [data-theme="battler"] {
   color-scheme: dark;
@@ -152,12 +154,12 @@
   --muted: #c0a0a8;
   --accent: #e85a70;
   --accent-soft: #f2b8c6;
-  --border: #2a0f18;
-  --border-strong: #4a1520;
+  --border: #4a2030;
+  --border-strong: #6e3444;
   --danger: #ff6b6b;
   --warning: #f0c674;
   --success: #a8d08d;
-  --selection: #2a0f18;
+  --selection: #3a1828;
 }
 /* Virgilia is senpai's one light theme: silver with a deep red accent. */
 [data-theme="virgilia"] {
@@ -169,12 +171,13 @@
   --muted: #5a5e6c;
   --accent: #8b1a2d;
   --accent-soft: #b83048;
-  --border: #cdd1dc;
+  --border: #c5cad6;
   --border-strong: #9ba0b0;
   --danger: #c62828;
   --warning: #9a6200;
   --success: #2e7d32;
-  --selection: #cdd1dc;
+  --selection: #f3d5db;
+  --shadow: 0 12px 28px rgb(26 26 36 / 0.12);
 }
 
 /* Catppuccin Mocha: the official pastel-on-dark palette. */
@@ -187,12 +190,12 @@
   --muted: #b1b7cf;
   --accent: #cba6f7;
   --accent-soft: #f5c2e7;
-  --border: #45475a;
-  --border-strong: #585b70;
+  --border: #585b70;
+  --border-strong: #6c7086;
   --danger: #f38ba8;
   --warning: #f9e2af;
   --success: #a6e3a1;
-  --selection: #585b70;
+  --selection: #45475a;
 }
 
 /* Danbooru: the classic light booru look, blue links on white. */
@@ -211,6 +214,7 @@
   --warning: #9a6200;
   --success: #2e7d32;
   --selection: #bcd8f7;
+  --shadow: 0 12px 28px rgb(34 34 34 / 0.12);
 }
 
 @media (max-width: 640px) {
@@ -241,6 +245,7 @@
   --warning: #f0c674;
   --success: #a8d08d;
   --selection: #493d62;
+  --shadow: 0 16px 40px rgb(0 0 0 / 0.38);
 }
 
 /* Fonts are independent of theme: each only swaps --font-body. Every

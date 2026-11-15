@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   DEFAULT_FONT,
   DEFAULT_THEME,
+  THEME_PAPERS,
   normalizeFont,
   normalizeTheme,
   type FontId,
@@ -15,6 +16,9 @@ export function applyAppearance(theme: ThemeId, font: FontId) {
   else root.dataset.theme = theme;
   if (font === DEFAULT_FONT) delete root.dataset.font;
   else root.dataset.font = font;
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute("content", THEME_PAPERS[theme]);
   try {
     localStorage.setItem("kura-theme", theme);
     localStorage.setItem("kura-font", font);

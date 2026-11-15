@@ -48,7 +48,7 @@ export const queryKeys = {
     offset === undefined
       ? (["list", id] as const)
       : (["list", id, offset, pageSize ?? 40] as const),
-  profile: (username: string) => ["profile", username] as const,
+  profile: (username: string, page = 1) => ["profile", username, page] as const,
   adminUsers: (q: string, role: string, sort: string, offset = 0, pageSize = 40) =>
     ["admin-users", q, role, sort, offset, pageSize] as const,
   postHistory: (id: string) => ["post-history", id] as const,

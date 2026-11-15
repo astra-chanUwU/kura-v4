@@ -55,10 +55,26 @@ export const THEME_SWATCHES: Record<ThemeId, string> = {
   lambdadelta: "#ff69b4",
   beatrice: "#d4a84b",
   erika: "#00b4d8",
-  battler: "#c41e3a",
+  battler: "#e85a70",
   virgilia: "#8b1a2d",
   catppuccin: "#cba6f7",
-  danbooru: "#0075f8",
+  danbooru: "#0069df",
+};
+
+/** Page color behind each accent, so a theme chip shows paper and ink. */
+export const THEME_PAPERS: Record<ThemeId, string> = {
+  kura: "#100f15",
+  safebooru: "#eef4fc",
+  rule34: "#0b0f08",
+  umineko: "#120d10",
+  bernkastel: "#06090f",
+  lambdadelta: "#120810",
+  beatrice: "#0f0a08",
+  erika: "#060a0f",
+  battler: "#0f0608",
+  virgilia: "#e8eaf0",
+  catppuccin: "#1e1e2e",
+  danbooru: "#f5f7fa",
 };
 
 /** Real self-hosted fonts behind each id (see main.tsx imports). */
