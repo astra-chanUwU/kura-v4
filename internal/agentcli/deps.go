@@ -11,14 +11,15 @@ import (
 // Business rules stay in those services. Nil services are only valid
 // for commands that do not touch the database (schema).
 type Deps struct {
-	Accounts    Accounts
-	Board       Board
-	Collections Collections
-	Comments    Comments
-	Moderation  Moderation
-	Site        Site
-	Tags        Tags
-	Reports     Reports
+	Accounts      Accounts
+	Board         Board
+	Collections   Collections
+	Comments      Comments
+	Moderation    Moderation
+	Site          Site
+	Tags          Tags
+	Reports       Reports
+	CommentSafety CommentSafety
 }
 
 // Options configures one invocation. Tests set SessionPath; the
@@ -91,6 +92,15 @@ type Reports interface {
 	Create(ctx context.Context, viewer model.User, postID, reason, note string) (model.PostReport, error)
 	ListOpen(ctx context.Context, actor model.User, limit, offset int) (model.PostReportPage, error)
 	Dismiss(ctx context.Context, actor model.User, reportID string) (model.PostReport, error)
+}
+
+// CommentSafety is the subset of commentsafety.Service the CLI uses.
+type CommentSafety interface {
+	List(ctx context.Context, actor model.User, filter model.CommentSafetyFilter, limit, offset int) (model.CommentSafetyPage, error)
+	Resolvers(ctx context.Context, actor model.User) ([]model.CommentSafetyResolver, error)
+	Dismiss(ctx context.Context, actor model.User, id string) (model.CommentSafetyEvent, error)
+	Remove(ctx context.Context, actor model.User, id string) (model.CommentSafetyEvent, error)
+	Reopen(ctx context.Context, actor model.User, id string) (model.CommentSafetyEvent, error)
 }
 
 // Site is the subset of site.Service the CLI uses.

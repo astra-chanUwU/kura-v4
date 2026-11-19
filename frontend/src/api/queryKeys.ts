@@ -65,6 +65,17 @@ export const queryKeys = {
   ) => ["admin-history", actorId, q, action, entity, sort, offset, pageSize] as const,
   historyActors: (q: string) => ["history-actors", q] as const,
   openReports: () => ["open-reports"] as const,
+  commentSafety: (
+    status = "open",
+    action = "",
+    category = "",
+    q = "",
+    resolver = "",
+    sort = "newest",
+    offset = 0,
+    pageSize = 40,
+  ) => ["comment-safety", status, action, category, q, resolver, sort, offset, pageSize] as const,
+  commentSafetyResolvers: () => ["comment-safety", "resolvers"] as const,
   failedJobs: (offset?: number) =>
     offset === undefined ? (["failed-jobs"] as const) : (["failed-jobs", offset] as const),
 };

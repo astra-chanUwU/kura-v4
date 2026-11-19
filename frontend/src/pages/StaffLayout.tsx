@@ -80,6 +80,10 @@ export function StaffLayout() {
           <IconShield />
           Reports
         </Link>
+        <Link to="/admin/comment-safety" activeProps={{ className: styles.active }}>
+          <IconShield />
+          Safety
+        </Link>
         <Link to="/admin/jobs" activeProps={{ className: styles.active }}>
           <IconShield />
           Jobs

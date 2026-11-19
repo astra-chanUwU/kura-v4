@@ -11,6 +11,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/board"
 	"github.com/astra-chanUwU/kura-v4/internal/collections"
 	"github.com/astra-chanUwU/kura-v4/internal/comments"
+	"github.com/astra-chanUwU/kura-v4/internal/commentsafety"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
 	"github.com/astra-chanUwU/kura-v4/internal/moderation"
 	"github.com/astra-chanUwU/kura-v4/internal/reports"
@@ -90,6 +91,7 @@ func classify(err error) (code, message string, unexpected bool) {
 	var mErr *moderation.ValidationError
 	var tErr *tags.ValidationError
 	var rErr *reports.ValidationError
+	var safetyErr *commentsafety.ValidationError
 	switch {
 	case errors.As(err, &aErr):
 		return "validation", aErr.Message, false
@@ -105,6 +107,8 @@ func classify(err error) (code, message string, unexpected bool) {
 		return "validation", tErr.Message, false
 	case errors.As(err, &rErr):
 		return "validation", rErr.Message, false
+	case errors.As(err, &safetyErr):
+		return "validation", safetyErr.Message, false
 	case errors.Is(err, board.ErrBadSort):
 		return "validation", "Sort must be newest, oldest, or favorites.", false
 	case errors.Is(err, board.ErrUploadLimit):
@@ -115,7 +119,7 @@ func classify(err error) (code, message string, unexpected bool) {
 		return "unauthenticated", "That username and sign-in didn't match. Check it and try again.", false
 	case errors.Is(err, collections.ErrForbidden):
 		return "forbidden", "That's not yours.", false
-	case errors.Is(err, moderation.ErrForbidden), errors.Is(err, tags.ErrForbidden), errors.Is(err, comments.ErrForbidden), errors.Is(err, reports.ErrForbidden):
+	case errors.Is(err, moderation.ErrForbidden), errors.Is(err, tags.ErrForbidden), errors.Is(err, comments.ErrForbidden), errors.Is(err, reports.ErrForbidden), errors.Is(err, commentsafety.ErrForbidden):
 		return "forbidden", "You don't have permission to do that.", false
 	case errors.Is(err, model.ErrNotFound):
 		return "not_found", "Not found.", false

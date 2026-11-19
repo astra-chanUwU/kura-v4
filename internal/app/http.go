@@ -14,6 +14,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/board"
 	"github.com/astra-chanUwU/kura-v4/internal/collections"
 	"github.com/astra-chanUwU/kura-v4/internal/comments"
+	"github.com/astra-chanUwU/kura-v4/internal/commentsafety"
 	"github.com/astra-chanUwU/kura-v4/internal/controllers"
 	"github.com/astra-chanUwU/kura-v4/internal/dto"
 	"github.com/astra-chanUwU/kura-v4/internal/jobs"
@@ -37,6 +38,7 @@ type HTTPDeps struct {
 	Jobs          *jobs.Service
 	Comments      *comments.Service
 	Reports       *reports.Service
+	CommentSafety *commentsafety.Service
 	Notifications *notifications.Service
 	Searches      *searches.Service
 	Tags          *tags.Service
@@ -115,6 +117,9 @@ func NewHTTP(deps HTTPDeps) *fiber.App {
 		}
 		if deps.Reports != nil {
 			controllers.NewReports(deps.Reports).RegisterRoutes(api)
+		}
+		if deps.CommentSafety != nil {
+			controllers.NewCommentSafety(deps.CommentSafety).RegisterRoutes(api)
 		}
 		if deps.Searches != nil {
 			controllers.NewSearches(deps.Searches).RegisterRoutes(api)

@@ -11,6 +11,7 @@ import { HiddenPostsPage } from "../pages/HiddenPostsPage";
 import { FailedJobsPage } from "../pages/FailedJobsPage";
 import { HistoryPage } from "../pages/HistoryPage";
 import { NotificationsPage } from "../pages/NotificationsPage";
+import { CommentSafetyPage } from "../pages/CommentSafetyPage";
 import { ReportsPage } from "../pages/ReportsPage";
 import { SuggestionsPage } from "../pages/SuggestionsPage";
 import { PostPage } from "../pages/PostPage";
@@ -77,6 +78,11 @@ const reportsRoute = createRoute({
   getParentRoute: () => staffRoute,
   path: "reports",
   component: ReportsPage,
+});
+const commentSafetyRoute = createRoute({
+  getParentRoute: () => staffRoute,
+  path: "comment-safety",
+  component: CommentSafetyPage,
 });
 const jobsRoute = createRoute({
   getParentRoute: () => staffRoute,
@@ -150,6 +156,7 @@ export const router = createRouter({
       hiddenRoute,
       historyRoute,
       reportsRoute,
+      commentSafetyRoute,
       jobsRoute,
       suggestionsRoute,
     ]),

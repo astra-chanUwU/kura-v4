@@ -37,7 +37,24 @@ func TestCatalogRoles(t *testing.T) {
 	require.Contains(t, names, "comments.create")
 	require.Contains(t, names, "comments.update")
 	require.Contains(t, names, "comments.delete")
+	require.Contains(t, names, "comment-safety.list")
+	require.Contains(t, names, "comment-safety.resolvers")
+	require.Contains(t, names, "comment-safety.dismiss")
+	require.Contains(t, names, "comment-safety.remove")
+	require.Contains(t, names, "comment-safety.reopen")
 	require.Contains(t, names, "users.role")
+	for _, cmd := range Catalog() {
+		switch cmd.Name {
+		case "comments.create", "comments.update":
+			require.Contains(t, cmd.Summary, "Phone numbers and off-site contact details are rejected.")
+		case "comment-safety.list", "comment-safety.resolvers":
+			require.Equal(t, "moderator", cmd.MinRole)
+			require.False(t, cmd.Mutates)
+		case "comment-safety.dismiss", "comment-safety.remove", "comment-safety.reopen":
+			require.Equal(t, "moderator", cmd.MinRole)
+			require.True(t, cmd.Mutates)
+		}
+	}
 	require.Contains(t, names, "history.rollback")
 	require.NotContains(t, names, "promote")
 	require.NotContains(t, names, "backup")

@@ -26,15 +26,17 @@ func TestVisitorReadsStayPublicAndWritesSignIn(t *testing.T) {
 	cols := &stubCollections{}
 	tags := &auditTags{}
 	reports := &auditReports{}
+	safety := &auditCommentSafety{}
 	repo := newCommentRepo(publicCommentPost())
 	deps := Deps{
-		Board:       board,
-		Collections: cols,
-		Comments:    comments.NewService(repo),
-		Tags:        tags,
-		Reports:     reports,
-		Site:        &authSite{get: func(context.Context) (model.Site, error) { return model.Site{Name: "Kura"}, nil }},
-		Moderation:  &stubModeration{},
+		Board:         board,
+		Collections:   cols,
+		Comments:      comments.NewService(repo),
+		Tags:          tags,
+		Reports:       reports,
+		CommentSafety: safety,
+		Site:          &authSite{get: func(context.Context) (model.Site, error) { return model.Site{Name: "Kura"}, nil }},
+		Moderation:    &stubModeration{},
 	}
 
 	public := [][]string{
@@ -87,6 +89,11 @@ func TestVisitorReadsStayPublicAndWritesSignIn(t *testing.T) {
 		{"reports", "create", "p1", "--reason", "spam"},
 		{"reports", "list"},
 		{"reports", "dismiss", "r1"},
+		{"comment-safety", "list"},
+		{"comment-safety", "resolvers"},
+		{"comment-safety", "dismiss", "e1"},
+		{"comment-safety", "remove", "e1"},
+		{"comment-safety", "reopen", "e1"},
 		{"users", "list"},
 		{"users", "role", "ada", "member"},
 	}
@@ -100,6 +107,7 @@ func TestVisitorReadsStayPublicAndWritesSignIn(t *testing.T) {
 	}
 	require.False(t, tags.mutated)
 	require.False(t, reports.mutated)
+	require.False(t, safety.mutated)
 	require.False(t, cols.favCalled)
 	require.False(t, cols.addCalled)
 	require.Empty(t, repo.created)
@@ -164,4 +172,27 @@ func (a *auditReports) ListOpen(context.Context, model.User, int, int) (model.Po
 func (a *auditReports) Dismiss(context.Context, model.User, string) (model.PostReport, error) {
 	a.mutated = true
 	return model.PostReport{}, nil
+}
+
+type auditCommentSafety struct{ mutated bool }
+
+func (a *auditCommentSafety) List(context.Context, model.User, model.CommentSafetyFilter, int, int) (model.CommentSafetyPage, error) {
+	a.mutated = true
+	return model.CommentSafetyPage{}, nil
+}
+func (a *auditCommentSafety) Resolvers(context.Context, model.User) ([]model.CommentSafetyResolver, error) {
+	a.mutated = true
+	return nil, nil
+}
+func (a *auditCommentSafety) Dismiss(context.Context, model.User, string) (model.CommentSafetyEvent, error) {
+	a.mutated = true
+	return model.CommentSafetyEvent{}, nil
+}
+func (a *auditCommentSafety) Remove(context.Context, model.User, string) (model.CommentSafetyEvent, error) {
+	a.mutated = true
+	return model.CommentSafetyEvent{}, nil
+}
+func (a *auditCommentSafety) Reopen(context.Context, model.User, string) (model.CommentSafetyEvent, error) {
+	a.mutated = true
+	return model.CommentSafetyEvent{}, nil
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/board"
 	"github.com/astra-chanUwU/kura-v4/internal/collections"
 	"github.com/astra-chanUwU/kura-v4/internal/comments"
+	"github.com/astra-chanUwU/kura-v4/internal/commentsafety"
 	"github.com/astra-chanUwU/kura-v4/internal/config"
 	"github.com/astra-chanUwU/kura-v4/internal/dao"
 	"github.com/astra-chanUwU/kura-v4/internal/db"
@@ -49,7 +50,10 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	boardSvc := board.NewService(postsRepo, media)
 	boardSvc.SetJobQueue(jobQueue, log)
 	collectionsSvc := collections.NewService(repository.NewCollections(dao.NewCollections(conn)))
+	safetyRepo := repository.NewCommentSafety(dao.NewCommentSafety(conn))
 	commentsSvc := comments.NewService(repository.NewComments(dao.NewComments(conn)))
+	commentsSvc.SetSafety(safetyRepo)
+	commentSafetySvc := commentsafety.NewService(safetyRepo)
 	reportsSvc := reports.NewService(repository.NewReports(dao.NewReports(conn)))
 	searchesSvc := searches.NewService(repository.NewSavedSearches(dao.NewSavedSearches(conn)))
 	tagsSvc := tags.NewService(repository.NewTagPages(dao.NewTagPages(conn)))
@@ -63,7 +67,7 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	if err != nil {
 		return errors.New("site schema unavailable; run the migrate command before serve")
 	}
-	api := NewHTTP(HTTPDeps{Site: svc, Accounts: accountsSvc, Board: boardSvc, Collections: collectionsSvc, Moderation: moderationSvc, Jobs: jobsSvc, Comments: commentsSvc, Reports: reportsSvc, Searches: searchesSvc, Tags: tagsSvc, Notifications: notesSvc, Ping: conn.PingContext, Assets: webui.Files(), Log: log, SecureCookie: strings.HasPrefix(cfg.PublicURL, "https://")})
+	api := NewHTTP(HTTPDeps{Site: svc, Accounts: accountsSvc, Board: boardSvc, Collections: collectionsSvc, Moderation: moderationSvc, Jobs: jobsSvc, Comments: commentsSvc, Reports: reportsSvc, CommentSafety: commentSafetySvc, Searches: searchesSvc, Tags: tagsSvc, Notifications: notesSvc, Ping: conn.PingContext, Assets: webui.Files(), Log: log, SecureCookie: strings.HasPrefix(cfg.PublicURL, "https://")})
 	workerCtx, stopWorkers := context.WithCancel(ctx)
 	workerDone := make(chan struct{})
 	sweepDone := make(chan struct{})

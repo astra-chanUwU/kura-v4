@@ -2,6 +2,7 @@ package comments
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -239,4 +240,182 @@ func TestListInvisiblePostNotFound(t *testing.T) {
 	err = NewService(hidden).Delete(context.Background(), model.User{ID: "mod", Role: model.RoleModerator}, "c1")
 	require.ErrorIs(t, err, model.ErrNotFound)
 	require.Empty(t, hidden.deleted)
+}
+
+var errSafetyQueue = errors.New("safety queue unavailable")
+
+type fakeSafety struct {
+	drafts []model.CommentSafetyDraft
+	err    error
+}
+
+func (f *fakeSafety) Record(_ context.Context, draft model.CommentSafetyDraft) error {
+	f.drafts = append(f.drafts, draft)
+	return f.err
+}
+
+func TestPlainCommentStillCreates(t *testing.T) {
+	repo := &fakeRepo{access: publicPost()}
+	log := &fakeSafety{}
+	svc := NewService(repo)
+	svc.SetSafety(log)
+	got, err := svc.Create(context.Background(), member("mem"), "p1", "  hello  ")
+	require.NoError(t, err)
+	require.Equal(t, "hello", got.Body)
+	require.Equal(t, "hello", repo.comments[0].Body)
+	require.Empty(t, log.drafts)
+}
+
+func TestPhoneOrTelegramDoesNotPublish(t *testing.T) {
+	const message = "Comments can't include phone numbers or off-site contact details."
+	bodies := []string{"555-123-4567", "https://t.me/example_user"}
+	roles := []model.Role{model.RoleMember, model.RoleModerator, model.RoleAdmin, model.RoleSuperAdmin}
+	for _, role := range roles {
+		for _, body := range bodies {
+			repo := &fakeRepo{access: publicPost()}
+			log := &fakeSafety{}
+			svc := NewService(repo)
+			svc.SetSafety(log)
+			_, err := svc.Create(context.Background(), model.User{ID: "mem", Role: role}, "p1", "  "+body+"  ")
+			var vErr *ValidationError
+			require.ErrorAs(t, err, &vErr)
+			require.Equal(t, message, vErr.Message)
+			require.NotContains(t, err.Error(), "555")
+			require.NotContains(t, err.Error(), "t.me")
+			require.Empty(t, repo.comments)
+			require.Len(t, log.drafts, 1)
+			require.Equal(t, "blocked", log.drafts[0].Action)
+			require.Empty(t, log.drafts[0].CommentID)
+			require.Equal(t, "p1", log.drafts[0].PostID)
+			require.Equal(t, "mem", log.drafts[0].AuthorID)
+			require.Equal(t, body, log.drafts[0].Body)
+			if strings.Contains(body, "t.me") {
+				require.Contains(t, log.drafts[0].Categories, "telegram")
+			} else {
+				require.Contains(t, log.drafts[0].Categories, "phone")
+			}
+		}
+	}
+}
+
+func TestBlockWithoutSafetyLog(t *testing.T) {
+	repo := &fakeRepo{access: publicPost()}
+	_, err := NewService(repo).Create(context.Background(), member("mem"), "p1", "555-123-4567")
+	var vErr *ValidationError
+	require.ErrorAs(t, err, &vErr)
+	require.Equal(t, "Comments can't include phone numbers or off-site contact details.", vErr.Message)
+	require.Empty(t, repo.comments)
+}
+
+func TestFailingLogOnBlockStillRejects(t *testing.T) {
+	repo := &fakeRepo{access: publicPost()}
+	log := &fakeSafety{err: errSafetyQueue}
+	svc := NewService(repo)
+	svc.SetSafety(log)
+	_, err := svc.Create(context.Background(), member("mem"), "p1", "555-123-4567")
+	var vErr *ValidationError
+	require.ErrorAs(t, err, &vErr)
+	require.Equal(t, "Comments can't include phone numbers or off-site contact details.", vErr.Message)
+	require.NotErrorIs(t, err, errSafetyQueue)
+	require.Empty(t, repo.comments)
+	require.Equal(t, "blocked", log.drafts[0].Action)
+}
+
+func TestSolicitationOrEmailIsFlagged(t *testing.T) {
+	for _, body := range []string{"dm me", "ada@example.com"} {
+		repo := &fakeRepo{access: publicPost()}
+		log := &fakeSafety{}
+		svc := NewService(repo)
+		svc.SetSafety(log)
+		got, err := svc.Create(context.Background(), member("mem"), "p1", "  "+body+"  ")
+		require.NoError(t, err)
+		require.Equal(t, body, got.Body)
+		require.Equal(t, body, repo.comments[0].Body)
+		require.Len(t, log.drafts, 1)
+		require.Equal(t, "flagged", log.drafts[0].Action)
+		require.Equal(t, got.ID, log.drafts[0].CommentID)
+		require.Equal(t, "p1", log.drafts[0].PostID)
+		require.Equal(t, "mem", log.drafts[0].AuthorID)
+		require.Equal(t, body, log.drafts[0].Body)
+		if strings.Contains(body, "@") {
+			require.Contains(t, log.drafts[0].Categories, "email")
+		} else {
+			require.Contains(t, log.drafts[0].Categories, "solicitation")
+		}
+	}
+}
+
+func TestFlagWithoutSafetyLogStillPublishes(t *testing.T) {
+	repo := &fakeRepo{access: publicPost()}
+	got, err := NewService(repo).Create(context.Background(), member("mem"), "p1", "dm me")
+	require.NoError(t, err)
+	require.Equal(t, "dm me", got.Body)
+	require.Len(t, repo.comments, 1)
+	require.Empty(t, repo.deleted)
+}
+
+func TestFlaggedCreateRollsBackWhenLogFails(t *testing.T) {
+	repo := &fakeRepo{access: publicPost()}
+	log := &fakeSafety{err: errSafetyQueue}
+	svc := NewService(repo)
+	svc.SetSafety(log)
+	_, err := svc.Create(context.Background(), member("mem"), "p1", "dm me")
+	require.ErrorIs(t, err, errSafetyQueue)
+	require.Empty(t, repo.comments)
+	require.Equal(t, []string{"c-new"}, repo.deleted)
+	require.Equal(t, "flagged", log.drafts[0].Action)
+	require.Equal(t, "c-new", log.drafts[0].CommentID)
+}
+
+func TestUpdateIntoPhoneDoesNotChangeBody(t *testing.T) {
+	repo := seed(publicPost())
+	log := &fakeSafety{}
+	svc := NewService(repo)
+	svc.SetSafety(log)
+	_, err := svc.Update(context.Background(), member("author"), "c1", "  555-123-4567  ")
+	var vErr *ValidationError
+	require.ErrorAs(t, err, &vErr)
+	require.Equal(t, "Comments can't include phone numbers or off-site contact details.", vErr.Message)
+	require.NotContains(t, err.Error(), "555")
+	require.Zero(t, repo.updateCalls)
+	require.Equal(t, "hello", repo.comments[0].Body)
+	require.Len(t, log.drafts, 1)
+	require.Equal(t, "blocked", log.drafts[0].Action)
+	require.Equal(t, "c1", log.drafts[0].CommentID)
+	require.Equal(t, "p1", log.drafts[0].PostID)
+	require.Equal(t, "author", log.drafts[0].AuthorID)
+	require.Equal(t, "555-123-4567", log.drafts[0].Body)
+	require.Contains(t, log.drafts[0].Categories, "phone")
+}
+
+func TestUpdateIntoSolicitationFlags(t *testing.T) {
+	repo := seed(publicPost())
+	log := &fakeSafety{}
+	svc := NewService(repo)
+	svc.SetSafety(log)
+	got, err := svc.Update(context.Background(), member("author"), "c1", "  dm me  ")
+	require.NoError(t, err)
+	require.Equal(t, "dm me", got.Body)
+	require.Equal(t, "dm me", repo.comments[0].Body)
+	require.Equal(t, 1, repo.updateCalls)
+	require.Len(t, log.drafts, 1)
+	require.Equal(t, "flagged", log.drafts[0].Action)
+	require.Equal(t, "c1", log.drafts[0].CommentID)
+	require.Equal(t, "p1", log.drafts[0].PostID)
+	require.Equal(t, "author", log.drafts[0].AuthorID)
+	require.Equal(t, "dm me", log.drafts[0].Body)
+	require.Contains(t, log.drafts[0].Categories, "solicitation")
+}
+
+func TestFlaggedUpdateRestoresBodyWhenLogFails(t *testing.T) {
+	repo := seed(publicPost())
+	log := &fakeSafety{err: errSafetyQueue}
+	svc := NewService(repo)
+	svc.SetSafety(log)
+	_, err := svc.Update(context.Background(), member("author"), "c1", "dm me")
+	require.ErrorIs(t, err, errSafetyQueue)
+	require.Equal(t, "hello", repo.comments[0].Body)
+	require.Equal(t, 2, repo.updateCalls)
+	require.Equal(t, "flagged", log.drafts[0].Action)
+	require.Equal(t, "c1", log.drafts[0].CommentID)
 }

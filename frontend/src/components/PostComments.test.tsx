@@ -65,6 +65,11 @@ describe("PostComments", () => {
     renderComments();
     expect(await screen.findByText("No comments yet.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Comments" })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Don't share phone numbers, Telegram links, or other off-site contact details.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("renders a comment", async () => {

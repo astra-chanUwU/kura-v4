@@ -66,6 +66,10 @@ describe("StaffLayout", () => {
       "/admin/hidden",
     );
     expect(tabs.getByRole("link", { name: /History/ })).toHaveAttribute("href", "/admin/history");
+    expect(tabs.getByRole("link", { name: "Safety" })).toHaveAttribute(
+      "href",
+      "/admin/comment-safety",
+    );
     expect(screen.getByTestId("staff-outlet")).toBeInTheDocument();
   });
 

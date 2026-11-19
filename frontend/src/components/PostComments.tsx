@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { Comment } from "../types/comments";
 import { useCommentActions, useComments } from "../hooks/useComments";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { IconPencil, IconTrash } from "./icons";
 import styles from "./PostComments.module.css";
 import { shortError, useToasts } from "./Toasts";
 
@@ -91,6 +92,9 @@ export function PostComments({ postId }: { postId: string }) {
             aria-label="Write a comment"
             onChange={(e) => setDraft(e.target.value)}
           />
+          <p className={styles.muted}>
+            Don't share phone numbers, Telegram links, or other off-site contact details.
+          </p>
           <button
             type="submit"
             className={styles.primary}
@@ -157,6 +161,32 @@ function CommentRow({
         </Link>
         <time dateTime={comment.created_at}>{new Date(comment.created_at).toLocaleString()}</time>
         {comment.updated_at !== comment.created_at && <span className={styles.edited}>edited</span>}
+        {(comment.can_edit || comment.can_delete) && !editing && (
+          <div className={styles.rowActions}>
+            {comment.can_edit && (
+              <button
+                type="button"
+                className={styles.icon}
+                aria-label="Edit"
+                title="Edit"
+                onClick={onStartEdit}
+              >
+                <IconPencil />
+              </button>
+            )}
+            {comment.can_delete && (
+              <button
+                type="button"
+                className={styles.iconDanger}
+                aria-label="Delete"
+                title="Delete"
+                onClick={onDelete}
+              >
+                <IconTrash />
+              </button>
+            )}
+          </div>
+        )}
       </div>
       {editing ? (
         <form
@@ -189,20 +219,6 @@ function CommentRow({
         </form>
       ) : (
         <p className={styles.body}>{comment.body}</p>
-      )}
-      {(comment.can_edit || comment.can_delete) && !editing && (
-        <div className={styles.actions}>
-          {comment.can_edit && (
-            <button type="button" className={styles.button} onClick={onStartEdit}>
-              Edit
-            </button>
-          )}
-          {comment.can_delete && (
-            <button type="button" className={styles.danger} onClick={onDelete}>
-              Delete
-            </button>
-          )}
-        </div>
       )}
     </>
   );

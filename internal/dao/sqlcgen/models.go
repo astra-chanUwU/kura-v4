@@ -25,6 +25,29 @@ type ChangeHistory struct {
 	CreatedAt     time.Time
 }
 
+type CommentSafetyDecision struct {
+	ID            uuid.UUID
+	EventID       uuid.UUID
+	ActorID       uuid.NullUUID
+	ActorUsername string
+	Action        string
+	CreatedAt     time.Time
+}
+
+type CommentSafetyEvent struct {
+	ID         uuid.UUID
+	CommentID  uuid.NullUUID
+	PostID     uuid.UUID
+	AuthorID   uuid.UUID
+	Action     string
+	Categories []string
+	Body       string
+	Status     string
+	CreatedAt  time.Time
+	ResolvedAt sql.NullTime
+	ResolverID uuid.NullUUID
+}
+
 type Favorite struct {
 	UserID    uuid.UUID
 	PostID    uuid.UUID

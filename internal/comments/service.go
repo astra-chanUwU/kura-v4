@@ -6,10 +6,18 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/astra-chanUwU/kura-v4/internal/comments/gate"
 	"github.com/astra-chanUwU/kura-v4/internal/model"
 )
 
 const maxCommentRunes = 2000
+
+const contactDetailsMessage = "Comments can't include phone numbers or off-site contact details."
+
+const (
+	safetyActionBlocked = "blocked"
+	safetyActionFlagged = "flagged"
+)
 
 var ErrForbidden = errors.New("you don't have permission to do that")
 
@@ -27,9 +35,21 @@ type Repository interface {
 	DeleteComment(ctx context.Context, id string) (int64, error)
 }
 
-type Service struct{ repo Repository }
+// SafetyLog records a blocked or flagged comment for staff review.
+// Production wiring sets it. A nil log still blocks contact details.
+// Flagged and allowed comments then proceed without a queue row.
+type SafetyLog interface {
+	Record(ctx context.Context, draft model.CommentSafetyDraft) error
+}
+
+type Service struct {
+	repo   Repository
+	safety SafetyLog
+}
 
 func NewService(repo Repository) *Service { return &Service{repo: repo} }
+
+func (s *Service) SetSafety(log SafetyLog) { s.safety = log }
 
 func (s *Service) List(ctx context.Context, viewer *model.User, postID string, limit, offset int) (model.CommentPage, error) {
 	if err := s.visiblePost(ctx, viewer, postID); err != nil {
@@ -61,7 +81,38 @@ func (s *Service) Create(ctx context.Context, viewer model.User, postID, body st
 	if err != nil {
 		return model.Comment{}, err
 	}
-	return s.repo.CreateComment(ctx, postID, viewer.ID, body)
+	decision := gate.Evaluate(body)
+	switch decision.Action {
+	case gate.ActionBlock:
+		if s.safety != nil {
+			_ = s.safety.Record(ctx, model.CommentSafetyDraft{
+				PostID: postID, AuthorID: viewer.ID, Action: safetyActionBlocked,
+				Categories: decision.Categories, Body: body,
+			})
+		}
+		return model.Comment{}, contactBlocked()
+	case gate.ActionFlag:
+		created, err := s.repo.CreateComment(ctx, postID, viewer.ID, body)
+		if err != nil {
+			return model.Comment{}, err
+		}
+		if s.safety == nil {
+			return created, nil
+		}
+		recErr := s.safety.Record(ctx, model.CommentSafetyDraft{
+			CommentID: created.ID, PostID: postID, AuthorID: viewer.ID, Action: safetyActionFlagged,
+			Categories: decision.Categories, Body: body,
+		})
+		if recErr != nil {
+			if _, delErr := s.repo.DeleteComment(ctx, created.ID); delErr != nil {
+				return model.Comment{}, errors.Join(recErr, delErr)
+			}
+			return model.Comment{}, recErr
+		}
+		return created, nil
+	default:
+		return s.repo.CreateComment(ctx, postID, viewer.ID, body)
+	}
 }
 
 func (s *Service) Update(ctx context.Context, viewer model.User, commentID, body string) (model.Comment, error) {
@@ -76,7 +127,38 @@ func (s *Service) Update(ctx context.Context, viewer model.User, commentID, body
 	if err != nil {
 		return model.Comment{}, err
 	}
-	return s.repo.UpdateCommentBody(ctx, commentID, body)
+	decision := gate.Evaluate(body)
+	switch decision.Action {
+	case gate.ActionBlock:
+		if s.safety != nil {
+			_ = s.safety.Record(ctx, model.CommentSafetyDraft{
+				CommentID: current.ID, PostID: current.PostID, AuthorID: current.AuthorID,
+				Action: safetyActionBlocked, Categories: decision.Categories, Body: body,
+			})
+		}
+		return model.Comment{}, contactBlocked()
+	case gate.ActionFlag:
+		updated, err := s.repo.UpdateCommentBody(ctx, commentID, body)
+		if err != nil {
+			return model.Comment{}, err
+		}
+		if s.safety == nil {
+			return updated, nil
+		}
+		recErr := s.safety.Record(ctx, model.CommentSafetyDraft{
+			CommentID: current.ID, PostID: current.PostID, AuthorID: current.AuthorID,
+			Action: safetyActionFlagged, Categories: decision.Categories, Body: body,
+		})
+		if recErr != nil {
+			if _, restoreErr := s.repo.UpdateCommentBody(ctx, commentID, current.Body); restoreErr != nil {
+				return model.Comment{}, errors.Join(recErr, restoreErr)
+			}
+			return model.Comment{}, recErr
+		}
+		return updated, nil
+	default:
+		return s.repo.UpdateCommentBody(ctx, commentID, body)
+	}
 }
 
 func (s *Service) Delete(ctx context.Context, viewer model.User, commentID string) error {
@@ -140,6 +222,10 @@ func canSeePost(viewer *model.User, post model.CommentPostAccess) bool {
 
 func seesNSFW(viewer *model.User) bool {
 	return viewer != nil && viewer.ID != "" && viewer.ShowNSFW
+}
+
+func contactBlocked() error {
+	return &ValidationError{Message: contactDetailsMessage}
 }
 
 func normalizeBody(body string) (string, error) {

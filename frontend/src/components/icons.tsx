@@ -188,6 +188,15 @@ export function IconTrash() {
   );
 }
 
+export function IconPencil() {
+  return (
+    <Base>
+      <path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+      <path d="m13.2 6.8 3.8 3.8" />
+    </Base>
+  );
+}
+
 export function IconUndo() {
   return (
     <Base>

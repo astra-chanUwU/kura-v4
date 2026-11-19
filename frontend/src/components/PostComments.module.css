@@ -54,6 +54,12 @@
   font-size: 0.85rem;
 }
 
+.rowActions {
+  display: flex;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
 .meta a {
   color: var(--accent);
   font-weight: 650;
@@ -103,8 +109,7 @@
 }
 
 .button,
-.primary,
-.danger {
+.primary {
   padding: 0.45rem 0.8rem;
   border: 1px solid var(--border);
   border-radius: 0.4rem;
@@ -120,10 +125,40 @@
   border-color: var(--accent);
 }
 
-.danger {
-  color: var(--danger);
-  border-color: var(--danger);
+.icon,
+.iconDanger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
   background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.iconDanger {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+  color: var(--danger);
+}
+
+.iconDanger:hover {
+  background: color-mix(in srgb, var(--danger) 16%, var(--surface));
+  color: var(--danger);
+}
+
+.icon:focus-visible,
+.iconDanger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .button:disabled,

@@ -14,6 +14,7 @@ import (
 	"github.com/astra-chanUwU/kura-v4/internal/board"
 	"github.com/astra-chanUwU/kura-v4/internal/collections"
 	"github.com/astra-chanUwU/kura-v4/internal/comments"
+	"github.com/astra-chanUwU/kura-v4/internal/commentsafety"
 	"github.com/astra-chanUwU/kura-v4/internal/config"
 	"github.com/astra-chanUwU/kura-v4/internal/dao"
 	"github.com/astra-chanUwU/kura-v4/internal/db"
@@ -52,7 +53,10 @@ func Agent(ctx context.Context, cfg config.Config, args []string, out io.Writer)
 	boardSvc := board.NewService(postsRepo, media)
 	boardSvc.SetJobQueue(repository.NewJobs(dao.NewJobs(conn)), slog.Default())
 	collectionsSvc := collections.NewService(repository.NewCollections(dao.NewCollections(conn)))
+	safetyRepo := repository.NewCommentSafety(dao.NewCommentSafety(conn))
 	commentsSvc := comments.NewService(repository.NewComments(dao.NewComments(conn)))
+	commentsSvc.SetSafety(safetyRepo)
+	commentSafetySvc := commentsafety.NewService(safetyRepo)
 	tagsSvc := tags.NewService(repository.NewTagPages(dao.NewTagPages(conn)))
 	reportsSvc := reports.NewService(repository.NewReports(dao.NewReports(conn)))
 	moderationSvc := moderation.NewService(repository.NewModeration(dao.NewAccounts(conn), postsRepo, dao.NewAudit(conn)))
@@ -64,14 +68,15 @@ func Agent(ctx context.Context, cfg config.Config, args []string, out io.Writer)
 		return failAgent(out, fmt.Errorf("site schema unavailable; run the migrate command before using the agent CLI: %w", err))
 	}
 	return agentcli.Execute(ctx, agentcli.Deps{
-		Accounts:    accountsSvc,
-		Board:       boardSvc,
-		Collections: collectionsSvc,
-		Comments:    commentsSvc,
-		Moderation:  moderationSvc,
-		Site:        svc,
-		Tags:        tagsSvc,
-		Reports:     reportsSvc,
+		Accounts:      accountsSvc,
+		Board:         boardSvc,
+		Collections:   collectionsSvc,
+		Comments:      commentsSvc,
+		Moderation:    moderationSvc,
+		Site:          svc,
+		Tags:          tagsSvc,
+		Reports:       reportsSvc,
+		CommentSafety: commentSafetySvc,
 	}, args, out, agentcli.Options{})
 }
 

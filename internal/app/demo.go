@@ -197,10 +197,13 @@ func Demo(ctx context.Context, cfg config.Config, dirs []string, log *slog.Logge
 	postsRepo := repository.NewPosts(dao.NewPosts(conn))
 	boardSvc := board.NewService(postsRepo, store)
 	boardSvc.SetJobQueue(repository.NewJobs(dao.NewJobs(conn)), log)
+	safetyRepo := repository.NewCommentSafety(dao.NewCommentSafety(conn))
+	commentsSvc := comments.NewService(repository.NewComments(dao.NewComments(conn)))
+	commentsSvc.SetSafety(safetyRepo)
 	env := &demoEnv{
 		log: log, accounts: accountsSvc, board: boardSvc,
 		collections: collections.NewService(repository.NewCollections(dao.NewCollections(conn))),
-		comments:    comments.NewService(repository.NewComments(dao.NewComments(conn))),
+		comments:    commentsSvc,
 		notes:       notifications.NewService(repository.NewNotifications(dao.NewNotifications(conn))),
 		tags:        tags.NewService(repository.NewTagPages(dao.NewTagPages(conn))),
 		roleRepo:    repository.NewModeration(accountsDAO, postsRepo, dao.NewAudit(conn)),
